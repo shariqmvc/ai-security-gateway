@@ -1,11 +1,9 @@
 package com.ai.gateway.dto;
 
+import com.ai.gateway.constants.PIIType;
 import lombok.*;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Value
 @Builder
 public class DetectedPII {
 
@@ -24,6 +22,6 @@ public class DetectedPII {
      * PHONE
      * CREDIT_CARD
      */
-    private String piiType;
+    private PIIType piiType;
 
 }
