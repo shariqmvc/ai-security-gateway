@@ -7,34 +7,39 @@ import com.ai.gateway.service.TokenVaultService;
 import com.ai.gateway.util.EncryptionUtil;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TokenVaultServiceImpl implements TokenVaultService
 {
     private final TokenVaultRepository repository;
-
+    private final EncryptionUtil encryptionUtil;
 
     @Override
 public void save(UUID requestId, List<DetectedPII> detectedValues) {
 
+        List<TokenVault> entities = new ArrayList<>();
 
-    for (DetectedPII pii : detectedValues) {
+        for (DetectedPII pii : detectedValues) {
 
-        TokenVault entity = TokenVault.builder()
-                .requestUuid(requestId)
-                .token(pii.getToken())
-                .encryptedValue(
-                        EncryptionUtil.encrypt(
-                                pii.getOriginalValue()))
-                .piiType(pii.getPiiType())
-                .build();
+            entities.add(
+                    TokenVault.builder()
+                            .requestUuid(requestId)
+                            .token(pii.getToken())
+                            .encryptedValue(
+                                    encryptionUtil.encrypt(pii.getOriginalValue()))
+                            .piiType(pii.getPiiType())
+                            .build());
+        }
 
-        repository.save(entity);
-    }
+        repository.saveAll(entities);
 }
 
 public List<TokenVault> getTokens(UUID requestId) {

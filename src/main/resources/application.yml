@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   datasource:
@@ -11,13 +11,30 @@ spring:
     hibernate:
       ddl-auto: update
 
+    show-sql: true
+
     properties:
       hibernate:
         format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
 
-    show-sql: true
+logging:
+  pattern:
+    console: "%d %-5level [%X{requestId}] %logger - %msg%n"
+
+  level:
+    org.hibernate.SQL: DEBUG
 
 openai:
-  api-key: YOUR_API_KEY
+  api-key: ${OPENAI_API_KEY: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}
   model: gpt-5
   url: https://api.openai.com/v1/responses
+  connect-timeout: 5s
+  read-timeout: 60s
+
+security:
+  encryption:
+    aes-key: ${AES_KEY:12345656778}

@@ -1,6 +1,6 @@
 package com.ai.gateway.entity;
 
-import com.ai.gateway.constants.PIIType;
+import com.ai.gateway.enums.PIIType;
 import jakarta.persistence.*;
 import lombok.*;
 

@@ -1,35 +1,35 @@
 package com.ai.gateway.util;
 
 import lombok.experimental.UtilityClass;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-@UtilityClass
+@Component
 public class EncryptionUtil {
 
-    /**
-     * Replace with externalized configuration later.
-     * Must be exactly 32 bytes for AES-256.
-     */
-    private static final String SECRET =
-            "12345678901234567890123456789012";
+    private final SecretKeySpec secretKey;
 
-    private static final SecretKeySpec KEY =
-            new SecretKeySpec(
-                    SECRET.getBytes(StandardCharsets.UTF_8),
-                    "AES"
-            );
+    public EncryptionUtil(
+            @Value("${security.encryption.aes-key}")
+            String key) {
 
-    public static String encrypt(String value) {
+        this.secretKey = new SecretKeySpec(
+                key.getBytes(StandardCharsets.UTF_8),
+                "AES");
+    }
+
+    public String encrypt(String value) {
 
         try {
 
             Cipher cipher = Cipher.getInstance("AES");
 
-            cipher.init(Cipher.ENCRYPT_MODE, KEY);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
 
             byte[] encrypted = cipher.doFinal(
                     value.getBytes(StandardCharsets.UTF_8));
@@ -40,16 +40,15 @@ public class EncryptionUtil {
 
             throw new RuntimeException("Encryption failed", ex);
         }
-
     }
 
-    public static String decrypt(String encryptedValue) {
+    public String decrypt(String encryptedValue) {
 
         try {
 
             Cipher cipher = Cipher.getInstance("AES");
 
-            cipher.init(Cipher.DECRYPT_MODE, KEY);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey);
 
             byte[] decrypted = cipher.doFinal(
                     Base64.getDecoder().decode(encryptedValue));
@@ -60,6 +59,5 @@ public class EncryptionUtil {
 
             throw new RuntimeException("Decryption failed", ex);
         }
-
     }
 }

@@ -1,4 +1,4 @@
-package com.ai.gateway.constants;
+package com.ai.gateway.enums;
 
 public enum PIIType {
     EMAIL,

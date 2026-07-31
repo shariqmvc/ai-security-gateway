@@ -1,6 +1,7 @@
 package com.ai.gateway.entity;
 
-import com.ai.gateway.constants.RequestStatus;
+import com.ai.gateway.enums.AuditStatus;
+import com.ai.gateway.enums.RequestStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,7 +42,7 @@ public class RequestAudit {
     private String provider;
 
     @Enumerated(EnumType.STRING)
-    private RequestStatus status;
+    private AuditStatus status;
 
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;

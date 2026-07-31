@@ -1,10 +1,9 @@
 package com.ai.gateway.util;
 
-import com.ai.gateway.constants.PIIType;
+import com.ai.gateway.enums.PIIType;
 
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class TokenGenerator {
 

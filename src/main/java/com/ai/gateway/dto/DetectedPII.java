@@ -1,6 +1,6 @@
 package com.ai.gateway.dto;
 
-import com.ai.gateway.constants.PIIType;
+import com.ai.gateway.enums.PIIType;
 import lombok.*;
 
 @Value

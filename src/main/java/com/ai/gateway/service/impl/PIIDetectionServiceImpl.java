@@ -1,84 +1,84 @@
 package com.ai.gateway.service.impl;
 
-import com.ai.gateway.constants.PIIType;
+import com.ai.gateway.enums.PIIType;
 import com.ai.gateway.dto.DetectedPII;
 import com.ai.gateway.dto.MaskingResult;
 import com.ai.gateway.service.PIIDetectionService;
 import com.ai.gateway.util.RegexUtil;
 import com.ai.gateway.util.TokenGenerator;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+@Slf4j
 @Service
 public class PIIDetectionServiceImpl implements PIIDetectionService {
     public MaskingResult mask(String prompt) {
 
-        TokenGenerator generator = new TokenGenerator();
+        TokenGenerator tokenGenerator = new TokenGenerator();
+
         List<DetectedPII> detectedValues = new ArrayList<>();
 
-        String maskedPrompt = prompt;
+        String masked = prompt;
 
-        maskedPrompt = maskPattern(
-                maskedPrompt,
+        masked = mask(masked,
                 RegexUtil.EMAIL_PATTERN,
                 PIIType.EMAIL,
-                detectedValues,
-                generator);
+                tokenGenerator,
+                detectedValues);
 
-        maskedPrompt = maskPattern(
-                maskedPrompt,
+        masked = mask(masked,
                 RegexUtil.PHONE_PATTERN,
                 PIIType.PHONE,
-                detectedValues,
-                generator);
+                tokenGenerator,
+                detectedValues);
 
-        maskedPrompt = maskPattern(
-                maskedPrompt,
+        masked = mask(masked,
                 RegexUtil.CREDIT_CARD_PATTERN,
                 PIIType.CREDIT_CARD,
-                detectedValues,
-                generator);
+                tokenGenerator,
+                detectedValues);
 
         return MaskingResult.builder()
-                .maskedPrompt(maskedPrompt)
+                .maskedPrompt(masked)
                 .detectedValues(detectedValues)
                 .build();
     }
 
-    private String maskPattern(String text,
-                               Pattern pattern,
-                               PIIType piiType,
-                               List<DetectedPII> detectedValues,
-                               TokenGenerator generator) {
+    private String mask(String input,
+                        Pattern pattern,
+                        PIIType piiType,
+                        TokenGenerator tokenGenerator,
+                        List<DetectedPII> detectedValues) {
 
-        Matcher matcher = pattern.matcher(text);
-        StringBuffer sb = new StringBuffer();
+        Matcher matcher = pattern.matcher(input);
+
+        StringBuffer buffer = new StringBuffer();
 
         while (matcher.find()) {
 
-            String value = matcher.group();
-            String token = generator.nextToken(piiType);
+            String original = matcher.group();
+
+            String token = tokenGenerator.nextToken(piiType);
 
             detectedValues.add(
                     DetectedPII.builder()
-                            .originalValue(value)
+                            .originalValue(original)
                             .token(token)
                             .piiType(piiType)
-                            .build()
-            );
+                            .build());
 
             matcher.appendReplacement(
-                    sb,
-                    Matcher.quoteReplacement(token)
-            );
+                    buffer,
+                    Matcher.quoteReplacement(token));
         }
 
-        matcher.appendTail(sb);
+        matcher.appendTail(buffer);
 
-        return sb.toString();
+        return buffer.toString();
     }
+
 }
