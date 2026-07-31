@@ -1,9 +1,12 @@
 package com.ai.gateway.service.impl;
 
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.dto.ChatResponse;
-import com.ai.gateway.dto.MaskingResult;
+import com.ai.gateway.config.GeminiConfig;
+import com.ai.gateway.config.OpenAIConfig;
+import com.ai.gateway.dto.*;
 import com.ai.gateway.enums.AuditStatus;
+import com.ai.gateway.enums.Provider;
+import com.ai.gateway.provider.AIProvider;
+import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,86 +18,85 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class GatewayServiceImpl implements GatewayService {
-        private final PIIDetectionService piiDetectionService;
-        private final TokenVaultService tokenVaultService;
-        private final RestoreService restoreService;
-        private final AiProvider aiProvider;
-        private final AuditService auditService;
+    private final PIIDetectionService piiDetectionService;
+    private final TokenVaultService tokenVaultService;
+    private final RestoreService restoreService;
+    //   private final AiProvider aiProvider;
+    private final AuditService auditService;
+    private final AIProviderFactory providerFactory;
+    private final OpenAIConfig openAIConfig;
+    private final GeminiConfig geminiConfig;
 
     @Override
     public ChatResponse process(ChatRequest request) {
         UUID requestId = UUID.randomUUID();
-        log.info(
-                "AI request started. requestId={}, provider={}, model={}",
-                requestId,
-                "OPENAI",
-                "gpt-5");
-
         long start = System.currentTimeMillis();
-        long latency = 0l;
+
         MaskingResult maskingResult = null;
-        String restored = null;
+        AIRequest aiRequest = null;
 
-      try {
-          maskingResult =
-                  piiDetectionService.mask(request.getPrompt());
+        try {
 
-          log.debug(
-                  "Request masked. requestId={}, piiDetected={}, maskedPrompt={}",
-                  requestId,
-                  maskingResult.getDetectedValues().size(),
-                  maskingResult.getMaskedPrompt());
+            maskingResult = piiDetectionService.mask(request.getPrompt());
 
-          tokenVaultService.save(
-                  requestId,
-                  maskingResult.getDetectedValues());
+            tokenVaultService.save(
+                    requestId,
+                    maskingResult.getDetectedValues());
 
-          String llmResponse =
-                  aiProvider.chat(maskingResult.getMaskedPrompt());
+            String model = switch (request.getProvider()) {
 
-          log.info("LLM Response = {}", llmResponse);
+                case OPENAI -> openAIConfig.getModel();
 
-          restored =
-                  restoreService.restore(
-                          llmResponse,
-                          requestId);
-          log.info("Restored Response = {}", restored);
+                case GEMINI -> geminiConfig.getModel();
 
-          latency = System.currentTimeMillis() - start;
-          auditService.save(
-                  requestId,
-                  maskingResult.getMaskedPrompt(),
-                  llmResponse,
-                  latency,
-                  "gpt-5",
-                  "OPENAI",
-                  AuditStatus.SUCCESS
-          );
-          log.info(
-                  "AI request completed. requestId={}, latency={} ms",
-                  requestId,
-                  latency);
-      }catch (Exception exc) {
+                default -> throw new IllegalArgumentException("Unsupported provider");
+            };
 
-          log.error("Gateway processing failed", exc);
+            aiRequest = AIRequest.builder()
+                    .provider(request.getProvider())
+                    .model(model)
+                    .prompt(maskingResult.getMaskedPrompt())
+                    .build();
 
-          auditService.save(
-                  requestId,
-                  maskingResult != null ? maskingResult.getMaskedPrompt() : null,
-                  null,
-                  System.currentTimeMillis() - start,
-                  "gpt-5",
-                  "OPENAI",
-                  AuditStatus.FAILED
-          );
+            AIResponse aiResponse =
+                    providerFactory
+                            .getProvider(aiRequest.getProvider())
+                            .chat(aiRequest);
 
-          throw exc;
-      }
+            String restored =
+                    restoreService.restore(
+                            aiResponse.getResponse(),
+                            requestId);
 
-        return ChatResponse.builder()
-                .requestId(requestId)
-                .response(restored)
-                .build();
+            long latency = System.currentTimeMillis() - start;
+
+            auditService.save(
+                    requestId,
+                    maskingResult.getMaskedPrompt(),
+                    aiResponse.getResponse(),
+                    latency,
+                    aiRequest.getModel(),
+                    aiRequest.getProvider().name(),
+                    AuditStatus.SUCCESS);
+
+            return ChatResponse.builder()
+                    .requestId(requestId)
+                    .response(restored)
+                    .build();
+
+        } catch (Exception ex) {
+
+            auditService.save(
+                    requestId,
+                    maskingResult != null ? maskingResult.getMaskedPrompt() : null,
+                    null,
+                    System.currentTimeMillis() - start,
+                    aiRequest != null ? aiRequest.getModel() : null,
+                    aiRequest != null ? aiRequest.getProvider().name() : null,
+                    AuditStatus.FAILED);
+
+            throw ex;
+        }
     }
-    }
+}
 

@@ -35,6 +35,15 @@ openai:
   connect-timeout: 5s
   read-timeout: 60s
 
+gemini:
+  api:
+    key: AQ.Ab8RN6Lb69fHm67Hj-NXCwYU06D-SoQxsXE68mB4WAM5PpMzcg
+
+  base:
+    url: https://generativelanguage.googleapis.com
+
+  model: gemini-3.1-pro-preview
+
 security:
   encryption:
     aes-key: ${AES_KEY:12345656778}
