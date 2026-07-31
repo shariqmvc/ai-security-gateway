@@ -11,20 +11,37 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class PIIDetectionServiceImpl implements PIIDetectionService {
     public MaskingResult mask(String prompt) {
 
-        TokenGenerator tokenGenerator = new TokenGenerator();
-
+        TokenGenerator generator = new TokenGenerator();
         List<DetectedPII> detectedValues = new ArrayList<>();
 
         String maskedPrompt = prompt;
 
-        maskedPrompt = maskEmails(maskedPrompt, detectedValues, tokenGenerator);
-        maskedPrompt = maskPhones(maskedPrompt, detectedValues, tokenGenerator);
-        maskedPrompt = maskCards(maskedPrompt, detectedValues, tokenGenerator);
+        maskedPrompt = maskPattern(
+                maskedPrompt,
+                RegexUtil.EMAIL_PATTERN,
+                PIIType.EMAIL,
+                detectedValues,
+                generator);
+
+        maskedPrompt = maskPattern(
+                maskedPrompt,
+                RegexUtil.PHONE_PATTERN,
+                PIIType.PHONE,
+                detectedValues,
+                generator);
+
+        maskedPrompt = maskPattern(
+                maskedPrompt,
+                RegexUtil.CREDIT_CARD_PATTERN,
+                PIIType.CREDIT_CARD,
+                detectedValues,
+                generator);
 
         return MaskingResult.builder()
                 .maskedPrompt(maskedPrompt)
@@ -32,81 +49,36 @@ public class PIIDetectionServiceImpl implements PIIDetectionService {
                 .build();
     }
 
-    private String maskEmails(String text,
-                              List<DetectedPII> detectedValues,
-                              TokenGenerator generator) {
+    private String maskPattern(String text,
+                               Pattern pattern,
+                               PIIType piiType,
+                               List<DetectedPII> detectedValues,
+                               TokenGenerator generator) {
 
-        Matcher matcher = RegexUtil.EMAIL_PATTERN.matcher(text);
+        Matcher matcher = pattern.matcher(text);
+        StringBuffer sb = new StringBuffer();
 
         while (matcher.find()) {
 
             String value = matcher.group();
-
-            String token = generator.nextToken(PIIType.EMAIL);
+            String token = generator.nextToken(piiType);
 
             detectedValues.add(
                     DetectedPII.builder()
                             .originalValue(value)
                             .token(token)
-                            .piiType(PIIType.EMAIL)
+                            .piiType(piiType)
                             .build()
             );
 
-            text = text.replace(value, token);
-        }
-
-        return text;
-    }
-
-    private String maskPhones(String text,
-                              List<DetectedPII> detectedValues,
-                              TokenGenerator generator) {
-
-        Matcher matcher = RegexUtil.PHONE_PATTERN.matcher(text);
-
-        while (matcher.find()) {
-
-            String value = matcher.group();
-
-            String token = generator.nextToken(PIIType.PHONE);
-
-            detectedValues.add(
-                    DetectedPII.builder()
-                            .originalValue(value)
-                            .token(token)
-                            .piiType(PIIType.PHONE)
-                            .build()
+            matcher.appendReplacement(
+                    sb,
+                    Matcher.quoteReplacement(token)
             );
-
-            text = text.replace(value, token);
         }
 
-        return text;
-    }
+        matcher.appendTail(sb);
 
-    private String maskCards(String text,
-                             List<DetectedPII> detectedValues,
-                             TokenGenerator generator) {
-
-        Matcher matcher = RegexUtil.CREDIT_CARD_PATTERN.matcher(text);
-
-        while (matcher.find()) {
-
-            String value = matcher.group();
-
-            String token = generator.nextToken(PIIType.CREDIT_CARD);
-
-            detectedValues.add(
-                    DetectedPII.builder()
-                            .originalValue(value)
-                            .token(token)
-                            .piiType(PIIType.CREDIT_CARD)
-                            .build()
-            );
-
-            text = text.replace(value, token);
-        }
-
-        return text;
+        return sb.toString();
     }
 }

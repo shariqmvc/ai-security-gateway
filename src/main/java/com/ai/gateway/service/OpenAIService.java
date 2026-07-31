@@ -1,4 +1,6 @@
 package com.ai.gateway.service;
 
-public class OpenAIService {
+public interface OpenAIService {
+
+    String ask(String maskedPrompt);
 }

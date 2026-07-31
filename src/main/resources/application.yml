@@ -1,8 +1,23 @@
+server:
+  port: 8080
+
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/aigateway
+    url: jdbc:postgresql://localhost:5432/ai_gateway
     username: postgres
-    password: postgres
+    password: shariq
+
   jpa:
     hibernate:
       ddl-auto: update
+
+    properties:
+      hibernate:
+        format_sql: true
+
+    show-sql: true
+
+openai:
+  api-key: YOUR_API_KEY
+  model: gpt-5
+  url: https://api.openai.com/v1/responses

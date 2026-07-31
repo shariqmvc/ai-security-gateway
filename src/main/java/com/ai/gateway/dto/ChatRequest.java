@@ -3,6 +3,7 @@ package com.ai.gateway.dto;
 import lombok.*;
 
 @Setter
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
