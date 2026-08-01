@@ -1,0 +1,38 @@
+policy:
+
+  code-generation:
+    enabled: true
+    patterns:
+      - write java
+      - generate code
+      - spring boot
+      - python code
+      - javascript
+      - sql query
+      - c++
+      - c#
+      - golang
+      - kotlin
+      - create api
+      - write program
+      - generate source code
+
+  pii-access:
+    enabled: true
+    patterns:
+      - show ssn
+      - reveal aadhar
+      - reveal pan
+      - reveal credit card
+
+  financial-advice:
+    enabled: false
+    patterns:
+      - investment advice
+      - stock recommendation
+
+  medical-advice:
+    enabled: false
+    patterns:
+      - prescribe medicine
+      - diagnose disease

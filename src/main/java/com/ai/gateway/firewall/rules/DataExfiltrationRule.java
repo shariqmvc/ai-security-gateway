@@ -2,62 +2,46 @@ package com.ai.gateway.firewall.rules;
 
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
+import com.ai.gateway.firewall.config.FirewallProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class DataExfiltrationRule implements PromptRule {
 
-    private static final List<String> PATTERNS = List.of(
-
-            "dump database",
-            "dump all records",
-            "customer data",
-            "employee data",
-            "confidential",
-            "internal document",
-            "private document",
-            "export all data",
-            "show passwords",
-            "show api keys",
-            "credit card",
-            "social security number",
-            "ssn",
-            "reveal memory",
-            "list all users"
-
-    );
-
-    @Override
-    public String name() {
-        return "";
-    }
-
-    @Override
-    public int priority() {
-        return 0;
-    }
+    private final FirewallProperties properties;
 
     @Override
     public FirewallResult evaluate(String prompt) {
 
         String lower = prompt.toLowerCase();
 
-        for (String pattern : PATTERNS) {
+        for (String pattern : properties.getDataExfiltration()) {
 
-            if (lower.contains(pattern)) {
+            if (lower.contains(pattern.toLowerCase())) {
 
                 return FirewallResult.builder()
                         .allowed(false)
                         .reason("Possible data exfiltration attempt detected.")
                         .build();
-
             }
         }
 
         return FirewallResult.builder()
                 .allowed(true)
                 .build();
+    }
+
+    @Override
+    public String name() {
+        return "Data Exfiltration Rule";
+    }
+
+    @Override
+    public int priority() {
+        return 150;
     }
 }

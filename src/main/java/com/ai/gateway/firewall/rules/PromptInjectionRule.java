@@ -2,26 +2,16 @@ package com.ai.gateway.firewall.rules;
 
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
+import com.ai.gateway.firewall.config.FirewallProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class PromptInjectionRule implements PromptRule {
-    private static final List<String> PATTERNS = List.of(
-
-            "ignore previous instructions",
-            "ignore all previous instructions",
-            "forget previous instructions",
-            "disregard previous instructions",
-            "ignore system prompt",
-            "ignore safety instructions",
-            "bypass restrictions",
-            "override instructions",
-            "act without limitations",
-            "disable safety"
-
-    );
+    private final FirewallProperties properties;
 
     @Override
     public String name() {
@@ -38,15 +28,14 @@ public class PromptInjectionRule implements PromptRule {
 
         String lower = prompt.toLowerCase();
 
-        for (String pattern : PATTERNS) {
+        for (String pattern : properties.getPromptInjection()) {
 
-            if (lower.contains(pattern)) {
+            if (lower.contains(pattern.toLowerCase())) {
 
                 return FirewallResult.builder()
                         .allowed(false)
-                        .reason("Prompt Injection Detected")
+                        .reason("Prompt injection detected.")
                         .build();
-
             }
         }
 

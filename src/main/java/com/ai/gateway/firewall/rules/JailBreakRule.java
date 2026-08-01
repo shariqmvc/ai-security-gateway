@@ -2,10 +2,14 @@ package com.ai.gateway.firewall.rules;
 
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
+import com.ai.gateway.firewall.config.FirewallProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class JailBreakRule implements PromptRule {
+    private final FirewallProperties properties;
 
     @Override
     public String name() {
@@ -22,14 +26,16 @@ public class JailBreakRule implements PromptRule {
 
         String lower = prompt.toLowerCase();
 
-        if (lower.contains("ignore previous instructions")) {
+        for (String pattern : properties.getJailbreak()) {
 
-            return FirewallResult.builder()
-                    .allowed(false)
-                    .reason("Prompt injection detected.")
-                    .build();
+            if (lower.contains(pattern.toLowerCase())) {
+
+                return FirewallResult.builder()
+                        .allowed(false)
+                        .reason("Jailbreak attempt detected.")
+                        .build();
+            }
         }
-
         return FirewallResult.builder()
                 .allowed(true)
                 .build();

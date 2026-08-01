@@ -8,6 +8,8 @@ import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.service.PromptFireWallService;
+import com.ai.gateway.policy.PolicyResult;
+import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.service.*;
@@ -30,9 +32,11 @@ public class GatewayServiceImpl implements GatewayService {
     private final OpenAIConfig openAIConfig;
     private final GeminiConfig geminiConfig;
     private final PromptFireWallService firewallService;
+    private final PolicyEngineService policyEngineService;
 
     @Override
     public ChatResponse process(ChatRequest request) {
+
 
         UUID requestId = UUID.randomUUID();
         long start = System.currentTimeMillis();
@@ -50,6 +54,13 @@ public class GatewayServiceImpl implements GatewayService {
 
             if (!firewall.isAllowed()) {
                 throw new BusinessException(firewall.getReason());
+            }
+
+            PolicyResult policy =
+                    policyEngineService.evaluate(request.getPrompt());
+
+            if (!policy.isAllowed()) {
+                throw new BusinessException(policy.getReason());
             }
 
             // Step 2 : Mask PII

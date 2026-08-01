@@ -2,36 +2,27 @@ package com.ai.gateway.firewall.rules;
 
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
+import com.ai.gateway.firewall.config.FirewallProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Component
+@RequiredArgsConstructor
 public class SystemPromptRule implements PromptRule {
 
-    private static final List<String> PATTERNS = List.of(
-
-            "system prompt",
-            "hidden prompt",
-            "initial instructions",
-            "developer instructions",
-            "show system prompt",
-            "reveal system prompt",
-            "display system prompt",
-            "internal prompt",
-            "prompt template",
-            "hidden instructions"
-
-    );
+    private final FirewallProperties properties;
 
     @Override
     public String name() {
-        return "";
+        return "System Prompt Rule";
     }
 
     @Override
     public int priority() {
-        return 0;
+        return 100;
     }
 
     @Override
@@ -39,15 +30,14 @@ public class SystemPromptRule implements PromptRule {
 
         String lower = prompt.toLowerCase();
 
-        for (String pattern : PATTERNS) {
+        for (String pattern : properties.getSystemPrompt()) {
 
-            if (lower.contains(pattern)) {
+            if (lower.contains(pattern.toLowerCase())) {
 
                 return FirewallResult.builder()
                         .allowed(false)
                         .reason("Attempt to access system prompt detected.")
                         .build();
-
             }
         }
 

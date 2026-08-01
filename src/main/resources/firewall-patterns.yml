@@ -1,0 +1,54 @@
+firewall:
+
+  system-prompt:
+    - system prompt
+    - system instructions
+    - developer instructions
+    - hidden instructions
+
+  jailbreak:
+    - ignore previous instructions
+    - bypass restrictions
+    - do anything now
+    - dan mode
+
+  role-override:
+    - act as
+    - you are now
+    - pretend to be
+
+  prompt-injection:
+    - "<system>"
+    - "### system"
+    - assistant:
+    - developer:
+
+  secret-leak:
+    - api key
+    - api_key
+    - secret key
+    - secret token
+    - access token
+    - bearer token
+    - authorization header
+    - private key
+    - ssh key
+    - jwt secret
+    - client secret
+    - aws access key
+    - aws secret key
+    - database password
+    - db password
+
+  data-exfiltration:
+    - dump database
+    - export all data
+    - list all users
+    - retrieve customer data
+    - return all emails
+    - download database
+    - show all records
+    - exfiltrate
+    - extract confidential data
+    - export payroll
+    - export employee data

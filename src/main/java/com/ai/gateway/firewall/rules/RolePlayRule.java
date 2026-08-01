@@ -2,12 +2,16 @@ package com.ai.gateway.firewall.rules;
 
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
+import com.ai.gateway.firewall.config.FirewallProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class RolePlayRule implements PromptRule {
+    private final FirewallProperties properties;
 
     private static final List<String> PATTERNS = List.of(
 
@@ -39,15 +43,14 @@ public class RolePlayRule implements PromptRule {
 
         String lower = prompt.toLowerCase();
 
-        for (String pattern : PATTERNS) {
+        for (String pattern : properties.getRoleOverride()) {
 
-            if (lower.contains(pattern)) {
+            if (lower.contains(pattern.toLowerCase())) {
 
                 return FirewallResult.builder()
                         .allowed(false)
-                        .reason("Role-play jailbreak detected.")
+                        .reason("Role override detected.")
                         .build();
-
             }
         }
 
