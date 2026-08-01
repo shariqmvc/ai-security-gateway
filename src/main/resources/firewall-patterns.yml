@@ -1,54 +1,169 @@
 firewall:
 
   system-prompt:
-    - system prompt
-    - system instructions
-    - developer instructions
-    - hidden instructions
+
+    enabled: true
+    threshold: 80
+    action: BLOCK
+
+    rules:
+
+      - id: SYS001
+        severity: HIGH
+        score: 40
+        regex: "(?i)\\b(system|developer|internal|hidden)\\b"
+
+      - id: SYS002
+        severity: HIGH
+        score: 40
+        regex: "(?i)\\b(prompt|instruction|instructions|configuration)\\b"
+
+      - id: SYS003
+        severity: HIGH
+        score: 50
+        regex: "(?i)\\b(show|display|print|reveal|dump|output)\\b"
+
+      - id: SYS004
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)system\\s+(prompt|instructions)"
 
   jailbreak:
-    - ignore previous instructions
-    - bypass restrictions
-    - do anything now
-    - dan mode
+
+    enabled: true
+    threshold: 70
+    action: BLOCK
+
+    rules:
+
+      - id: JB001
+        severity: HIGH
+        score: 30
+        regex: "(?i)ignore"
+
+      - id: JB002
+        severity: HIGH
+        score: 30
+        regex: "(?i)forget"
+
+      - id: JB003
+        severity: HIGH
+        score: 40
+        regex: "(?i)override"
+
+      - id: JB004
+        severity: HIGH
+        score: 40
+        regex: "(?i)bypass"
+
+      - id: JB005
+        severity: CRITICAL
+        score: 80
+        regex: "(?i)previous\\s+instructions"
+
+      - id: JB006
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)do anything now"
 
   role-override:
-    - act as
-    - you are now
-    - pretend to be
+
+    enabled: true
+    threshold: 60
+    action: BLOCK
+
+    rules:
+
+      - id: RO001
+        severity: HIGH
+        score: 30
+        regex: "(?i)act as"
+
+      - id: RO002
+        severity: HIGH
+        score: 30
+        regex: "(?i)pretend"
+
+      - id: RO003
+        severity: HIGH
+        score: 30
+        regex: "(?i)roleplay"
+
+      - id: RO004
+        severity: HIGH
+        score: 40
+        regex: "(?i)you are now"
 
   prompt-injection:
-    - "<system>"
-    - "### system"
-    - assistant:
-    - developer:
+
+    enabled: true
+    threshold: 70
+    action: BLOCK
+
+    rules:
+
+      - id: PI001
+        severity: HIGH
+        score: 50
+        regex: "(?i)<system>"
+
+      - id: PI002
+        severity: HIGH
+        score: 50
+        regex: "(?i)###\\s*system"
+
+      - id: PI003
+        severity: HIGH
+        score: 50
+        regex: "(?i)^system\\s*:"
+
+      - id: PI004
+        severity: HIGH
+        score: 50
+        regex: "(?i)^developer\\s*:"
 
   secret-leak:
-    - api key
-    - api_key
-    - secret key
-    - secret token
-    - access token
-    - bearer token
-    - authorization header
-    - private key
-    - ssh key
-    - jwt secret
-    - client secret
-    - aws access key
-    - aws secret key
-    - database password
-    - db password
+
+    enabled: true
+    threshold: 80
+    action: BLOCK
+
+    rules:
+
+      - id: SEC001
+        severity: HIGH
+        score: 30
+        regex: "(?i)(api|access|secret|credential)"
+
+      - id: SEC002
+        severity: HIGH
+        score: 30
+        regex: "(?i)(key|token|password)"
+
+      - id: SEC003
+        severity: HIGH
+        score: 40
+        regex: "(?i)(aws|azure|gcp|jwt|ssh|database)"
 
   data-exfiltration:
-    - dump database
-    - export all data
-    - list all users
-    - retrieve customer data
-    - return all emails
-    - download database
-    - show all records
-    - exfiltrate
-    - extract confidential data
-    - export payroll
-    - export employee data
+
+    enabled: true
+    threshold: 80
+    action: BLOCK
+
+    rules:
+
+      - id: DE001
+        severity: HIGH
+        score: 30
+        regex: "(?i)(dump|download|extract|export)"
+
+      - id: DE002
+        severity: HIGH
+        score: 30
+        regex: "(?i)(database|customer|employee|user)"
+
+      - id: DE003
+        severity: HIGH
+        score: 30
+        regex: "(?i)(records|emails|confidential|payroll)"

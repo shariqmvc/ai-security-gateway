@@ -1,5 +1,6 @@
 package com.ai.gateway.firewall.config;
 
+import com.ai.gateway.firewall.rulemetadata.RuleGroup;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -13,16 +14,16 @@ import java.util.List;
 @ConfigurationProperties(prefix = "firewall")
 public class FirewallProperties {
 
-    private List<String> systemPrompt;
+    private RuleGroup systemPrompt;
 
-    private List<String> jailbreak;
+    private RuleGroup jailbreak;
 
-    private List<String> roleOverride;
+    private RuleGroup roleOverride;
 
-    private List<String> promptInjection;
+    private RuleGroup promptInjection;
 
-    private List<String> secretLeak;
+    private RuleGroup secretLeak;
 
-    private List<String> dataExfiltration;
+    private RuleGroup dataExfiltration;
 
 }

@@ -3,6 +3,7 @@ package com.ai.gateway.firewall.rules;
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
 import com.ai.gateway.firewall.config.FirewallProperties;
+import com.ai.gateway.firewall.rulemetadata.RuleEvaluator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,7 @@ import java.util.regex.Pattern;
 public class SystemPromptRule implements PromptRule {
 
     private final FirewallProperties properties;
+    private final RuleEvaluator evaluator;
 
     @Override
     public String name() {
@@ -28,21 +30,13 @@ public class SystemPromptRule implements PromptRule {
     @Override
     public FirewallResult evaluate(String prompt) {
 
-        String lower = prompt.toLowerCase();
+        return evaluator.evaluate(
 
-        for (String pattern : properties.getSystemPrompt()) {
+                prompt,
 
-            if (lower.contains(pattern.toLowerCase())) {
+                properties.getSystemPrompt(),
 
-                return FirewallResult.builder()
-                        .allowed(false)
-                        .reason("Attempt to access system prompt detected.")
-                        .build();
-            }
-        }
-
-        return FirewallResult.builder()
-                .allowed(true)
-                .build();
+                "Attempt to access system prompt detected."
+        );
     }
 }

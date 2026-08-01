@@ -3,6 +3,7 @@ package com.ai.gateway.firewall.rules;
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
 import com.ai.gateway.firewall.config.FirewallProperties;
+import com.ai.gateway.firewall.rulemetadata.RuleEvaluator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,26 +14,15 @@ import java.util.List;
 public class DataExfiltrationRule implements PromptRule {
 
     private final FirewallProperties properties;
+    private final RuleEvaluator evaluator;
 
     @Override
     public FirewallResult evaluate(String prompt) {
 
-        String lower = prompt.toLowerCase();
-
-        for (String pattern : properties.getDataExfiltration()) {
-
-            if (lower.contains(pattern.toLowerCase())) {
-
-                return FirewallResult.builder()
-                        .allowed(false)
-                        .reason("Possible data exfiltration attempt detected.")
-                        .build();
-            }
-        }
-
-        return FirewallResult.builder()
-                .allowed(true)
-                .build();
+        return evaluator.evaluate(
+                prompt,
+                properties.getDataExfiltration(),
+                "Data exfiltration detected.");
     }
 
     @Override

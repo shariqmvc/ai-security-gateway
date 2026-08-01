@@ -3,6 +3,7 @@ package com.ai.gateway.firewall.rules;
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.PromptRule;
 import com.ai.gateway.firewall.config.FirewallProperties;
+import com.ai.gateway.firewall.rulemetadata.RuleEvaluator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RolePlayRule implements PromptRule {
     private final FirewallProperties properties;
+    private final RuleEvaluator evaluator;
 
     private static final List<String> PATTERNS = List.of(
 
@@ -41,21 +43,10 @@ public class RolePlayRule implements PromptRule {
     @Override
     public FirewallResult evaluate(String prompt) {
 
-        String lower = prompt.toLowerCase();
+        return evaluator.evaluate(
+                prompt,
+                properties.getRoleOverride(),
+                "Role override attempt detected.");
 
-        for (String pattern : properties.getRoleOverride()) {
-
-            if (lower.contains(pattern.toLowerCase())) {
-
-                return FirewallResult.builder()
-                        .allowed(false)
-                        .reason("Role override detected.")
-                        .build();
-            }
-        }
-
-        return FirewallResult.builder()
-                .allowed(true)
-                .build();
     }
 }
