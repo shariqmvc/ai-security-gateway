@@ -12,6 +12,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -20,33 +23,49 @@ public class RestoreServiceImpl implements RestoreService {
     private final TokenVaultService tokenVaultService;
     private final EncryptionUtil encryptionUtil;
 
+    private static final Pattern TOKEN_PATTERN =
+            Pattern.compile("<PII_[A-Z]+_[^>]+>");
+
+
+    @Override
     public String restore(String response, UUID requestId) {
+            List<TokenVault> vaultEntries =
+                    tokenVaultService.getTokens(requestId);
 
-        List<TokenVault> tokens =
-                tokenVaultService.getTokens(requestId);
+            if (vaultEntries.isEmpty()) {
+                return response;
+            }
 
-        Map<String, String> tokenMap = new HashMap<>();
+            Map<String, String> tokenMap = new HashMap<>();
 
-        for (TokenVault token : tokens) {
+            for (TokenVault vault : vaultEntries) {
 
-            tokenMap.put(
-                    token.getToken(),
-                    encryptionUtil.decrypt(
-                            token.getEncryptedValue()));
+                tokenMap.put(
+                        vault.getToken(),
+                        encryptionUtil.decrypt(
+                                vault.getEncryptedValue()
+                        )
+                );
+            }
+
+            Matcher matcher = TOKEN_PATTERN.matcher(response);
+
+            StringBuffer sb = new StringBuffer();
+
+            while (matcher.find()) {
+
+                String token = matcher.group();
+
+                matcher.appendReplacement(
+                        sb,
+                        Matcher.quoteReplacement(
+                                tokenMap.getOrDefault(token, token)
+                        )
+                );
+            }
+
+            matcher.appendTail(sb);
+
+            return sb.toString();
         }
-
-        String restored = response;
-
-        for (Map.Entry<String, String> entry : tokenMap.entrySet()) {
-
-            restored = restored.replace(
-                    entry.getKey(),
-                    entry.getValue());
-        }
-        log.debug(
-                "Response restored. requestId={}",
-                requestId);
-        return restored;
-    }
-
 }

@@ -9,6 +9,18 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "TOKEN_VAULT")
+/*@Table(
+        name = "token_vault",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_request_token",
+                        columnNames = {
+                                "request_uuid",
+                                "token"
+                        }
+                )
+        }
+) */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,7 +35,7 @@ public class TokenVault {
     @Column(name = "REQUEST_UUID", nullable = false)
     private UUID requestUuid;
 
-    @Column(name = "TOKEN", nullable = false, unique = true, length = 100)
+    @Column(name = "TOKEN", length = 100)
     private String token;
 
     @Lob

@@ -2,25 +2,31 @@ package com.ai.gateway.util;
 
 import com.ai.gateway.enums.PIIType;
 
+import java.security.SecureRandom;
 import java.util.EnumMap;
 import java.util.Map;
 
 public class TokenGenerator {
 
-    private final Map<PIIType, Integer> counters = new EnumMap<>(PIIType.class);
-
-    public TokenGenerator() {
-        for (PIIType type : PIIType.values()) {
-            counters.put(type, 1);
-        }
-    }
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     public String nextToken(PIIType type) {
 
-        int count = counters.get(type);
+        byte[] bytes = new byte[4]; // 8 hex characters
+        RANDOM.nextBytes(bytes);
 
-        counters.put(type, count + 1);
+        StringBuilder sb = new StringBuilder();
 
-        return "{{" + type.name() + "_" + count + "}}";
+        sb.append("<PII_");
+        sb.append(type.name());
+        sb.append("_");
+
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+
+        sb.append(">");
+
+        return sb.toString();
     }
 }
