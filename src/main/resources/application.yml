@@ -6,6 +6,8 @@ spring:
     url: jdbc:postgresql://localhost:5432/ai_gateway
     username: postgres
     password: shariq
+  config:
+    import: classpath:firewall-patterns.yml
 
   jpa:
     hibernate:
