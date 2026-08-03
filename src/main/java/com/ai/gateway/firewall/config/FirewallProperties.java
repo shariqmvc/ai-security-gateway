@@ -26,4 +26,10 @@ public class FirewallProperties {
 
     private RuleGroup dataExfiltration;
 
+    private RuleGroup filesystemAccess;
+
+    private RuleGroup systemRecon;
+
+    private RuleGroup commandExecution;
+
 }

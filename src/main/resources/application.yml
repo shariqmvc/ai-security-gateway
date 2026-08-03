@@ -46,6 +46,15 @@ gemini:
 
   model: gemini-3.6-flash
 
+ollama:
+  base:
+    url: http://localhost:11434
+  model: llama3.1:8b
+
 security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
+
+gateway:
+  rate-limit:
+    requests-per-minute: 60

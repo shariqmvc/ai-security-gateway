@@ -3,7 +3,7 @@ firewall:
   system-prompt:
 
     enabled: true
-    threshold: 80
+    threshold: 100
     action: BLOCK
 
     rules:
@@ -11,159 +11,347 @@ firewall:
       - id: SYS001
         severity: HIGH
         score: 40
-        regex: "(?i)\\b(system|developer|internal|hidden)\\b"
+        regex: "(?i)(show|display|print|reveal|dump|output|expose).*(system\\s+prompt|developer\\s+prompt|hidden\\s+prompt)"
 
       - id: SYS002
         severity: HIGH
         score: 40
-        regex: "(?i)\\b(prompt|instruction|instructions|configuration)\\b"
+        regex: "(?i)(show|display|reveal|print).*(internal\\s+instructions?|configuration)"
 
       - id: SYS003
-        severity: HIGH
-        score: 50
-        regex: "(?i)\\b(show|display|print|reveal|dump|output)\\b"
-
-      - id: SYS004
         severity: CRITICAL
         score: 100
-        regex: "(?i)system\\s+(prompt|instructions)"
+        regex: "(?i)(system\\s+prompt|developer\\s+instructions?)"
+
+      - id: SYS004
+        severity: HIGH
+        score: 50
+        regex: "(?i)(repeat|echo|return).*(instructions?)"
 
   jailbreak:
 
     enabled: true
-    threshold: 70
+    threshold: 100
     action: BLOCK
 
     rules:
 
       - id: JB001
         severity: HIGH
-        score: 30
-        regex: "(?i)ignore"
+        score: 50
+        regex: "(?i)ignore\\s+(all\\s+)?(previous|prior|above)\\s+(instructions?|prompts?)"
 
       - id: JB002
         severity: HIGH
-        score: 30
-        regex: "(?i)forget"
+        score: 50
+        regex: "(?i)forget\\s+(all\\s+)?(previous|prior)\\s+instructions?"
 
       - id: JB003
         severity: HIGH
-        score: 40
-        regex: "(?i)override"
+        score: 50
+        regex: "(?i)override\\s+(security|policy|guardrails?|instructions?)"
 
       - id: JB004
         severity: HIGH
-        score: 40
-        regex: "(?i)bypass"
+        score: 50
+        regex: "(?i)bypass\\s+(security|policy|filters?|guardrails?)"
 
       - id: JB005
         severity: CRITICAL
-        score: 80
-        regex: "(?i)previous\\s+instructions"
+        score: 100
+        regex: "(?i)do\\s+anything\\s+now|dan"
 
       - id: JB006
         severity: CRITICAL
         score: 100
-        regex: "(?i)do anything now"
+        regex: "(?i)ignore\\s+all\\s+previous\\s+instructions"
+
+      - id: JB007
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)pretend\\s+the\\s+rules\\s+do\\s+not\\s+exist"
 
   role-override:
 
     enabled: true
-    threshold: 60
+    threshold: 100
     action: BLOCK
 
     rules:
 
       - id: RO001
         severity: HIGH
-        score: 30
-        regex: "(?i)act as"
+        score: 50
+        regex: "(?i)act\\s+as\\s+(system|developer|administrator|root|superuser)"
 
       - id: RO002
         severity: HIGH
-        score: 30
-        regex: "(?i)pretend"
+        score: 50
+        regex: "(?i)you\\s+are\\s+now\\s+(system|developer|administrator|root)"
 
       - id: RO003
         severity: HIGH
-        score: 30
-        regex: "(?i)roleplay"
+        score: 50
+        regex: "(?i)assume\\s+the\\s+role\\s+of\\s+(system|developer|administrator)"
 
       - id: RO004
         severity: HIGH
-        score: 40
-        regex: "(?i)you are now"
+        score: 50
+        regex: "(?i)simulate\\s+(system|developer|root)\\s+mode"
 
   prompt-injection:
 
     enabled: true
-    threshold: 70
+    threshold: 100
     action: BLOCK
 
     rules:
 
       - id: PI001
         severity: HIGH
-        score: 50
-        regex: "(?i)<system>"
+        score: 60
+        regex: "(?i)<\\s*system\\s*>"
 
       - id: PI002
         severity: HIGH
-        score: 50
-        regex: "(?i)###\\s*system"
+        score: 60
+        regex: "(?i)<\\s*developer\\s*>"
 
       - id: PI003
         severity: HIGH
-        score: 50
+        score: 60
         regex: "(?i)^system\\s*:"
 
       - id: PI004
         severity: HIGH
-        score: 50
+        score: 60
         regex: "(?i)^developer\\s*:"
+
+      - id: PI005
+        severity: HIGH
+        score: 60
+        regex: "(?i)###\\s*(system|developer)"
+
+      - id: PI006
+        severity: HIGH
+        score: 60
+        regex: "(?i)BEGIN\\s+SYSTEM\\s+PROMPT"
 
   secret-leak:
 
     enabled: true
-    threshold: 80
+    threshold: 100
     action: BLOCK
 
     rules:
 
       - id: SEC001
         severity: HIGH
-        score: 30
-        regex: "(?i)(api|access|secret|credential)"
+        score: 50
+        regex: "(?i)(show|display|print|dump|reveal|give).*(api\\s*key|access\\s*key|secret\\s*key|token|password)"
 
       - id: SEC002
         severity: HIGH
-        score: 30
-        regex: "(?i)(key|token|password)"
+        score: 50
+        regex: "(?i)(aws|azure|gcp).*(secret|access\\s*key|credentials?)"
 
       - id: SEC003
         severity: HIGH
-        score: 40
-        regex: "(?i)(aws|azure|gcp|jwt|ssh|database)"
+        score: 50
+        regex: "(?i)(jwt|oauth|bearer\\s+token|ssh\\s+key)"
 
+      - id: SEC004
+        severity: HIGH
+        score: 50
+        regex: "(?i)(database\\s+password|db\\s+password|connection\\s+string)"
+
+      - id: SEC005
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)(export|dump|print|display).*(credentials?|secrets?|tokens?|passwords?)"
   data-exfiltration:
 
     enabled: true
-    threshold: 80
+    threshold: 100
     action: BLOCK
 
     rules:
 
       - id: DE001
         severity: HIGH
-        score: 30
-        regex: "(?i)(dump|download|extract|export)"
+        score: 50
+        regex: "(?i)(dump|export|extract|download).*(database|records?|table|collection)"
 
       - id: DE002
         severity: HIGH
-        score: 30
-        regex: "(?i)(database|customer|employee|user)"
+        score: 50
+        regex: "(?i)(show|display|print|list).*(all\\s+users?|customers?|employees?)"
 
       - id: DE003
         severity: HIGH
-        score: 30
-        regex: "(?i)(records|emails|confidential|payroll)"
+        score: 50
+        regex: "(?i)(download|export).*(emails?|contacts?|payroll|salary)"
+
+      - id: DE004
+        severity: HIGH
+        score: 50
+        regex: "(?i)(copy|send|transfer).*(confidential|internal|private|sensitive)"
+
+      - id: DE005
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)(dump\\s+database|export\\s+database|download\\s+database)"
+
+  filesystem-access:
+
+    enabled: true
+    threshold: 100
+    action: BLOCK
+
+    rules:
+
+      - id: FS001
+        severity: HIGH
+        score: 50
+        regex: "(?i)(read|open|view|display|print).*(file|folder|directory)"
+
+      - id: FS002
+        severity: HIGH
+        score: 50
+        regex: "(?i)(list|enumerate).*(files|folders|directories)"
+
+      - id: FS003
+        severity: HIGH
+        score: 50
+        regex: "(?i)(delete|remove).*(file|folder)"
+
+      - id: FS004
+        severity: HIGH
+        score: 50
+        regex: "(?i)(copy|move).*(file|folder)"
+
+      - id: FS005
+        severity: HIGH
+        score: 60
+        regex: "(?i)(c:\\\\users\\\\|c:\\\\windows\\\\|c:\\\\program files\\\\)"
+
+      - id: FS006
+        severity: HIGH
+        score: 60
+        regex: "(?i)(/etc/|/root/|/home/|/var/|/usr/)"
+
+      - id: FS007
+        severity: HIGH
+        score: 60
+        regex: "(?i)(desktop|documents|downloads|appdata)"
+
+      - id: FS008
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)(read\\s+all\\s+files|scan\\s+filesystem)"
+
+  system-recon:
+
+    enabled: true
+    threshold: 100
+    action: BLOCK
+
+    rules:
+
+      - id: SR001
+        severity: HIGH
+        score: 50
+        regex: "(?i)(system|machine|computer).*(information|details|configuration)"
+
+      - id: SR002
+        severity: HIGH
+        score: 50
+        regex: "(?i)(hostname|computer\\s+name)"
+
+      - id: SR003
+        severity: HIGH
+        score: 50
+        regex: "(?i)(operating\\s+system|os\\s+version|windows\\s+version|linux\\s+version)"
+
+      - id: SR004
+        severity: HIGH
+        score: 50
+        regex: "(?i)(environment\\s+variables?|env\\s+vars?)"
+
+      - id: SR005
+        severity: HIGH
+        score: 50
+        regex: "(?i)(running\\s+processes?|process\\s+list|task\\s+manager)"
+
+      - id: SR006
+        severity: HIGH
+        score: 50
+        regex: "(?i)(installed\\s+software|installed\\s+applications?)"
+
+      - id: SR007
+        severity: HIGH
+        score: 50
+        regex: "(?i)(cpu|processor|memory|ram|disk\\s+usage|disk\\s+information)"
+
+      - id: SR008
+        severity: HIGH
+        score: 50
+        regex: "(?i)(bios|motherboard|serial\\s+number|hardware\\s+id)"
+
+      - id: SR009
+        severity: HIGH
+        score: 50
+        regex: "(?i)(mac\\s+address|ip\\s+address|network\\s+adapters?)"
+
+      - id: SR010
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)(systeminfo|hostname|whoami|ipconfig|ifconfig|wmic|uname)"
+
+  command-execution:
+
+    enabled: true
+    threshold: 100
+    action: BLOCK
+
+    rules:
+
+      - id: CMD001
+        severity: HIGH
+        score: 50
+        regex: "(?i)(cmd\\.exe|powershell|pwsh|bash|zsh|sh)"
+
+      - id: CMD002
+        severity: HIGH
+        score: 50
+        regex: "(?i)(execute|run|launch|invoke).*(command|script|shell)"
+
+      - id: CMD003
+        severity: HIGH
+        score: 50
+        regex: "(?i)(curl|wget|invoke-webrequest)"
+
+      - id: CMD004
+        severity: HIGH
+        score: 50
+        regex: "(?i)(netstat|tasklist|ps\\s|top\\s|lsof)"
+
+      - id: CMD005
+        severity: HIGH
+        score: 50
+        regex: "(?i)(chmod|chown|scp|ssh|sudo|su)"
+
+      - id: CMD006
+        severity: HIGH
+        score: 50
+        regex: "(?i)(mkdir|rmdir|rm\\s|del\\s|copy\\s|move\\s)"
+
+      - id: CMD007
+        severity: HIGH
+        score: 60
+        regex: "(?i)(python|node|java|perl|ruby).*(-c|--eval)"
+
+      - id: CMD008
+        severity: CRITICAL
+        score: 100
+        regex: "(?i)(execute\\s+system\\s+command|run\\s+shell\\s+command)"
