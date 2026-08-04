@@ -2,6 +2,7 @@ package com.ai.gateway.provider.openai;
 
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.provider.AIProvider;
 import lombok.RequiredArgsConstructor;
@@ -64,11 +65,25 @@ public class OpenAiProvider implements AIProvider {
 
         log.info("OpenAI response received successfully.");
 
+        Usage usage = Usage.builder()
+                .inputTokens(0)
+                .outputTokens(0)
+                .totalTokens(0)
+                .build();
+
+        if (response.getUsage() != null) {
+
+            usage = Usage.builder()
+                    .inputTokens(response.getUsage().getInputTokens())
+                    .outputTokens(response.getUsage().getOutputTokens())
+                    .totalTokens(response.getUsage().getTotalTokens())
+                    .build();
+        }
+
         return AIResponse.builder()
                 .response(text)
-                .providerRequestId(null)
-                .inputTokens(null)
-                .outputTokens(null)
+                .providerRequestId(response.getId())
+                .usage(usage)
                 .build();
     }
 }
