@@ -2,6 +2,7 @@ package com.ai.gateway.provider.gemini;
 
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.gemini.dto.GeminiContent;
@@ -79,6 +80,13 @@ public class GeminiProvider implements AIProvider {
 
         return AIResponse.builder()
                 .response(answer)
+                .usage(
+                        Usage.builder()
+                                .inputTokens(0)
+                                .outputTokens(0)
+                                .totalTokens(0)
+                                .build()
+                )
                 .build();
     }
 }

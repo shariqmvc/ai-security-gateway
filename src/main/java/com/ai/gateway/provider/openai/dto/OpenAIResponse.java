@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class OpenAIResponse {
+    private String id;
 
     private List<Output> output;
 
@@ -25,6 +26,9 @@ public class OpenAIResponse {
 
         private String text;
 
+
+
     }
 
+    private Usage usage;
 }

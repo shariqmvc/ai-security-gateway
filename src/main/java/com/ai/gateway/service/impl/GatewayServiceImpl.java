@@ -38,6 +38,7 @@ public class GatewayServiceImpl implements GatewayService {
     private final PromptFireWallService firewallService;
     private final PolicyEngineService policyEngineService;
     private final GatewayMetricsService metricsService;
+    private final TokenUsageService tokenUsageService;
 
     @Override
     public ChatResponse process(ChatRequest request) {
@@ -122,6 +123,11 @@ public class GatewayServiceImpl implements GatewayService {
                     providerFactory
                             .getProvider(aiRequest.getProvider())
                             .chat(aiRequest);
+
+            tokenUsageService.save(
+                    requestId,
+                    aiRequest,
+                    aiResponse);
 
             // Step 7 : Restore PII
             String restored =

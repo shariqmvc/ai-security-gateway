@@ -11,8 +11,6 @@ public class AIResponse {
 
     private String providerRequestId;
 
-    private Integer inputTokens;
-
-    private Integer outputTokens;
+    private Usage usage;
 
 }
