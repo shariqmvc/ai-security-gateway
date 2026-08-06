@@ -85,14 +85,27 @@ public class GeminiProvider implements AIProvider {
                         .getFirst()
                         .getText();
 
+        Usage usage =
+                Usage.builder()
+                        .inputTokens(
+                                response.getBody().getUsageMetadata()
+                                        .getPromptTokenCount())
+
+                        .outputTokens(
+                                response.getBody().getUsageMetadata()
+                                        .getCandidatesTokenCount())
+
+                        .totalTokens(
+                                response.getBody().getUsageMetadata()
+                                        .getTotalTokenCount())
+                        .reasoningTokens( response.getBody().getUsageMetadata().getThoughtsTokenCount())
+
+                        .build();
+
         return AIResponse.builder()
                 .response(answer)
                 .usage(
-                        Usage.builder()
-                                .inputTokens(0)
-                                .outputTokens(0)
-                                .totalTokens(0)
-                                .build()
+                        usage
                 )
                 .build();
     }

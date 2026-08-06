@@ -35,4 +35,6 @@ public class TokenUsage {
 
     private LocalDateTime createdAt;
 
+    private Integer reasoningTokens;
+
 }
