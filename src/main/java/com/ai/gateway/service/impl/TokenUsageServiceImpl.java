@@ -44,6 +44,7 @@ public class TokenUsageServiceImpl implements TokenUsageService {
                         .inputTokens(usage.getInputTokens())
                         .outputTokens(usage.getOutputTokens())
                         .totalTokens(usage.getTotalTokens())
+                        .reasoningTokens(usage.getReasoningTokens())
                         .createdAt(LocalDateTime.now())
                         .build();
 

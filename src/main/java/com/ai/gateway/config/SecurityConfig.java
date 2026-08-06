@@ -1,18 +1,19 @@
 package com.ai.gateway.config;
 
-import com.ai.gateway.security.ApiKeyFilter;
+import com.ai.gateway.authentication.AuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final ApiKeyFilter apiKeyFilter;
+    private final AuthenticationFilter authenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
@@ -24,8 +25,8 @@ public class SecurityConfig {
                         .anyRequest()
                         .permitAll())
                 .addFilterBefore(
-                        apiKeyFilter,
-                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+                        authenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

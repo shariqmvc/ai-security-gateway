@@ -15,4 +15,6 @@ public class Usage {
 
     private Long latencyMs;
 
+    private Integer reasoningTokens;
+
 }

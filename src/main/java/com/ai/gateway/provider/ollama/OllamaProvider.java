@@ -1,5 +1,6 @@
 package com.ai.gateway.provider.ollama;
 
+import com.ai.gateway.config.OllamaConfig;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.Usage;
@@ -25,6 +26,7 @@ import java.util.List;
 public class OllamaProvider implements AIProvider {
 
     private final RestTemplate restTemplate;
+    private final OllamaConfig ollamaConfig;
 
     @Value("${ollama.base.url}")
     private String baseUrl;
@@ -35,6 +37,11 @@ public class OllamaProvider implements AIProvider {
     @Override
     public Provider provider() {
         return Provider.OLLAMA;
+    }
+
+    @Override
+    public String defaultModel() {
+        return ollamaConfig.getModel();
     }
 
     @Override

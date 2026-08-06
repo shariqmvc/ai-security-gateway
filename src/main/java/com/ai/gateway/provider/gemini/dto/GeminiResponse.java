@@ -14,5 +14,10 @@ import java.util.List;
 public class GeminiResponse {
 
     private List<Candidate> candidates;
+    private UsageMetadata usageMetadata;
+
+    private String modelVersion;
+
+    private String responseId;
 
 }

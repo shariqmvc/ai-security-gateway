@@ -19,4 +19,8 @@ public final class MetricsConstants {
 
     public static final String GEMINI_REQUESTS = "GEMINI_REQUESTS";
 
+    public static final String CLAUDE_REQUESTS = "CLAUDE_REQUESTS";
+
+    public static final String OLLAMA_REQUESTS = "OLLAMA_REQUESTS";
+
 }

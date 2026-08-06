@@ -1,5 +1,6 @@
 package com.ai.gateway.provider.gemini;
 
+import com.ai.gateway.config.GeminiConfig;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.Usage;
@@ -22,6 +23,7 @@ import java.util.List;
 public class GeminiProvider implements AIProvider {
 
     private final RestTemplate restTemplate;
+    private final GeminiConfig geminiConfig;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -35,6 +37,11 @@ public class GeminiProvider implements AIProvider {
     @Override
     public Provider provider() {
         return Provider.GEMINI;
+    }
+
+    @Override
+    public String defaultModel() {
+        return geminiConfig.getModel();
     }
 
     @Override
@@ -78,14 +85,27 @@ public class GeminiProvider implements AIProvider {
                         .getFirst()
                         .getText();
 
+        Usage usage =
+                Usage.builder()
+                        .inputTokens(
+                                response.getBody().getUsageMetadata()
+                                        .getPromptTokenCount())
+
+                        .outputTokens(
+                                response.getBody().getUsageMetadata()
+                                        .getCandidatesTokenCount())
+
+                        .totalTokens(
+                                response.getBody().getUsageMetadata()
+                                        .getTotalTokenCount())
+                        .reasoningTokens( response.getBody().getUsageMetadata().getThoughtsTokenCount())
+
+                        .build();
+
         return AIResponse.builder()
                 .response(answer)
                 .usage(
-                        Usage.builder()
-                                .inputTokens(0)
-                                .outputTokens(0)
-                                .totalTokens(0)
-                                .build()
+                        usage
                 )
                 .build();
     }

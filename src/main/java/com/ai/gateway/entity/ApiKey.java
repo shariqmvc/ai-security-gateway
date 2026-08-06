@@ -1,6 +1,7 @@
 package com.ai.gateway.entity;
 
 import com.ai.gateway.enums.ApiKeyStatus;
+import com.ai.gateway.tenant.Tenant;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -25,6 +26,10 @@ public class ApiKey {
 
     @Column(name = "client_name", nullable = false)
     private String clientName;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
 
     @Enumerated(EnumType.STRING)
     private ApiKeyStatus status;

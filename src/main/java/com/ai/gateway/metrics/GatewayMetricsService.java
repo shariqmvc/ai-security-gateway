@@ -1,5 +1,6 @@
 package com.ai.gateway.metrics;
 
+import com.ai.gateway.enums.Provider;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -36,6 +37,12 @@ public class GatewayMetricsService {
                 new AtomicLong());
 
         counters.put(MetricsConstants.GEMINI_REQUESTS,
+                new AtomicLong());
+
+        counters.put(MetricsConstants.CLAUDE_REQUESTS,
+                new AtomicLong());
+
+        counters.put(MetricsConstants.OLLAMA_REQUESTS,
                 new AtomicLong());
 
     }
@@ -84,6 +91,11 @@ public class GatewayMetricsService {
 
                 .geminiRequests(
                         counters.get(MetricsConstants.GEMINI_REQUESTS).get())
+                .claudeRequests(
+                       counters.get(MetricsConstants.CLAUDE_REQUESTS).get())
+
+                .ollamaRequests(
+                        counters.get(MetricsConstants.OLLAMA_REQUESTS).get())
 
                 .totalLatencyMs(latency)
 
@@ -91,5 +103,20 @@ public class GatewayMetricsService {
 
                 .build();
 
+    }
+
+    public void incrementProviderRequest(Provider provider) {
+
+        switch (provider) {
+
+            case OPENAI -> increment(MetricsConstants.OPENAI_REQUESTS);
+
+            case GEMINI -> increment(MetricsConstants.GEMINI_REQUESTS);
+
+            case CLAUDE -> increment(MetricsConstants.CLAUDE_REQUESTS);
+
+            case OLLAMA -> increment(MetricsConstants.OLLAMA_REQUESTS);
+
+        }
     }
 }
