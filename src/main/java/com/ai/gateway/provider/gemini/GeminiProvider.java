@@ -1,5 +1,6 @@
 package com.ai.gateway.provider.gemini;
 
+import com.ai.gateway.config.GeminiConfig;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.Usage;
@@ -22,6 +23,7 @@ import java.util.List;
 public class GeminiProvider implements AIProvider {
 
     private final RestTemplate restTemplate;
+    private final GeminiConfig geminiConfig;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -35,6 +37,11 @@ public class GeminiProvider implements AIProvider {
     @Override
     public Provider provider() {
         return Provider.GEMINI;
+    }
+
+    @Override
+    public String defaultModel() {
+        return geminiConfig.getModel();
     }
 
     @Override

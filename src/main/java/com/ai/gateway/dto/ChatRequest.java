@@ -13,5 +13,6 @@ public class ChatRequest {
    // @NotBlank(message = "Prompt cannot be empty")
     private String prompt;
     private Provider provider;
+    private String model;
 
 }

@@ -7,6 +7,8 @@ import com.ai.gateway.enums.Provider;
 public interface AIProvider {
     Provider provider();
 
+    String defaultModel();
+
     AIResponse chat(AIRequest request);
 
 }

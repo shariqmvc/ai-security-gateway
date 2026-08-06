@@ -26,5 +26,8 @@ public class GatewayMetrics {
     private long totalLatencyMs;
 
     private double averageLatencyMs;
+    private long claudeRequests;
+
+    private long ollamaRequests;
 
 }

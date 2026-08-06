@@ -28,12 +28,16 @@ public class OpenAiProvider implements AIProvider {
         return Provider.OPENAI;
     }
 
+    @Override
+    public String defaultModel() {
+        return openAIConfig.getModel();
+    }
+
 
     @Override
     public AIResponse chat(AIRequest request) {
 
         log.info("Calling OpenAI. model={}", request.getModel());
-
         OpenAIRequest openAIRequest = OpenAIRequest.builder()
                 .model(request.getModel())
                 .input(request.getPrompt())

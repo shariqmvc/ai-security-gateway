@@ -4,6 +4,7 @@ import com.ai.gateway.entity.ApiKey;
 import com.ai.gateway.enums.ApiKeyStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -15,32 +16,33 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     private final ApiKeyRepository repository;
 
     @Override
-    public Optional<ApiKey> authenticate(String apiKey) {
+    @Transactional
+    public Optional<ApiKey> authenticate(
+            String apiKey) {
 
-        Optional<ApiKey> optionalApiKey =
-                repository.findByApiKey(apiKey);
+        Optional<ApiKey> optional =
+                repository.findByApiKeyWithTenant(apiKey);
 
-        if (optionalApiKey.isEmpty()) {
+        if (optional.isEmpty()) {
             return Optional.empty();
         }
 
-        ApiKey key = optionalApiKey.get();
+        ApiKey entity = optional.get();
 
-        if (key.getStatus() != ApiKeyStatus.ACTIVE) {
+        if (entity.getStatus() != ApiKeyStatus.ACTIVE) {
             return Optional.empty();
         }
 
-        if (key.getExpiresAt() != null &&
-                key.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (entity.getExpiresAt() != null
+                && entity.getExpiresAt().isBefore(LocalDateTime.now())) {
 
             return Optional.empty();
         }
 
-        key.setLastUsedAt(LocalDateTime.now());
+        entity.setLastUsedAt(LocalDateTime.now());
 
-        repository.save(key);
+        return Optional.of(entity);
 
-        return Optional.of(key);
     }
 
 }
