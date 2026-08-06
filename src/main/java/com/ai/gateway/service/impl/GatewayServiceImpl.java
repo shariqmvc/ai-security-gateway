@@ -2,6 +2,7 @@ package com.ai.gateway.service.impl;
 
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.*;
 import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
@@ -46,6 +47,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final GatewayMetricsService metricsService;
 
     private final TokenUsageService tokenUsageService;
+
+    private final CostService costService;
 
     @Override
     public ChatResponse process(ChatRequest request) {
@@ -168,6 +171,11 @@ public class GatewayServiceImpl implements GatewayService {
                     aiRequest,
                     aiResponse);
 
+            costService.save(
+                    requestId,
+                    auth,
+                    aiRequest,
+                    aiResponse);
             // -------------------------------
             // Restore Response
             // -------------------------------
@@ -278,6 +286,31 @@ public class GatewayServiceImpl implements GatewayService {
                 model,
                 provider,
                 AuditStatus.FAILED);
+    }
+
+    private AIRequest buildAIRequest(
+            ChatRequest request,
+            AuthenticationContext auth) {
+
+        Provider selectedProvider =
+                request.getProvider() != null
+                        ? request.getProvider()
+                        : auth.getDefaultProvider();
+
+        AIProvider aiProvider =
+                providerFactory.getProvider(selectedProvider);
+
+        String selectedModel =
+                request.getModel() != null
+                        && !request.getModel().isBlank()
+                        ? request.getModel()
+                        : aiProvider.defaultModel();
+
+        return AIRequest.builder()
+                .provider(selectedProvider)
+                .model(selectedModel)
+                .prompt(request.getPrompt())
+                .build();
     }
 
 
