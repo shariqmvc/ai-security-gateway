@@ -13,11 +13,6 @@ import java.util.UUID;
 public interface RequestCostRepository
         extends JpaRepository<RequestCost, UUID> {
 
-    List<RequestCost> findByTenantId(UUID tenantId);
-
-    List<RequestCost> findByProvider(Provider provider);
-
-    List<RequestCost> findByModel(String model);
 
     @Query("""
         SELECT new com.ai.gateway.cost.dto.CostSummary(

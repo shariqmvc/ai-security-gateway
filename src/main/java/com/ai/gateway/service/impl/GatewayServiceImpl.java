@@ -65,9 +65,9 @@ public class GatewayServiceImpl implements GatewayService {
 
 
 
-
-        AIRequest aiRequest = null;
         AuthenticationContext auth = getAuthenticationContext();
+        AIRequest aiRequest = null;
+
 
 
         try {
@@ -75,103 +75,37 @@ public class GatewayServiceImpl implements GatewayService {
 
             // -------------------------------
             // Prompt Firewall
-            // -------------------------------
-
-            FirewallResult firewall =
-                    firewallService.inspect(originalPrompt);
-
-            if (!firewall.isAllowed()) {
-
-                metricsService.increment(
-                        MetricsConstants.FIREWALL_BLOCKED);
-
-                throw new BusinessException(
-                        firewall.getReason());
-
-            }
-
-            // -------------------------------
             // Policy Engine
             // -------------------------------
+            validateRequest(originalPrompt);
 
-            PolicyResult policy =
-                    policyEngineService.evaluate(originalPrompt);
 
-            if (!policy.isAllowed()) {
-
-                metricsService.increment(
-                        MetricsConstants.POLICY_BLOCKED);
-
-                throw new BusinessException(
-                        policy.getReason());
-
-            }
-
-            // -------------------------------
-            // PII Detection
-            // -------------------------------
 
             MaskingResult maskingResult =
-                    piiDetectionService.mask(originalPrompt);
+                    maskPrompt(requestId, originalPrompt);
 
             maskedPrompt =
                     maskingResult.getMaskedPrompt();
 
-            // -------------------------------
-            // Token Vault
-            // -------------------------------
-
-            tokenVaultService.save(
-                    requestId,
-                    maskingResult.getDetectedValues());
-
-            // -------------------------------
-            // AI Request
-            // -------------------------------
-
-            Provider selectedProvider =
-                    request.getProvider() != null
-                            ? request.getProvider()
-                            : auth.getDefaultProvider();
-
-            AIProvider aiProvider =
-                    providerFactory.getProvider(selectedProvider);
-
-            String selectedModel =
-                    request.getModel() != null && !request.getModel().isBlank()
-                            ? request.getModel()
-                            : aiProvider.defaultModel();
 
             aiRequest =
-                    AIRequest.builder()
-                            .provider(selectedProvider)
-                            .model(selectedModel)
-                            .prompt(maskedPrompt)
-                            .build();
-            log.info(
-                    "Processing request. tenant={}, provider={}, model={}",
-                    auth.getTenantCode(),
-                    selectedProvider,
-                    selectedModel);
-            metricsService.incrementProviderRequest(selectedProvider);
-
+                    buildAIRequest(
+                            request,
+                            auth,
+                            maskedPrompt);
             // -------------------------------
             // Provider Invocation
             // -------------------------------
 
             AIResponse aiResponse =
-                    aiProvider .chat(aiRequest);
+                    invokeProvider(aiRequest);
 
             // -------------------------------
             // Token Usage
             // -------------------------------
 
-            tokenUsageService.save(
-                    requestId,
-                    aiRequest,
-                    aiResponse);
 
-            costService.save(
+            persistUsage(
                     requestId,
                     auth,
                     aiRequest,
@@ -181,30 +115,19 @@ public class GatewayServiceImpl implements GatewayService {
             // -------------------------------
 
             String restored =
-                    restoreService.restore(
-                            aiResponse.getResponse(),
-                            requestId);
+                    restoreResponse(
+                            requestId,
+                            aiResponse);
 
             long latency =
                     System.currentTimeMillis() - start;
 
-            metricsService.addLatency(latency);
-
-            // -------------------------------
-            // Audit
-            // -------------------------------
-
-            auditService.save(
+            auditSuccess(
                     requestId,
                     maskedPrompt,
-                    aiResponse.getResponse(),
-                    latency,
-                    aiRequest.getModel(),
-                    aiRequest.getProvider().name(),
-                    AuditStatus.SUCCESS);
-
-            metricsService.increment(
-                    MetricsConstants.SUCCESSFUL_REQUESTS);
+                    aiRequest,
+                    aiResponse,
+                    latency);
 
             return ChatResponse.builder()
                     .requestId(requestId)
@@ -288,33 +211,151 @@ public class GatewayServiceImpl implements GatewayService {
                 AuditStatus.FAILED);
     }
 
+
+    private void validateRequest(String prompt) {
+
+        FirewallResult firewall =
+                firewallService.inspect(prompt);
+
+        if (!firewall.isAllowed()) {
+
+            metricsService.increment(
+                    MetricsConstants.FIREWALL_BLOCKED);
+
+            throw new BusinessException(
+                    firewall.getReason());
+
+        }
+
+        PolicyResult policy =
+                policyEngineService.evaluate(prompt);
+
+        if (!policy.isAllowed()) {
+
+            metricsService.increment(
+                    MetricsConstants.POLICY_BLOCKED);
+
+            throw new BusinessException(
+                    policy.getReason());
+
+        }
+
+    }
+
+    private MaskingResult maskPrompt(
+            UUID requestId,
+            String prompt) {
+
+        MaskingResult result =
+                piiDetectionService.mask(prompt);
+
+        tokenVaultService.save(
+                requestId,
+                result.getDetectedValues());
+
+        return result;
+
+    }
+
     private AIRequest buildAIRequest(
             ChatRequest request,
-            AuthenticationContext auth) {
+            AuthenticationContext auth,
+            String prompt) {
+
+
 
         Provider selectedProvider =
                 request.getProvider() != null
                         ? request.getProvider()
                         : auth.getDefaultProvider();
 
-        AIProvider aiProvider =
+        AIProvider provider =
                 providerFactory.getProvider(selectedProvider);
 
         String selectedModel =
                 request.getModel() != null
                         && !request.getModel().isBlank()
                         ? request.getModel()
-                        : aiProvider.defaultModel();
+                        : provider.defaultModel();
+
+        log.info(
+                "Tenant={} Provider={} Model={}",
+                auth.getTenantCode(),
+                selectedProvider,
+                selectedModel);
+
+        metricsService.incrementProviderRequest(
+                selectedProvider);
 
         return AIRequest.builder()
                 .provider(selectedProvider)
                 .model(selectedModel)
-                .prompt(request.getPrompt())
+                .prompt(prompt)
                 .build();
+
+    }
+    private AIResponse invokeProvider(
+            AIRequest request) {
+
+        AIProvider provider =
+                providerFactory.getProvider(
+                        request.getProvider());
+
+        return provider.chat(request);
+
     }
 
+    private void persistUsage(
+            UUID requestId,
+            AuthenticationContext auth,
+            AIRequest request,
+            AIResponse response) {
 
+        tokenUsageService.save(
+                requestId,
+                request,
+                response);
 
+        costService.save(
+                requestId,
+                auth,
+                request,
+                response);
+
+    }
+
+    private String restoreResponse(
+            UUID requestId,
+            AIResponse response) {
+
+        return restoreService.restore(
+                response.getResponse(),
+                requestId);
+
+    }
+
+    private void auditSuccess(
+            UUID requestId,
+            String prompt,
+            AIRequest request,
+            AIResponse response,
+            long latency) {
+
+        auditService.save(
+                requestId,
+                prompt,
+                response.getResponse(),
+                latency,
+                request.getModel(),
+                request.getProvider().name(),
+                AuditStatus.SUCCESS);
+
+        metricsService.addLatency(latency);
+
+        metricsService.increment(
+                MetricsConstants.SUCCESSFUL_REQUESTS);
+
+    }
     }
 
 

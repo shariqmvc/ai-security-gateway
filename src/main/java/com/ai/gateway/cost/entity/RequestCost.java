@@ -40,6 +40,9 @@ public class RequestCost {
     @Column(name = "output_tokens")
     private Integer outputTokens;
 
+    @Column(name = "total_tokens")
+    private Integer totalTokens;
+
     @Column(name = "input_cost", precision = 19, scale = 8)
     private BigDecimal inputCost;
 
@@ -48,6 +51,8 @@ public class RequestCost {
 
     @Column(name = "total_cost", precision = 19, scale = 8)
     private BigDecimal totalCost;
+
+    private Integer reasoningTokens;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
