@@ -10,15 +10,13 @@ import com.ai.gateway.cost.service.CostCalculator;
 import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -28,7 +26,7 @@ public class CostServiceImpl implements CostService {
 
     private final CostCalculator costCalculator;
 
-    private final RequestCostRepository repository;
+    private final RequestCostRepository requestCostRepository;
 
     @Override
     public void save(
@@ -37,11 +35,13 @@ public class CostServiceImpl implements CostService {
             AIRequest aiRequest,
             AIResponse aiResponse) {
 
-        if (aiResponse.getUsage() == null) {
+        Usage usage = aiResponse.getUsage();
 
-            log.debug(
-                    "Token usage unavailable. Skipping cost calculation.");
+        if (usage == null
+                || usage.getInputTokens() == null
+                || usage.getOutputTokens() == null) {
 
+            log.debug("Token usage unavailable. Skipping cost calculation.");
             return;
         }
 
@@ -75,38 +75,38 @@ public class CostServiceImpl implements CostService {
                         .createdAt(LocalDateTime.now())
                         .build();
 
-        repository.save(entity);
+        requestCostRepository.save(entity);
     }
 
     @Override
     public CostSummary getOverallSummary() {
 
-        return repository.getOverallSummary();
+        return requestCostRepository.getOverallSummary();
     }
 
     @Override
     public CostSummary getTenantSummary(UUID tenantId) {
 
-        return repository.getTenantSummary(tenantId);
+        return requestCostRepository.getTenantSummary(tenantId);
     }
 
     @Override
     public CostSummary getProviderSummary(
             Provider provider) {
 
-        return repository.getProviderSummary(provider);
+        return requestCostRepository.getProviderSummary(provider);
     }
 
     @Override
     public CostSummary getModelSummary(String model) {
-        return repository.getModelSummary(model);
+        return requestCostRepository.getModelSummary(model);
     }
 
     @Override
     public CostSummary getTodaySummary() {
         LocalDate today = LocalDate.now();
 
-        return repository.getSummaryBetween(
+        return requestCostRepository.getSummaryBetween(
                 today.atStartOfDay(),
                 today.plusDays(1).atStartOfDay());
     }
@@ -117,46 +117,9 @@ public class CostServiceImpl implements CostService {
                 LocalDate.now()
                         .withDayOfMonth(1);
 
-        return repository.getSummaryBetween(
+        return requestCostRepository.getSummaryBetween(
                 firstDay.atStartOfDay(),
                 firstDay.plusMonths(1).atStartOfDay());
     }
 
-    private CostSummary buildSummary(
-            List<RequestCost> costs) {
-
-        BigDecimal inputCost = BigDecimal.ZERO;
-        BigDecimal outputCost = BigDecimal.ZERO;
-
-        long inputTokens = 0;
-        long outputTokens = 0;
-
-        for (RequestCost cost : costs) {
-
-            inputCost = inputCost.add(cost.getInputCost());
-
-            outputCost = outputCost.add(cost.getOutputCost());
-
-            inputTokens += cost.getInputTokens();
-
-            outputTokens += cost.getOutputTokens();
-
-        }
-
-        return CostSummary.builder()
-
-                .inputCost(inputCost)
-
-                .outputCost(outputCost)
-
-                .totalCost(inputCost.add(outputCost))
-
-                .totalRequests((long) costs.size())
-
-                .totalInputTokens(inputTokens)
-
-                .totalOutputTokens(outputTokens)
-
-                .build();
-    }
 }

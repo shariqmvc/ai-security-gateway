@@ -20,21 +20,32 @@ public class TokenUsage {
     @GeneratedValue
     private UUID id;
 
+    @Column(name = "request_id")
     private UUID requestId;
+
 
     @Enumerated(EnumType.STRING)
     private Provider provider;
 
     private String model;
 
+    @Column(name = "input_tokens")
     private Integer inputTokens;
 
+    @Column(name = "output_tokens")
     private Integer outputTokens;
 
+    @Column(name = "total_tokens")
     private Integer totalTokens;
+
+    @Column(name = "reasoning_tokens")
+    private Integer reasoningTokens;
 
     private LocalDateTime createdAt;
 
-    private Integer reasoningTokens;
+
+
+
+
 
 }
