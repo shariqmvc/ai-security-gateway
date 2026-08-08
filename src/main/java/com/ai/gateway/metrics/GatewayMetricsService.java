@@ -44,6 +44,9 @@ public class GatewayMetricsService {
 
         counters.put(MetricsConstants.OLLAMA_REQUESTS,
                 new AtomicLong());
+        counters.put(
+                MetricsConstants.ACCESS_DENIED,
+                new AtomicLong());
 
     }
 

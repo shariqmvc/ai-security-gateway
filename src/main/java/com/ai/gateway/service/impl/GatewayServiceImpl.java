@@ -4,6 +4,9 @@ import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.*;
+import com.ai.gateway.entitlement.enums.Feature;
+import com.ai.gateway.entitlement.mapper.ProviderFeatureMapper;
+import com.ai.gateway.entitlement.service.EntitlementService;
 import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
@@ -50,6 +53,8 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final CostService costService;
 
+    private final EntitlementService entitlementService;
+
     @Override
     public ChatResponse process(ChatRequest request) {
 
@@ -93,6 +98,14 @@ public class GatewayServiceImpl implements GatewayService {
                             request,
                             auth,
                             maskedPrompt);
+
+            Feature feature =
+                    ProviderFeatureMapper.toFeature(
+                            aiRequest.getProvider());
+
+            validateFeature(
+                    auth,
+                    feature);
             // -------------------------------
             // Provider Invocation
             // -------------------------------
@@ -356,6 +369,30 @@ public class GatewayServiceImpl implements GatewayService {
                 MetricsConstants.SUCCESSFUL_REQUESTS);
 
     }
+    private void validateFeature(
+            AuthenticationContext auth,
+            Feature feature) {
+
+        if (!entitlementService.hasFeature(
+                auth.getTenantId(),
+                feature)) {
+
+            log.warn(
+                    "Access denied. tenant={}, feature={}",
+                    auth.getTenantCode(),
+                    feature);
+
+            metricsService.increment(
+                    MetricsConstants.ACCESS_DENIED);
+
+            throw new BusinessException(
+                    feature + " is disabled for this tenant.");
+
+        }
+
     }
+
+
+}
 
 
