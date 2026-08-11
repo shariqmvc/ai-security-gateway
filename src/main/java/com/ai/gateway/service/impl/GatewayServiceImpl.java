@@ -2,6 +2,7 @@ package com.ai.gateway.service.impl;
 
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.budget.service.BudgetService;
 import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.*;
 import com.ai.gateway.entitlement.annotation.RequiresFeature;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Slf4j
@@ -58,6 +60,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final EntitlementService entitlementService;
 
     private final QuotaService quotaService;
+
+    private final BudgetService budgetService;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -329,20 +333,36 @@ public class GatewayServiceImpl implements GatewayService {
             AIRequest request,
             AIResponse response) {
 
-        consumeTokenQuota(
-                auth,
-                response);
-
         tokenUsageService.save(
                 requestId,
                 request,
                 response);
 
-        costService.save(
-                requestId,
-                auth,
-                request,
-                response);
+        BigDecimal cost =
+                costService.save(
+                        requestId,
+                        auth,
+                        request,
+                        response);
+
+        if (response.getUsage() != null
+                && response.getUsage().getTotalTokens() != null
+                && response.getUsage().getTotalTokens() > 0) {
+
+            quotaService.consumeTokens(
+                    auth.getTenantId(),
+                    response.getUsage()
+                            .getTotalTokens()
+                            .longValue());
+        }
+
+        if (cost != null
+                && cost.compareTo(BigDecimal.ZERO) > 0) {
+
+            budgetService.consume(
+                    auth.getTenantId(),
+                    cost);
+        }
     }
 
     private String restoreResponse(

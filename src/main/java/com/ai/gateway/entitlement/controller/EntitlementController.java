@@ -1,5 +1,7 @@
 package com.ai.gateway.entitlement.controller;
 
+import com.ai.gateway.budget.dto.BudgetUsageResponse;
+import com.ai.gateway.budget.service.BudgetService;
 import com.ai.gateway.entitlement.dto.CreateTenantEntitlementRequest;
 import com.ai.gateway.entitlement.dto.TenantEntitlementDto;
 import com.ai.gateway.entitlement.dto.TenantEntitlementResponse;
@@ -23,6 +25,8 @@ public class EntitlementController {
     private final EntitlementService service;
 
     private final QuotaService quotaService;
+
+    private final BudgetService budgetService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -75,11 +79,19 @@ public class EntitlementController {
                 service.provision(tenantId));
     }
 
-    @GetMapping("/{tenantId}/quota")
+    @GetMapping("/tenants/{tenantId}/quota")
     public TenantQuotaUsageResponse getQuotaUsage(
             @PathVariable UUID tenantId) {
 
         return quotaService.getUsage(
+                tenantId);
+    }
+
+    @GetMapping("/tenants/{tenantId}/budget")
+    public BudgetUsageResponse getBudgetUsage(
+            @PathVariable UUID tenantId) {
+
+        return budgetService.getUsage(
                 tenantId);
     }
 }
