@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -77,7 +78,7 @@ class EntitlementProvisioningServiceTest {
         when(entitlementRepository.findByTenantId(tenantId))
                 .thenReturn(Optional.empty());
 
-        when(tenantRepository.findById(tenantId))
+        when(tenantRepository.findByIdForUpdate(tenantId))
                 .thenReturn(Optional.of(tenant));
 
         when(tenant.getId())
@@ -143,53 +144,60 @@ class EntitlementProvisioningServiceTest {
                         .enabled(true)
                         .build();
 
+        when(tenantRepository.findByIdForUpdate(tenantId))
+                .thenReturn(Optional.of(tenant));
+
         when(entitlementRepository.findByTenantId(tenantId))
                 .thenReturn(Optional.of(existing));
 
         provisioningService.provision(tenantId);
 
+        verify(tenantRepository)
+                .findByIdForUpdate(tenantId);
+
+        verify(entitlementRepository)
+                .findByTenantId(tenantId);
+
         verify(entitlementRepository, never())
                 .save(any(TenantEntitlement.class));
 
-        verifyNoInteractions(
-                tenantRepository,
-                planDefaultsProvider);
+        verify(planDefaultsProvider, never())
+                .getDefaults(any(Plan.class));
+
     }
 
     @Test
     void shouldThrowWhenTenantDoesNotExist() {
 
-        when(entitlementRepository.findByTenantId(tenantId))
-                .thenReturn(Optional.empty());
-
-        when(tenantRepository.findById(tenantId))
+        when(tenantRepository.findByIdForUpdate(tenantId))
                 .thenReturn(Optional.empty());
 
         IllegalStateException exception =
                 assertThrows(
                         IllegalStateException.class,
-                        () ->
-                                provisioningService.provision(
-                                        tenantId));
+                        () -> provisioningService.provision(tenantId));
 
         assertEquals(
                 "Tenant not found: " + tenantId,
                 exception.getMessage());
 
         verify(entitlementRepository, never())
-                .save(any(TenantEntitlement.class));
+                .findByTenantId(any(UUID.class));
 
-        verifyNoInteractions(
-                planDefaultsProvider);
+        verify(planDefaultsProvider, never())
+                .getDefaults(any(Plan.class));
+
+        verify(entitlementRepository, never())
+                .save(any(TenantEntitlement.class));
     }
 
     @Test
     void shouldThrowWhenTenantHasNoPlan() {
 
-        when(entitlementRepository.findByTenantId(tenantId))
-                .thenReturn(Optional.empty());
+   //     when(entitlementRepository.findByTenantId(tenantId))
+     //           .thenReturn(Optional.empty());
 
-        when(tenantRepository.findById(tenantId))
+        when(tenantRepository.findByIdForUpdate(tenantId))
                 .thenReturn(Optional.of(tenant));
 
         when(tenant.getPlan())
@@ -233,10 +241,10 @@ class EntitlementProvisioningServiceTest {
                                 new BigDecimal("50.00"))
                         .build();
 
-        when(entitlementRepository.findByTenantId(tenantId))
-                .thenReturn(Optional.empty());
+   //     when(entitlementRepository.findByTenantId(tenantId))
+     //           .thenReturn(Optional.empty());
 
-        when(tenantRepository.findById(tenantId))
+        when(tenantRepository.findByIdForUpdate(tenantId))
                 .thenReturn(Optional.of(tenant));
 
         when(tenant.getId())
@@ -312,10 +320,10 @@ class EntitlementProvisioningServiceTest {
                                 new BigDecimal("5000.00"))
                         .build();
 
-        when(entitlementRepository.findByTenantId(tenantId))
-                .thenReturn(Optional.empty());
+    //    when(entitlementRepository.findByTenantId(tenantId))
+        //        .thenReturn(Optional.empty());
 
-        when(tenantRepository.findById(tenantId))
+        when(tenantRepository.findByIdForUpdate(tenantId))
                 .thenReturn(Optional.of(tenant));
 
         when(tenant.getId())
@@ -362,5 +370,66 @@ class EntitlementProvisioningServiceTest {
 
         assertTrue(
                 entitlement.isEnabled());
+    }
+
+    @Test
+    void shouldLockTenantBeforeCheckingEntitlement() {
+
+        Tenant tenant =
+                Tenant.builder()
+                        .id(tenantId)
+                        .tenantCode("TEST")
+                        .tenantName("Test Tenant")
+                        .plan(Plan.PROFESSIONAL)
+                        .build();
+
+        when(tenantRepository.findByIdForUpdate(tenantId))
+                .thenReturn(Optional.of(tenant));
+
+    //    when(entitlementRepository.findByTenantId(tenantId))
+         //       .thenReturn(Optional.empty());
+
+        PlanDefaults defaults =
+                PlanDefaults.builder()
+                        .plan(Plan.PROFESSIONAL)
+                        .features(Set.of(
+                                Feature.CHAT,
+                                Feature.OPENAI,
+                                Feature.GEMINI,
+                                Feature.CLAUDE,
+                                Feature.OLLAMA,
+                                Feature.RATE_LIMITING,
+                                Feature.QUOTA,
+                                Feature.BUDGET
+                        ))
+                        .requestsPerMinute(100)
+                        .requestsPerDay(10_000)
+                        .monthlyTokenQuota(10_000_000)
+                        .monthlyBudget(new BigDecimal("500.00"))
+                        .build();
+
+        when(planDefaultsProvider.getDefaults(
+                Plan.PROFESSIONAL))
+                .thenReturn(defaults);
+
+        provisioningService.provision(tenantId);
+
+        InOrder inOrder =
+                inOrder(
+                        tenantRepository,
+                        entitlementRepository,
+                        planDefaultsProvider);
+
+        inOrder.verify(tenantRepository)
+                .findByIdForUpdate(tenantId);
+
+        inOrder.verify(entitlementRepository)
+                .findByTenantId(tenantId);
+
+        inOrder.verify(planDefaultsProvider)
+                .getDefaults(Plan.PROFESSIONAL);
+
+        inOrder.verify(entitlementRepository)
+                .save(any(TenantEntitlement.class));
     }
 }

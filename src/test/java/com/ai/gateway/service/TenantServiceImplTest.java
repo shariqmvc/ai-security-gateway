@@ -159,4 +159,48 @@ class TenantServiceImplTest {
         assertNotNull(
                 tenant.getCreatedAt());
     }
+
+    @Test
+    void shouldPropagateProvisioningFailure() {
+
+        TenantRequest request =
+                TenantRequest.builder()
+                        .tenantCode("ACME")
+                        .tenantName("ACME Corporation")
+                        .plan(Plan.PROFESSIONAL)
+                        .build();
+
+        Tenant savedTenant =
+                Tenant.builder()
+                        .tenantCode("ACME")
+                        .tenantName("ACME Corporation")
+                        .plan(Plan.PROFESSIONAL)
+                        .build();
+
+        when(repository.findByTenantCode("ACME"))
+                .thenReturn(Optional.empty());
+
+        when(repository.save(any(Tenant.class)))
+                .thenReturn(savedTenant);
+
+        doThrow(new IllegalStateException(
+                "Provisioning failed"))
+                .when(entitlementProvisioningService)
+                .provision(savedTenant.getId());
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> tenantService.create(request));
+
+        assertEquals(
+                "Provisioning failed",
+                exception.getMessage());
+
+        verify(repository)
+                .save(any(Tenant.class));
+
+        verify(entitlementProvisioningService)
+                .provision(savedTenant.getId());
+    }
 }
