@@ -33,4 +33,10 @@ public interface EntitlementService {
             UUID tenantId);
 
     void clearCache();
+
+    TenantEntitlementResponse provision(UUID tenantId);
+
+    void validateFeature(
+            UUID tenantId,
+            Feature feature);
 }

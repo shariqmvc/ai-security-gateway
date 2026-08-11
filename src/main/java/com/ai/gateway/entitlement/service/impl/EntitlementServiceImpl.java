@@ -11,6 +11,8 @@ import com.ai.gateway.entitlement.mapper.TenantEntitlementMapper;
 import com.ai.gateway.entitlement.repository.TenantEntitlementRepository;
 import com.ai.gateway.entitlement.service.EntitlementService;
 import com.ai.gateway.exception.BusinessException;
+import com.ai.gateway.metrics.GatewayMetricsService;
+import com.ai.gateway.provisioning.EntitlementProvisioningService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,10 @@ public class EntitlementServiceImpl
     private final TenantEntitlementMapper mapper;
 
     private final EntitlementCache cache;
+
+    private final EntitlementProvisioningService provisioningService;
+
+    private final GatewayMetricsService metricsService;
 
     @Override
     public TenantEntitlementResponse create(
@@ -185,5 +191,30 @@ public class EntitlementServiceImpl
 
         log.info(
                 "Entitlement cache cleared.");
+    }
+
+    @Override
+    public TenantEntitlementResponse provision(UUID tenantId) {
+        provisioningService.provision(tenantId);
+
+        return get(tenantId);
+    }
+
+    @Override
+    public void validateFeature(
+            UUID tenantId,
+            Feature feature) {
+
+        if (!hasFeature(tenantId, feature)) {
+
+            log.warn(
+                    "Access denied. tenant={}, feature={}",
+                    tenantId,
+                    feature);
+
+            throw new BusinessException(
+                    feature
+                            + " is disabled for this tenant.");
+        }
     }
 }

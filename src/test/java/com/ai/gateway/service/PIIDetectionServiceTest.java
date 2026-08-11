@@ -5,8 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class PIIDetectionServiceTest {
@@ -25,8 +24,25 @@ class PIIDetectionServiceTest {
         System.out.println("Masked Prompt   : " + result.getMaskedPrompt());
         System.out.println("Detected Values : " + result.getDetectedValues());
 
-        assertTrue(result.getMaskedPrompt().contains("{{EMAIL_1}}"));
-        assertTrue(result.getMaskedPrompt().contains("{{PHONE_1}}"));
+        assertTrue(
+                result.getMaskedPrompt()
+                        .contains("<PII_EMAIL_"));
+
+        assertTrue(
+                result.getMaskedPrompt()
+                        .contains("<PII_PHONE_"));
+
+        assertFalse(
+                result.getMaskedPrompt()
+                        .contains("john@gmail.com"));
+
+        assertFalse(
+                result.getMaskedPrompt()
+                        .contains("9876543210"));
+
+        assertEquals(
+                2,
+                result.getDetectedValues().size());
         assertEquals(2, result.getDetectedValues().size());
     }
 }

@@ -5,9 +5,12 @@ import com.ai.gateway.entitlement.dto.TenantEntitlementDto;
 import com.ai.gateway.entitlement.dto.TenantEntitlementResponse;
 import com.ai.gateway.entitlement.dto.UpdateTenantEntitlementRequest;
 import com.ai.gateway.entitlement.service.EntitlementService;
+import com.ai.gateway.quota.dto.TenantQuotaUsageResponse;
+import com.ai.gateway.quota.service.QuotaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -18,6 +21,8 @@ import java.util.UUID;
 public class EntitlementController {
 
     private final EntitlementService service;
+
+    private final QuotaService quotaService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -60,5 +65,21 @@ public class EntitlementController {
 
         service.disable(tenantId);
 
+    }
+
+    @PostMapping("/tenants/{tenantId}/provision")
+    public ResponseEntity<TenantEntitlementResponse> provision(
+            @PathVariable UUID tenantId) {
+
+        return ResponseEntity.ok(
+                service.provision(tenantId));
+    }
+
+    @GetMapping("/{tenantId}/quota")
+    public TenantQuotaUsageResponse getQuotaUsage(
+            @PathVariable UUID tenantId) {
+
+        return quotaService.getUsage(
+                tenantId);
     }
 }

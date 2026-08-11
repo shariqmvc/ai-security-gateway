@@ -75,6 +75,8 @@ public class TenantEntitlement {
 
     private boolean enabled;
 
+
+
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
