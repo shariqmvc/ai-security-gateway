@@ -2,8 +2,13 @@ package com.ai.gateway.service.impl;
 
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.budget.service.BudgetService;
 import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.*;
+import com.ai.gateway.entitlement.annotation.RequiresFeature;
+import com.ai.gateway.entitlement.enums.Feature;
+import com.ai.gateway.entitlement.mapper.ProviderFeatureMapper;
+import com.ai.gateway.entitlement.service.EntitlementService;
 import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
@@ -15,6 +20,7 @@ import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
+import com.ai.gateway.quota.service.QuotaService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Slf4j
@@ -50,7 +57,14 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final CostService costService;
 
+    private final EntitlementService entitlementService;
+
+    private final QuotaService quotaService;
+
+    private final BudgetService budgetService;
+
     @Override
+    @RequiresFeature(Feature.CHAT)
     public ChatResponse process(ChatRequest request) {
 
         metricsService.increment(MetricsConstants.TOTAL_REQUESTS);
@@ -93,6 +107,14 @@ public class GatewayServiceImpl implements GatewayService {
                             request,
                             auth,
                             maskedPrompt);
+
+            Feature feature =
+                    ProviderFeatureMapper.toFeature(
+                            aiRequest.getProvider());
+
+            validateFeature(
+                    auth,
+                    feature);
             // -------------------------------
             // Provider Invocation
             // -------------------------------
@@ -316,12 +338,31 @@ public class GatewayServiceImpl implements GatewayService {
                 request,
                 response);
 
-        costService.save(
-                requestId,
-                auth,
-                request,
-                response);
+        BigDecimal cost =
+                costService.save(
+                        requestId,
+                        auth,
+                        request,
+                        response);
 
+        if (response.getUsage() != null
+                && response.getUsage().getTotalTokens() != null
+                && response.getUsage().getTotalTokens() > 0) {
+
+            quotaService.consumeTokens(
+                    auth.getTenantId(),
+                    response.getUsage()
+                            .getTotalTokens()
+                            .longValue());
+        }
+
+        if (cost != null
+                && cost.compareTo(BigDecimal.ZERO) > 0) {
+
+            budgetService.consume(
+                    auth.getTenantId(),
+                    cost);
+        }
     }
 
     private String restoreResponse(
@@ -356,6 +397,48 @@ public class GatewayServiceImpl implements GatewayService {
                 MetricsConstants.SUCCESSFUL_REQUESTS);
 
     }
+    private void validateFeature(
+            AuthenticationContext auth,
+            Feature feature) {
+
+        entitlementService.validateFeature(
+                auth.getTenantId(),
+                feature);
     }
+
+    private void consumeTokenQuota(
+            AuthenticationContext auth,
+            AIResponse response) {
+
+        if (response.getUsage() == null) {
+            log.warn(
+                    "Token usage unavailable. tenant={}",
+                    auth.getTenantCode());
+
+            return;
+        }
+
+        Integer totalTokens =
+                response.getUsage()
+                        .getTotalTokens();
+
+        if (totalTokens == null ||
+                totalTokens <= 0) {
+
+            log.warn(
+                    "Invalid token usage. tenant={}, totalTokens={}",
+                    auth.getTenantCode(),
+                    totalTokens);
+
+            return;
+        }
+
+        quotaService.consumeTokens(
+                auth.getTenantId(),
+                totalTokens.longValue());
+    }
+
+
+}
 
 

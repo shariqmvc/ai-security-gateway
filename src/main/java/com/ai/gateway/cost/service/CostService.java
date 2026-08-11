@@ -6,11 +6,12 @@ import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.enums.Provider;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public interface CostService {
 
-    void save(
+    BigDecimal save(
             UUID requestId,
             AuthenticationContext context,
             AIRequest aiRequest,

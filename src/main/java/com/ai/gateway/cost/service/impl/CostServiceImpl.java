@@ -15,6 +15,8 @@ import com.ai.gateway.enums.Provider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -29,7 +31,7 @@ public class CostServiceImpl implements CostService {
     private final RequestCostRepository requestCostRepository;
 
     @Override
-    public void save(
+    public BigDecimal save(
             UUID requestId,
             AuthenticationContext context,
             AIRequest aiRequest,
@@ -41,19 +43,20 @@ public class CostServiceImpl implements CostService {
                 || usage.getInputTokens() == null
                 || usage.getOutputTokens() == null) {
 
-            log.debug("Token usage unavailable. Skipping cost calculation.");
-            return;
-        }
+            log.debug(
+                    "Token usage unavailable. Skipping cost calculation.");
 
+            return BigDecimal.ZERO;
+        }
 
         CostRequest request =
                 CostRequest.builder()
                         .provider(aiRequest.getProvider())
                         .model(aiRequest.getModel())
                         .inputTokens(
-                                aiResponse.getUsage().getInputTokens())
+                                usage.getInputTokens())
                         .outputTokens(
-                                aiResponse.getUsage().getOutputTokens())
+                                usage.getOutputTokens())
                         .build();
 
         CostResponse response =
@@ -66,16 +69,26 @@ public class CostServiceImpl implements CostService {
                         .provider(aiRequest.getProvider())
                         .model(aiRequest.getModel())
                         .inputTokens(
-                                aiResponse.getUsage().getInputTokens())
+                                usage.getInputTokens())
                         .outputTokens(
-                                aiResponse.getUsage().getOutputTokens())
-                        .inputCost(response.getInputCost())
-                        .outputCost(response.getOutputCost())
-                        .totalCost(response.getTotalCost())
-                        .createdAt(LocalDateTime.now())
+                                usage.getOutputTokens())
+                        .totalTokens(
+                                usage.getTotalTokens())
+                        .inputCost(
+                                response.getInputCost())
+                        .outputCost(
+                                response.getOutputCost())
+                        .totalCost(
+                                response.getTotalCost())
+                        .reasoningTokens(
+                                usage.getReasoningTokens())
+                        .createdAt(
+                                LocalDateTime.now())
                         .build();
 
         requestCostRepository.save(entity);
+
+        return response.getTotalCost();
     }
 
     @Override

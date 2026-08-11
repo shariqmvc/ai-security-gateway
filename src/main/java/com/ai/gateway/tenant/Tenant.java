@@ -1,5 +1,6 @@
 package com.ai.gateway.tenant;
 
+import com.ai.gateway.entitlement.enums.Plan;
 import com.ai.gateway.enums.Provider;
 import jakarta.persistence.*;
 import lombok.*;
@@ -31,6 +32,10 @@ public class Tenant {
 
     @Enumerated(EnumType.STRING)
     private TenantType type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Plan plan;
 
     @Enumerated(EnumType.STRING)
     private Provider defaultProvider;

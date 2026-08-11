@@ -1,6 +1,7 @@
 package com.ai.gateway.config;
 
 import com.ai.gateway.authentication.AuthenticationFilter;
+import com.ai.gateway.ratelimit.filter.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final AuthenticationFilter authenticationFilter;
+    private final RateLimitFilter rateLimitFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
@@ -26,7 +28,10 @@ public class SecurityConfig {
                         .permitAll())
                 .addFilterBefore(
                         authenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(
+                        rateLimitFilter,
+                        AuthenticationFilter.class);
 
         return http.build();
     }
