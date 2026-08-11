@@ -25,17 +25,17 @@ public class EntitlementProvisioningServiceImpl
     @Transactional
     public void provision(UUID tenantId) {
 
+        Tenant tenant =
+                tenantRepository.findByIdForUpdate(tenantId)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Tenant not found: " + tenantId));
+
         if (entitlementRepository
                 .findByTenantId(tenantId)
                 .isPresent()) {
             return;
         }
-
-        Tenant tenant =
-                tenantRepository.findById(tenantId)
-                        .orElseThrow(() ->
-                                new IllegalStateException(
-                                        "Tenant not found: " + tenantId));
 
         if (tenant.getPlan() == null) {
             throw new IllegalStateException(
