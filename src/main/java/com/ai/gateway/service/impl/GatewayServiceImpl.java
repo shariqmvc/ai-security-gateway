@@ -333,36 +333,26 @@ public class GatewayServiceImpl implements GatewayService {
             AIRequest request,
             AIResponse response) {
 
+        Usage usage = response.getUsage();
+
+        if (usage == null) {
+            return;
+        }
+
+        quotaService.consumeTokens(
+                auth.getTenantId(),
+                usage.getTotalTokens());
+
         tokenUsageService.save(
                 requestId,
                 request,
                 response);
 
-        BigDecimal cost =
-                costService.save(
-                        requestId,
-                        auth,
-                        request,
-                        response);
-
-        if (response.getUsage() != null
-                && response.getUsage().getTotalTokens() != null
-                && response.getUsage().getTotalTokens() > 0) {
-
-            quotaService.consumeTokens(
-                    auth.getTenantId(),
-                    response.getUsage()
-                            .getTotalTokens()
-                            .longValue());
-        }
-
- /*       if (cost != null
-                && cost.compareTo(BigDecimal.ZERO) > 0) {
-
-            budgetService.consume(
-                    auth.getTenantId(),
-                    cost);
-        } */
+        costService.save(
+                requestId,
+                auth,
+                request,
+                response);
     }
 
     private String restoreResponse(
