@@ -21,6 +21,9 @@ import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.quota.service.QuotaService;
+import com.ai.gateway.routing.RoutingContext;
+import com.ai.gateway.routing.RoutingDecision;
+import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -62,8 +65,7 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final QuotaService quotaService;
 
-    private final ProviderModelRegistryService
-            providerModelRegistryService;
+    private final RoutingService routingService;
 
   //  private final BudgetService budgetService;
 
@@ -288,29 +290,17 @@ public class GatewayServiceImpl implements GatewayService {
             AuthenticationContext auth,
             String prompt) {
 
-
+        RoutingDecision routingDecision =
+                routingService.route(
+                        new RoutingContext(
+                                request,
+                                auth));
 
         Provider selectedProvider =
-                request.getProvider() != null
-                        ? request.getProvider()
-                        : auth.getDefaultProvider();
-
-        providerModelRegistryService
-                .requireProvider(selectedProvider);
-
-        AIProvider provider =
-                providerFactory.getProvider(selectedProvider);
+                routingDecision.provider();
 
         String selectedModel =
-                request.getModel() != null
-                        && !request.getModel().isBlank()
-                        ? request.getModel()
-                        : provider.defaultModel();
-
-        providerModelRegistryService
-                .requireModel(
-                        selectedProvider,
-                        selectedModel);
+                routingDecision.model();
 
         log.info(
                 "Tenant={} Provider={} Model={}",
@@ -326,7 +316,6 @@ public class GatewayServiceImpl implements GatewayService {
                 .model(selectedModel)
                 .prompt(prompt)
                 .build();
-
     }
     private AIResponse invokeProvider(
             AIRequest request) {
@@ -408,37 +397,7 @@ public class GatewayServiceImpl implements GatewayService {
                 feature);
     }
 
-    private void consumeTokenQuota(
-            AuthenticationContext auth,
-            AIResponse response) {
 
-        if (response.getUsage() == null) {
-            log.warn(
-                    "Token usage unavailable. tenant={}",
-                    auth.getTenantCode());
-
-            return;
-        }
-
-        Integer totalTokens =
-                response.getUsage()
-                        .getTotalTokens();
-
-        if (totalTokens == null ||
-                totalTokens <= 0) {
-
-            log.warn(
-                    "Invalid token usage. tenant={}, totalTokens={}",
-                    auth.getTenantCode(),
-                    totalTokens);
-
-            return;
-        }
-
-        quotaService.consumeTokens(
-                auth.getTenantId(),
-                totalTokens.longValue());
-    }
 
 
 }

@@ -18,6 +18,10 @@ import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.quota.exception.QuotaExceededException;
 import com.ai.gateway.quota.service.QuotaService;
+import com.ai.gateway.routing.RoutingContext;
+import com.ai.gateway.routing.RoutingDecision;
+import com.ai.gateway.routing.RoutingService;
+import com.ai.gateway.routing.RoutingStrategy;
 import com.ai.gateway.routing.registry.*;
 import com.ai.gateway.service.impl.GatewayServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
@@ -101,7 +105,8 @@ class GatewayServiceImplTest {
     private AuthenticationContext authenticationContext;
 
     @Mock
-    private ProviderModelRegistryService providerModelRegistryService;
+    private RoutingService routingService;
+
 
     @BeforeEach
     void setUp() {
@@ -126,10 +131,7 @@ class GatewayServiceImplTest {
 
         RequestContextHolder.setRequestAttributes(
                 servletRequestAttributes);
-
-
     }
-
     @AfterEach
     void tearDown() {
 
@@ -138,6 +140,9 @@ class GatewayServiceImplTest {
 
     @Test
     void shouldConsumeTokenQuotaAfterSuccessfulProviderResponse() {
+
+        mockGeminiRouting();
+
 
         ChatRequest request =
                 ChatRequest.builder()
@@ -179,7 +184,7 @@ class GatewayServiceImplTest {
                                         .build())
                         .build();
 
-        when(providerModelRegistryService.requireProvider(
+   /*     when(providerModelRegistryService.requireProvider(
                 Provider.GEMINI))
                 .thenReturn(
                         new ProviderDefinition(
@@ -199,7 +204,7 @@ class GatewayServiceImplTest {
                                 "gemini-test",
                                 ModelStatus.ENABLED,
                                 Set.of(ModelCapabilities.CHAT)
-                        ));
+                        )); */
 
         when(firewallService.inspect("hello"))
                 .thenReturn(firewallResult);
@@ -266,6 +271,8 @@ class GatewayServiceImplTest {
     @Test
     void shouldNotPersistUsageWhenProviderReturnsNoUsage() {
 
+        mockGeminiRouting();
+
         ChatRequest request =
                 ChatRequest.builder()
                         .prompt("hello")
@@ -299,7 +306,7 @@ class GatewayServiceImplTest {
                         .usage(null)
                         .build();
 
-        when(providerModelRegistryService.requireProvider(
+    /*    when(providerModelRegistryService.requireProvider(
                 Provider.GEMINI))
                 .thenReturn(
                         new ProviderDefinition(
@@ -319,7 +326,7 @@ class GatewayServiceImplTest {
                                 "gemini-test",
                                 ModelStatus.ENABLED,
                                 Set.of(ModelCapabilities.CHAT)
-                        ));
+                        )); */
 
         when(firewallService.inspect("hello"))
                 .thenReturn(firewallResult);
@@ -374,7 +381,9 @@ class GatewayServiceImplTest {
     void shouldRejectGeminiWhenTenantDoesNotHaveGeminiEntitlement()
             throws Exception {
 
-        when(providerModelRegistryService.requireProvider(
+        mockGeminiRouting();
+
+   /*     when(providerModelRegistryService.requireProvider(
                 Provider.GEMINI))
                 .thenReturn(
                         new ProviderDefinition(
@@ -394,7 +403,7 @@ class GatewayServiceImplTest {
                                 "gemini-test",
                                 ModelStatus.ENABLED,
                                 Set.of(ModelCapabilities.CHAT)
-                        ));
+                        )); */
 
         when(firewallService.inspect(anyString()))
                 .thenReturn(
@@ -415,9 +424,6 @@ class GatewayServiceImplTest {
                                 .detectedValues(List.of())
                                 .build());
 
-        when(providerFactory.getProvider(
-                Provider.GEMINI))
-                .thenReturn(provider);
 
         doThrow(new BusinessException(
                 "Gemini feature not enabled"))
@@ -448,6 +454,8 @@ class GatewayServiceImplTest {
 
     @Test
     void shouldRejectRequestWhenTokenQuotaIsExceeded() {
+
+        mockGeminiRouting();
 
         ChatRequest request =
                 ChatRequest.builder()
@@ -489,7 +497,7 @@ class GatewayServiceImplTest {
                                         .build())
                         .build();
 
-        when(providerModelRegistryService.requireProvider(
+       /* when(providerModelRegistryService.requireProvider(
                 Provider.GEMINI))
                 .thenReturn(
                         new ProviderDefinition(
@@ -509,7 +517,7 @@ class GatewayServiceImplTest {
                                 "gemini-test",
                                 ModelStatus.ENABLED,
                                 Set.of(ModelCapabilities.CHAT)
-                        ));
+                        )); */
 
         when(firewallService.inspect("hello"))
                 .thenReturn(firewallResult);
@@ -590,10 +598,8 @@ class GatewayServiceImplTest {
 
         doThrow(new BusinessException(
                 "Model unknown-model is not available for provider GEMINI."))
-                .when(providerModelRegistryService)
-                .requireModel(
-                        Provider.GEMINI,
-                        "unknown-model");
+                .when(routingService)
+                .route(any(RoutingContext.class));
 
         ChatRequest request =
                 ChatRequest.builder()
@@ -606,13 +612,13 @@ class GatewayServiceImplTest {
                 BusinessException.class,
                 () -> gatewayService.process(request));
 
-        verify(providerModelRegistryService)
+   /*     verify(providerModelRegistryService)
                 .requireProvider(Provider.GEMINI);
 
         verify(providerModelRegistryService)
                 .requireModel(
                         Provider.GEMINI,
-                        "unknown-model");
+                        "unknown-model"); */
 
         verify(provider, never())
                 .chat(any(AIRequest.class));
@@ -642,9 +648,8 @@ class GatewayServiceImplTest {
 
         doThrow(new BusinessException(
                 "GEMINI provider is not available."))
-                .when(providerModelRegistryService)
-                .requireProvider(
-                        Provider.GEMINI);
+                .when(routingService)
+                .route(any(RoutingContext.class));
 
         ChatRequest request =
                 ChatRequest.builder()
@@ -657,12 +662,23 @@ class GatewayServiceImplTest {
                 BusinessException.class,
                 () -> gatewayService.process(request));
 
-        verify(providerModelRegistryService)
+ /*       verify(providerModelRegistryService)
                 .requireProvider(
-                        Provider.GEMINI);
+                        Provider.GEMINI); */
 
         verify(providerFactory, never())
                 .getProvider(
                         Provider.GEMINI);
+    }
+
+    private void mockGeminiRouting() {
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
     }
 }
