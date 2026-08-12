@@ -61,7 +61,7 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final QuotaService quotaService;
 
-    private final BudgetService budgetService;
+  //  private final BudgetService budgetService;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -356,13 +356,13 @@ public class GatewayServiceImpl implements GatewayService {
                             .longValue());
         }
 
-        if (cost != null
+ /*       if (cost != null
                 && cost.compareTo(BigDecimal.ZERO) > 0) {
 
             budgetService.consume(
                     auth.getTenantId(),
                     cost);
-        }
+        } */
     }
 
     private String restoreResponse(
