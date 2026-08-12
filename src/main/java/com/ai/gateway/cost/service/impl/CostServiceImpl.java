@@ -1,6 +1,7 @@
 package com.ai.gateway.cost.service.impl;
 
 import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.budget.service.BudgetService;
 import com.ai.gateway.cost.dto.CostRequest;
 import com.ai.gateway.cost.dto.CostResponse;
 import com.ai.gateway.cost.dto.CostSummary;
@@ -29,6 +30,7 @@ public class CostServiceImpl implements CostService {
     private final CostCalculator costCalculator;
 
     private final RequestCostRepository requestCostRepository;
+    private final BudgetService budgetService;
 
     @Override
     public BigDecimal save(
@@ -61,6 +63,14 @@ public class CostServiceImpl implements CostService {
 
         CostResponse response =
                 costCalculator.calculate(request);
+
+        BigDecimal totalCost =
+                response.getTotalCost();
+
+        // Enforce budget before persisting cost.
+        budgetService.consume(
+                context.getTenantId(),
+                totalCost);
 
         RequestCost entity =
                 RequestCost.builder()

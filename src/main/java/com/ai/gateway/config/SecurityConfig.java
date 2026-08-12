@@ -24,8 +24,14 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/admin/tenants/**").permitAll()
+                        .requestMatchers("/admin/entitlements/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+            /*    .authorizeHttpRequests(auth -> auth
                         .anyRequest()
-                        .permitAll())
+                        .permitAll()) */
+
                 .addFilterBefore(
                         authenticationFilter,
                         UsernamePasswordAuthenticationFilter.class)

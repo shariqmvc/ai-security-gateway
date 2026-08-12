@@ -10,6 +10,7 @@ public enum Feature {
     // Core Gateway
     CHAT,
     STREAMING,
+    EMBEDDING,
 
     // Security
     PROMPT_FIREWALL,
