@@ -14,6 +14,8 @@ public interface ModelRegistry {
     List<ModelDefinition> findByProvider(
             Provider provider);
 
+    String defaultModel(Provider provider);
+
     boolean exists(
             Provider provider,
             String modelId);

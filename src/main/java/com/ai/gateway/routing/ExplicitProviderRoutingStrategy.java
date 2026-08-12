@@ -1,20 +1,27 @@
 package com.ai.gateway.routing;
 
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.routing.registry.ModelRegistry;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class ExplicitProviderRoutingStrategy implements RoutingStrategyHandler{
+public class ExplicitProviderRoutingStrategy
+        implements RoutingStrategyHandler {
+
     private final ProviderModelRegistryService registryService;
+
+    private final ModelRegistry modelRegistry;
 
     @Override
     public boolean supports(
             RoutingContext context) {
 
-        return context.request().getProvider() != null;
+        return context != null
+                && context.request() != null
+                && context.request().getProvider() != null;
     }
 
     @Override
@@ -32,8 +39,7 @@ public class ExplicitProviderRoutingStrategy implements RoutingStrategyHandler{
         if (model == null || model.isBlank()) {
 
             model =
-                    context.authenticationContext()
-                            .getDefaultModel();
+                    modelRegistry.defaultModel(provider);
         }
 
         registryService.requireModel(
