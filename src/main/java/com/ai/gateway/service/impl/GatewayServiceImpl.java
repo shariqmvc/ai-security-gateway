@@ -21,6 +21,7 @@ import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.quota.service.QuotaService;
+import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,9 @@ public class GatewayServiceImpl implements GatewayService {
     private final EntitlementService entitlementService;
 
     private final QuotaService quotaService;
+
+    private final ProviderModelRegistryService
+            providerModelRegistryService;
 
   //  private final BudgetService budgetService;
 
@@ -291,6 +295,9 @@ public class GatewayServiceImpl implements GatewayService {
                         ? request.getProvider()
                         : auth.getDefaultProvider();
 
+        providerModelRegistryService
+                .requireProvider(selectedProvider);
+
         AIProvider provider =
                 providerFactory.getProvider(selectedProvider);
 
@@ -299,6 +306,11 @@ public class GatewayServiceImpl implements GatewayService {
                         && !request.getModel().isBlank()
                         ? request.getModel()
                         : provider.defaultModel();
+
+        providerModelRegistryService
+                .requireModel(
+                        selectedProvider,
+                        selectedModel);
 
         log.info(
                 "Tenant={} Provider={} Model={}",

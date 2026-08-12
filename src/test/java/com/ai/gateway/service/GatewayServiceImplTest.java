@@ -18,6 +18,7 @@ import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.quota.exception.QuotaExceededException;
 import com.ai.gateway.quota.service.QuotaService;
+import com.ai.gateway.routing.registry.*;
 import com.ai.gateway.service.impl.GatewayServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +34,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -98,6 +100,9 @@ class GatewayServiceImplTest {
 
     private AuthenticationContext authenticationContext;
 
+    @Mock
+    private ProviderModelRegistryService providerModelRegistryService;
+
     @BeforeEach
     void setUp() {
 
@@ -121,6 +126,8 @@ class GatewayServiceImplTest {
 
         RequestContextHolder.setRequestAttributes(
                 servletRequestAttributes);
+
+
     }
 
     @AfterEach
@@ -171,6 +178,28 @@ class GatewayServiceImplTest {
                                         .reasoningTokens(0)
                                         .build())
                         .build();
+
+        when(providerModelRegistryService.requireProvider(
+                Provider.GEMINI))
+                .thenReturn(
+                        new ProviderDefinition(
+                                Provider.GEMINI,
+                                Provider.GEMINI.name(),
+                                ProviderStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
+
+        when(providerModelRegistryService.requireModel(
+                Provider.GEMINI,
+                "gemini-test"))
+                .thenReturn(
+                        new ModelDefinition(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                "gemini-test",
+                                ModelStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
 
         when(firewallService.inspect("hello"))
                 .thenReturn(firewallResult);
@@ -270,6 +299,28 @@ class GatewayServiceImplTest {
                         .usage(null)
                         .build();
 
+        when(providerModelRegistryService.requireProvider(
+                Provider.GEMINI))
+                .thenReturn(
+                        new ProviderDefinition(
+                                Provider.GEMINI,
+                                Provider.GEMINI.name(),
+                                ProviderStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
+
+        when(providerModelRegistryService.requireModel(
+                Provider.GEMINI,
+                "gemini-test"))
+                .thenReturn(
+                        new ModelDefinition(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                "gemini-test",
+                                ModelStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
+
         when(firewallService.inspect("hello"))
                 .thenReturn(firewallResult);
 
@@ -322,6 +373,28 @@ class GatewayServiceImplTest {
     @Test
     void shouldRejectGeminiWhenTenantDoesNotHaveGeminiEntitlement()
             throws Exception {
+
+        when(providerModelRegistryService.requireProvider(
+                Provider.GEMINI))
+                .thenReturn(
+                        new ProviderDefinition(
+                                Provider.GEMINI,
+                                Provider.GEMINI.name(),
+                                ProviderStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
+
+        when(providerModelRegistryService.requireModel(
+                Provider.GEMINI,
+                "gemini-test"))
+                .thenReturn(
+                        new ModelDefinition(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                "gemini-test",
+                                ModelStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
 
         when(firewallService.inspect(anyString()))
                 .thenReturn(
@@ -416,6 +489,28 @@ class GatewayServiceImplTest {
                                         .build())
                         .build();
 
+        when(providerModelRegistryService.requireProvider(
+                Provider.GEMINI))
+                .thenReturn(
+                        new ProviderDefinition(
+                                Provider.GEMINI,
+                                Provider.GEMINI.name(),
+                                ProviderStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
+
+        when(providerModelRegistryService.requireModel(
+                Provider.GEMINI,
+                "gemini-test"))
+                .thenReturn(
+                        new ModelDefinition(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                "gemini-test",
+                                ModelStatus.ENABLED,
+                                Set.of(ModelCapabilities.CHAT)
+                        ));
+
         when(firewallService.inspect("hello"))
                 .thenReturn(firewallResult);
 
@@ -469,5 +564,105 @@ class GatewayServiceImplTest {
                         eq(authenticationContext),
                         any(AIRequest.class),
                         eq(response));
+    }
+
+    @Test
+    void shouldRejectUnknownModel() {
+
+        when(firewallService.inspect(anyString()))
+                .thenReturn(
+                        FirewallResult.builder()
+                                .allowed(true)
+                                .build());
+
+        when(policyEngineService.evaluate(anyString()))
+                .thenReturn(
+                        PolicyResult.builder()
+                                .allowed(true)
+                                .build());
+
+        when(piiDetectionService.mask(anyString()))
+                .thenReturn(
+                        MaskingResult.builder()
+                                .maskedPrompt("hello")
+                                .detectedValues(List.of())
+                                .build());
+
+        doThrow(new BusinessException(
+                "Model unknown-model is not available for provider GEMINI."))
+                .when(providerModelRegistryService)
+                .requireModel(
+                        Provider.GEMINI,
+                        "unknown-model");
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.GEMINI)
+                        .model("unknown-model")
+                        .build();
+
+        assertThrows(
+                BusinessException.class,
+                () -> gatewayService.process(request));
+
+        verify(providerModelRegistryService)
+                .requireProvider(Provider.GEMINI);
+
+        verify(providerModelRegistryService)
+                .requireModel(
+                        Provider.GEMINI,
+                        "unknown-model");
+
+        verify(provider, never())
+                .chat(any(AIRequest.class));
+    }
+
+    @Test
+    void shouldRejectUnavailableProvider() {
+
+        when(firewallService.inspect(anyString()))
+                .thenReturn(
+                        FirewallResult.builder()
+                                .allowed(true)
+                                .build());
+
+        when(policyEngineService.evaluate(anyString()))
+                .thenReturn(
+                        PolicyResult.builder()
+                                .allowed(true)
+                                .build());
+
+        when(piiDetectionService.mask(anyString()))
+                .thenReturn(
+                        MaskingResult.builder()
+                                .maskedPrompt("hello")
+                                .detectedValues(List.of())
+                                .build());
+
+        doThrow(new BusinessException(
+                "GEMINI provider is not available."))
+                .when(providerModelRegistryService)
+                .requireProvider(
+                        Provider.GEMINI);
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.GEMINI)
+                        .model("gemini-test")
+                        .build();
+
+        assertThrows(
+                BusinessException.class,
+                () -> gatewayService.process(request));
+
+        verify(providerModelRegistryService)
+                .requireProvider(
+                        Provider.GEMINI);
+
+        verify(providerFactory, never())
+                .getProvider(
+                        Provider.GEMINI);
     }
 }
