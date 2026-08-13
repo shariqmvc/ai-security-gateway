@@ -110,6 +110,7 @@ public class GatewayServiceImpl implements GatewayService {
 
             aiRequest =
                     buildAIRequest(
+                            requestId,
                             request,
                             auth,
                             maskedPrompt);
@@ -309,36 +310,74 @@ public class GatewayServiceImpl implements GatewayService {
     }
 
     private AIRequest buildAIRequest(
+            UUID requestId,
             ChatRequest request,
             AuthenticationContext auth,
             String prompt) {
 
-        RoutingDecision routingDecision =
-                routingService.route(
-                        new RoutingContext(
-                                request,
-                                auth));
+        try {
+            RoutingDecision routingDecision =
+                    routingService.route(
+                            new RoutingContext(
+                                    request,
+                                    auth));
 
-        Provider selectedProvider =
-                routingDecision.provider();
+            metricsService.increment(
+                    MetricsConstants.ROUTING_DECISIONS);
 
-        String selectedModel =
-                routingDecision.model();
+            switch (routingDecision.strategy()) {
 
-        log.info(
-                "Tenant={} Provider={} Model={}",
-                auth.getTenantCode(),
-                selectedProvider,
-                selectedModel);
+                case EXPLICIT_PROVIDER ->
+                        metricsService.increment(
+                                MetricsConstants.ROUTING_EXPLICIT_PROVIDER);
 
-        metricsService.incrementProviderRequest(
-                selectedProvider);
+                case EXPLICIT_MODEL ->
+                        metricsService.increment(
+                                MetricsConstants.ROUTING_EXPLICIT_MODEL);
 
-        return AIRequest.builder()
-                .provider(selectedProvider)
-                .model(selectedModel)
-                .prompt(prompt)
-                .build();
+                case TENANT_DEFAULT ->
+                        metricsService.increment(
+                                MetricsConstants.ROUTING_TENANT_DEFAULT);
+            }
+
+            Provider selectedProvider =
+                    routingDecision.provider();
+
+            String selectedModel =
+                    routingDecision.model();
+
+            log.info(
+                    "Routing decision: requestId={} tenant={} strategy={} provider={} model={}",
+                    requestId,
+                    auth.getTenantCode(),
+                    routingDecision.strategy(),
+                    routingDecision.provider(),
+                    routingDecision.model()
+            );
+
+            metricsService.incrementProviderRequest(
+                    selectedProvider);
+
+            return AIRequest.builder()
+                    .provider(selectedProvider)
+                    .model(selectedModel)
+                    .prompt(prompt)
+                    .build();
+        } catch (Exception ex) {
+
+            log.warn(
+                    "Routing failed: requestId={} tenant={} provider={} model={} error={}",
+                    requestId,
+                    auth != null
+                            ? auth.getTenantCode()
+                            : null,
+                    request.getProvider(),
+                    request.getModel(),
+                    ex.getMessage()
+            );
+
+            throw ex;
+        }
     }
     private AIResponse invokeProvider(
             AIRequest request) {
