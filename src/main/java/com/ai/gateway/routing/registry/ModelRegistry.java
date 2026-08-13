@@ -19,4 +19,7 @@ public interface ModelRegistry {
     boolean exists(
             Provider provider,
             String modelId);
+
+    Optional<ModelDefinition> findByModel(
+            String modelId);
 }

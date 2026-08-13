@@ -7,6 +7,7 @@ import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.*;
 import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.service.EntitlementService;
+import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.firewall.FirewallResult;
@@ -680,5 +681,69 @@ class GatewayServiceImplTest {
                                 Provider.GEMINI,
                                 "gemini-test",
                                 RoutingStrategy.EXPLICIT_PROVIDER));
+    }
+
+    @Test
+    void shouldAuditFailureWithoutThrowingWhenTenantDefaultsAreMissing() {
+
+        AuthenticationContext context =
+                AuthenticationContext.builder()
+                        .tenantId(UUID.randomUUID())
+                        .tenantCode("TEST")
+                        .tenantName("Test Tenant")
+                        .defaultProvider(null)
+                        .defaultModel(null)
+                        .build();
+
+        when(httpServletRequest.getAttribute(
+                AuthenticationConstants.AUTH_CONTEXT))
+                .thenReturn(context);
+
+        when(firewallService.inspect(any()))
+                .thenReturn(
+                        FirewallResult.builder()
+                                .allowed(true)
+                                .reason(null)
+                                .build());
+
+        when(policyEngineService.evaluate(any()))
+                .thenReturn(
+                        PolicyResult.builder()
+                                .allowed(true)
+                                .reason(null)
+                                .build());
+
+        when(piiDetectionService.mask(any()))
+                .thenReturn(
+                        MaskingResult.builder()
+                                .maskedPrompt("hello")
+                                .detectedValues(
+                                        Collections.emptyList())
+                                .build());
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenThrow(
+                        new BusinessException(
+                                "Tenant default provider is not configured."));
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .build();
+
+        assertThrows(
+                BusinessException.class,
+                () -> gatewayService.process(request));
+
+        verify(auditService)
+                .save(
+                        any(UUID.class),
+                        eq("hello"),
+                        isNull(),
+                        anyLong(),
+                        isNull(),
+                        isNull(),
+                        eq(AuditStatus.FAILED));
     }
 }

@@ -4,9 +4,11 @@ import com.ai.gateway.enums.Provider;
 import com.ai.gateway.routing.registry.ModelRegistry;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
+@Order(1)
 @RequiredArgsConstructor
 public class ExplicitProviderRoutingStrategy
         implements RoutingStrategyHandler {

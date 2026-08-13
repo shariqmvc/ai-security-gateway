@@ -219,15 +219,38 @@ public class GatewayServiceImpl implements GatewayService {
             AIRequest aiRequest,
             AuthenticationContext auth) {
 
-        String provider =
-                aiRequest != null
-                        ? aiRequest.getProvider().name()
-                        : auth.getDefaultProvider().name();
+        String provider = null;
+        String model = null;
 
-        String model =
-                aiRequest != null
-                        ? aiRequest.getModel()
-                        : auth.getDefaultModel();
+        if (aiRequest != null) {
+
+            if (aiRequest.getProvider() != null) {
+                provider =
+                        aiRequest.getProvider().name();
+            }
+
+            model =
+                    aiRequest.getModel();
+        }
+
+        /*
+         * If AIRequest was not created, fall back to the
+         * authentication/tenant defaults.
+         */
+        if (provider == null
+                && auth != null
+                && auth.getDefaultProvider() != null) {
+
+            provider =
+                    auth.getDefaultProvider().name();
+        }
+
+        if (model == null
+                && auth != null) {
+
+            model =
+                    auth.getDefaultModel();
+        }
 
         auditService.save(
                 requestId,

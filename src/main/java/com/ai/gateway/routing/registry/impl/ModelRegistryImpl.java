@@ -64,6 +64,27 @@ public class ModelRegistryImpl
     }
 
     @Override
+    public Optional<ModelDefinition> findByModel(
+            String modelId) {
+
+        if (modelId == null || modelId.isBlank()) {
+            return Optional.empty();
+        }
+
+        for (Provider provider : Provider.values()) {
+
+            Optional<ModelDefinition> model =
+                    find(provider, modelId);
+
+            if (model.isPresent()) {
+                return model;
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    @Override
     public List<ModelDefinition> findByProvider(
             Provider provider) {
 
