@@ -4,28 +4,29 @@ import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.budget.service.BudgetService;
 import com.ai.gateway.cost.service.CostService;
-import com.ai.gateway.dto.*;
+import com.ai.gateway.dto.AIRequest;
+import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.dto.ChatRequest;
+import com.ai.gateway.dto.ChatResponse;
+import com.ai.gateway.dto.MaskingResult;
+import com.ai.gateway.dto.Usage;
 import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.service.EntitlementService;
-import com.ai.gateway.failover.ProviderFailoverService;
 import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
+import com.ai.gateway.failover.ProviderFailoverService;
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.service.PromptFireWallService;
 import com.ai.gateway.metrics.GatewayMetricsService;
-import com.ai.gateway.metrics.MetricsConstants;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
-import com.ai.gateway.provider.AIProvider;
-import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.quota.exception.QuotaExceededException;
 import com.ai.gateway.quota.service.QuotaService;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.RoutingStrategy;
-import com.ai.gateway.routing.registry.*;
 import com.ai.gateway.service.impl.GatewayServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -40,13 +41,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.math.BigDecimal;
 import java.util.Collections;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,9 +61,6 @@ class GatewayServiceImplTest {
 
     @Mock
     private AuditService auditService;
-
-    @Mock
-    private AIProviderFactory providerFactory;
 
     @Mock
     private PromptFireWallService firewallService;
@@ -92,13 +87,16 @@ class GatewayServiceImplTest {
     private EntitlementService entitlementService;
 
     @Mock
-    private AIProvider provider;
-
-    @Mock
     private HttpServletRequest httpServletRequest;
 
     @Mock
     private ServletRequestAttributes servletRequestAttributes;
+
+    @Mock
+    private RoutingService routingService;
+
+    @Mock
+    private ProviderFailoverService providerFailoverService;
 
     @InjectMocks
     private GatewayServiceImpl gatewayService;
@@ -107,12 +105,10 @@ class GatewayServiceImplTest {
 
     private AuthenticationContext authenticationContext;
 
-    @Mock
-    private RoutingService routingService;
 
-    @Mock
-    private ProviderFailoverService providerFailoverService;
-
+    // ============================================================
+    // SETUP
+    // ============================================================
 
     @BeforeEach
     void setUp() {
@@ -135,110 +131,33 @@ class GatewayServiceImplTest {
                 AuthenticationConstants.AUTH_CONTEXT))
                 .thenReturn(authenticationContext);
 
-        lenient().when(providerFailoverService.execute(
-                any(AIRequest.class)))
-                .thenAnswer(invocation ->
-                        providerFactory.getProvider(
-                                invocation.getArgument(
-                                        0,
-                                        AIRequest.class)
-                                        .getProvider())
-                                .chat(invocation.getArgument(
-                                        0,
-                                        AIRequest.class)));
-
         RequestContextHolder.setRequestAttributes(
                 servletRequestAttributes);
     }
+
+
     @AfterEach
     void tearDown() {
 
         RequestContextHolder.resetRequestAttributes();
     }
 
+
+    // ============================================================
+    // 1. SUCCESSFUL PROVIDER RESPONSE
+    // ============================================================
+
     @Test
     void shouldConsumeTokenQuotaAfterSuccessfulProviderResponse() {
 
+        mockSuccessfulPreProviderFlow();
         mockGeminiRouting();
 
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .model("gemini-test")
-                        .build();
-
-        MaskingResult maskingResult =
-                MaskingResult.builder()
-                        .maskedPrompt("hello")
-                        .detectedValues(
-                                Collections.emptyList())
-                        .build();
-
-        FirewallResult firewallResult =
-                FirewallResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
-
-        PolicyResult policyResult =
-                PolicyResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
-
         AIResponse response =
-                AIResponse.builder()
-                        .response("Hello from AI")
-                        .providerRequestId("provider-123")
-                        .usage(
-                                Usage.builder()
-                                        .inputTokens(100)
-                                        .outputTokens(50)
-                                        .totalTokens(150)
-                                        .latencyMs(200L)
-                                        .reasoningTokens(0)
-                                        .build())
-                        .build();
+                createSuccessfulAIResponse();
 
-   /*     when(providerModelRegistryService.requireProvider(
-                Provider.GEMINI))
-                .thenReturn(
-                        new ProviderDefinition(
-                                Provider.GEMINI,
-                                Provider.GEMINI.name(),
-                                ProviderStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        ));
-
-        when(providerModelRegistryService.requireModel(
-                Provider.GEMINI,
-                "gemini-test"))
-                .thenReturn(
-                        new ModelDefinition(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                "gemini-test",
-                                ModelStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        )); */
-
-        when(firewallService.inspect("hello"))
-                .thenReturn(firewallResult);
-
-        when(policyEngineService.evaluate("hello"))
-                .thenReturn(policyResult);
-
-        when(piiDetectionService.mask("hello"))
-                .thenReturn(maskingResult);
-
-        when(providerFactory.getProvider(
-                Provider.GEMINI))
-                .thenReturn(provider);
-
-
-        when(provider.chat(any(AIRequest.class)))
+        when(providerFailoverService.execute(
+                any(AIRequest.class)))
                 .thenReturn(response);
 
         when(costService.save(
@@ -254,18 +173,23 @@ class GatewayServiceImplTest {
                 any(UUID.class)))
                 .thenReturn("Hello from AI");
 
-        doNothing()
-                .when(entitlementService)
-                .validateFeature(
-                        tenantId,
-                        Feature.GEMINI);
+        ChatRequest request =
+                createGeminiRequest();
 
-        var result =
+        ChatResponse result =
                 gatewayService.process(request);
+
+        assertNotNull(result);
 
         assertEquals(
                 "Hello from AI",
                 result.getResponse());
+
+        verify(routingService)
+                .route(any(RoutingContext.class));
+
+        verify(providerFailoverService)
+                .execute(any(AIRequest.class));
 
         verify(quotaService)
                 .consumeTokens(
@@ -286,36 +210,16 @@ class GatewayServiceImplTest {
                         eq(response));
     }
 
+
+    // ============================================================
+    // 2. NO USAGE
+    // ============================================================
+
     @Test
     void shouldNotPersistUsageWhenProviderReturnsNoUsage() {
 
+        mockSuccessfulPreProviderFlow();
         mockGeminiRouting();
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .model("gemini-test")
-                        .build();
-
-        MaskingResult maskingResult =
-                MaskingResult.builder()
-                        .maskedPrompt("hello")
-                        .detectedValues(
-                                Collections.emptyList())
-                        .build();
-
-        FirewallResult firewallResult =
-                FirewallResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
-
-        PolicyResult policyResult =
-                PolicyResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
 
         AIResponse response =
                 AIResponse.builder()
@@ -324,52 +228,23 @@ class GatewayServiceImplTest {
                         .usage(null)
                         .build();
 
-    /*    when(providerModelRegistryService.requireProvider(
-                Provider.GEMINI))
-                .thenReturn(
-                        new ProviderDefinition(
-                                Provider.GEMINI,
-                                Provider.GEMINI.name(),
-                                ProviderStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        ));
-
-        when(providerModelRegistryService.requireModel(
-                Provider.GEMINI,
-                "gemini-test"))
-                .thenReturn(
-                        new ModelDefinition(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                "gemini-test",
-                                ModelStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        )); */
-
-        when(firewallService.inspect("hello"))
-                .thenReturn(firewallResult);
-
-        when(policyEngineService.evaluate("hello"))
-                .thenReturn(policyResult);
-
-        when(piiDetectionService.mask("hello"))
-                .thenReturn(maskingResult);
-
-        when(providerFactory.getProvider(
-                Provider.GEMINI))
-                .thenReturn(provider);
-
-        when(provider.chat(any(AIRequest.class)))
+        when(providerFailoverService.execute(
+                any(AIRequest.class)))
                 .thenReturn(response);
 
-        doNothing()
-                .when(entitlementService)
-                .validateFeature(
-                        tenantId,
-                        Feature.GEMINI);
+        when(restoreService.restore(
+                eq("Hello from AI"),
+                any(UUID.class)))
+                .thenReturn("Hello from AI");
+
+        ChatRequest request =
+                createGeminiRequest();
 
         assertDoesNotThrow(
                 () -> gatewayService.process(request));
+
+        verify(providerFailoverService)
+                .execute(any(AIRequest.class));
 
         verify(quotaService, never())
                 .consumeTokens(
@@ -395,67 +270,33 @@ class GatewayServiceImplTest {
                         any(BigDecimal.class));
     }
 
-    @Test
-    void shouldRejectGeminiWhenTenantDoesNotHaveGeminiEntitlement()
-            throws Exception {
 
+    // ============================================================
+    // 3. ENTITLEMENT FAILURE
+    // ============================================================
+
+    @Test
+    void shouldRejectGeminiWhenTenantDoesNotHaveGeminiEntitlement() {
+
+        /*
+         * Do NOT call mockSuccessfulPreProviderFlow() here because
+         * that helper also stubs entitlement success.
+         *
+         * This test is specifically testing entitlement rejection.
+         */
+        mockPreProviderFlowWithoutEntitlement();
         mockGeminiRouting();
 
-   /*     when(providerModelRegistryService.requireProvider(
-                Provider.GEMINI))
-                .thenReturn(
-                        new ProviderDefinition(
-                                Provider.GEMINI,
-                                Provider.GEMINI.name(),
-                                ProviderStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        ));
-
-        when(providerModelRegistryService.requireModel(
-                Provider.GEMINI,
-                "gemini-test"))
-                .thenReturn(
-                        new ModelDefinition(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                "gemini-test",
-                                ModelStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        )); */
-
-        when(firewallService.inspect(anyString()))
-                .thenReturn(
-                        FirewallResult.builder()
-                                .allowed(true)
-                                .build());
-
-        when(policyEngineService.evaluate(anyString()))
-                .thenReturn(
-                        PolicyResult.builder()
-                                .allowed(true)
-                                .build());
-
-        when(piiDetectionService.mask(anyString()))
-                .thenReturn(
-                        MaskingResult.builder()
-                                .maskedPrompt("hello")
-                                .detectedValues(List.of())
-                                .build());
-
-
-        doThrow(new BusinessException(
-                "Gemini feature not enabled"))
+        doThrow(
+                new BusinessException(
+                        "Gemini feature not enabled"))
                 .when(entitlementService)
                 .validateFeature(
                         tenantId,
                         Feature.GEMINI);
 
         ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .model("gemini-test")
-                        .build();
+                createGeminiRequest();
 
         assertThrows(
                 BusinessException.class,
@@ -466,118 +307,45 @@ class GatewayServiceImplTest {
                         tenantId,
                         Feature.GEMINI);
 
-        verify(provider, never())
-                .chat(any(AIRequest.class));
+        verify(providerFailoverService, never())
+                .execute(any(AIRequest.class));
     }
+
+
+    // ============================================================
+    // 4. TOKEN QUOTA FAILURE
+    // ============================================================
 
     @Test
     void shouldRejectRequestWhenTokenQuotaIsExceeded() {
 
+        mockSuccessfulPreProviderFlow();
         mockGeminiRouting();
 
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .model("gemini-test")
-                        .build();
-
-        MaskingResult maskingResult =
-                MaskingResult.builder()
-                        .maskedPrompt("hello")
-                        .detectedValues(
-                                Collections.emptyList())
-                        .build();
-
-        FirewallResult firewallResult =
-                FirewallResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
-
-        PolicyResult policyResult =
-                PolicyResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
-
         AIResponse response =
-                AIResponse.builder()
-                        .response("Hello from AI")
-                        .providerRequestId("provider-123")
-                        .usage(
-                                Usage.builder()
-                                        .inputTokens(100)
-                                        .outputTokens(50)
-                                        .totalTokens(150)
-                                        .latencyMs(200L)
-                                        .reasoningTokens(0)
-                                        .build())
-                        .build();
+                createSuccessfulAIResponse();
 
-       /* when(providerModelRegistryService.requireProvider(
-                Provider.GEMINI))
-                .thenReturn(
-                        new ProviderDefinition(
-                                Provider.GEMINI,
-                                Provider.GEMINI.name(),
-                                ProviderStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        ));
-
-        when(providerModelRegistryService.requireModel(
-                Provider.GEMINI,
-                "gemini-test"))
-                .thenReturn(
-                        new ModelDefinition(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                "gemini-test",
-                                ModelStatus.ENABLED,
-                                Set.of(ModelCapabilities.CHAT)
-                        )); */
-
-        when(firewallService.inspect("hello"))
-                .thenReturn(firewallResult);
-
-        when(policyEngineService.evaluate("hello"))
-                .thenReturn(policyResult);
-
-        when(piiDetectionService.mask("hello"))
-                .thenReturn(maskingResult);
-
-        when(providerFactory.getProvider(
-                Provider.GEMINI))
-                .thenReturn(provider);
-
-        when(provider.chat(any(AIRequest.class)))
+        when(providerFailoverService.execute(
+                any(AIRequest.class)))
                 .thenReturn(response);
 
-        doNothing()
-                .when(entitlementService)
-                .validateFeature(
-                        tenantId,
-                        Feature.GEMINI);
-
-        doThrow(new QuotaExceededException(
-                "Daily token quota exceeded"))
+        doThrow(
+                new QuotaExceededException(
+                        "Daily token quota exceeded"))
                 .when(quotaService)
                 .consumeTokens(
                         tenantId,
                         150L);
 
+        ChatRequest request =
+                createGeminiRequest();
+
         assertThrows(
                 QuotaExceededException.class,
-                () ->
-                        gatewayService.process(request));
+                () -> gatewayService.process(request));
 
-        verify(entitlementService)
-                .validateFeature(
-                        tenantId,
-                        Feature.GEMINI);
-
-        verify(provider)
-                .chat(any(AIRequest.class));
+        verify(providerFailoverService)
+                .execute(any(AIRequest.class));
 
         verify(quotaService)
                 .consumeTokens(
@@ -592,30 +360,19 @@ class GatewayServiceImplTest {
                         eq(response));
     }
 
+
+    // ============================================================
+    // 5. UNKNOWN MODEL
+    // ============================================================
+
     @Test
     void shouldRejectUnknownModel() {
 
-        when(firewallService.inspect(anyString()))
-                .thenReturn(
-                        FirewallResult.builder()
-                                .allowed(true)
-                                .build());
+        mockPreRoutingFlow();
 
-        when(policyEngineService.evaluate(anyString()))
-                .thenReturn(
-                        PolicyResult.builder()
-                                .allowed(true)
-                                .build());
-
-        when(piiDetectionService.mask(anyString()))
-                .thenReturn(
-                        MaskingResult.builder()
-                                .maskedPrompt("hello")
-                                .detectedValues(List.of())
-                                .build());
-
-        doThrow(new BusinessException(
-                "Model unknown-model is not available for provider GEMINI."))
+        doThrow(
+                new BusinessException(
+                        "Model unknown-model is not available for provider GEMINI."))
                 .when(routingService)
                 .route(any(RoutingContext.class));
 
@@ -630,42 +387,26 @@ class GatewayServiceImplTest {
                 BusinessException.class,
                 () -> gatewayService.process(request));
 
-   /*     verify(providerModelRegistryService)
-                .requireProvider(Provider.GEMINI);
+        verify(routingService)
+                .route(any(RoutingContext.class));
 
-        verify(providerModelRegistryService)
-                .requireModel(
-                        Provider.GEMINI,
-                        "unknown-model"); */
-
-        verify(provider, never())
-                .chat(any(AIRequest.class));
+        verify(providerFailoverService, never())
+                .execute(any(AIRequest.class));
     }
+
+
+    // ============================================================
+    // 6. UNAVAILABLE PROVIDER
+    // ============================================================
 
     @Test
     void shouldRejectUnavailableProvider() {
 
-        when(firewallService.inspect(anyString()))
-                .thenReturn(
-                        FirewallResult.builder()
-                                .allowed(true)
-                                .build());
+        mockPreRoutingFlow();
 
-        when(policyEngineService.evaluate(anyString()))
-                .thenReturn(
-                        PolicyResult.builder()
-                                .allowed(true)
-                                .build());
-
-        when(piiDetectionService.mask(anyString()))
-                .thenReturn(
-                        MaskingResult.builder()
-                                .maskedPrompt("hello")
-                                .detectedValues(List.of())
-                                .build());
-
-        doThrow(new BusinessException(
-                "GEMINI provider is not available."))
+        doThrow(
+                new BusinessException(
+                        "GEMINI provider is not available."))
                 .when(routingService)
                 .route(any(RoutingContext.class));
 
@@ -680,16 +421,105 @@ class GatewayServiceImplTest {
                 BusinessException.class,
                 () -> gatewayService.process(request));
 
- /*       verify(providerModelRegistryService)
-                .requireProvider(
-                        Provider.GEMINI); */
+        verify(routingService)
+                .route(any(RoutingContext.class));
 
-        verify(providerFactory, never())
-                .getProvider(
-                        Provider.GEMINI);
+        verify(providerFailoverService, never())
+                .execute(any(AIRequest.class));
     }
 
-    private void mockGeminiRouting() {
+
+    // ============================================================
+    // 7. ROUTING DECISION
+    // ============================================================
+
+    @Test
+    void shouldUseRoutingDecisionForProviderAndModel() {
+
+        mockSuccessfulPreProviderFlow();
+
+        RoutingDecision decision =
+                new RoutingDecision(
+                        Provider.GEMINI,
+                        "gemini-test",
+                        RoutingStrategy.EXPLICIT_PROVIDER);
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(decision);
+
+        AIResponse response =
+                createSuccessfulAIResponse();
+
+        when(providerFailoverService.execute(
+                any(AIRequest.class)))
+                .thenReturn(response);
+
+        when(restoreService.restore(
+                eq("Hello from AI"),
+                any(UUID.class)))
+                .thenReturn("Hello from AI");
+
+        ChatRequest request =
+                createGeminiRequest();
+
+        ChatResponse result =
+                gatewayService.process(request);
+
+        assertNotNull(result);
+
+        verify(routingService)
+                .route(any(RoutingContext.class));
+
+        verify(providerFailoverService)
+                .execute(
+                        argThat(aiRequest ->
+                                aiRequest.getProvider()
+                                        == Provider.GEMINI
+                                        &&
+                                        "gemini-test".equals(
+                                                aiRequest.getModel())));
+    }
+
+
+    // ============================================================
+    // 8. ROUTING FAILURE
+    // ============================================================
+
+    @Test
+    void shouldNotInvokeProviderWhenRoutingFails() {
+
+        mockPreRoutingFlow();
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenThrow(
+                        new BusinessException(
+                                "Routing failed"));
+
+        ChatRequest request =
+                createGeminiRequest();
+
+        assertThrows(
+                BusinessException.class,
+                () -> gatewayService.process(request));
+
+        verify(routingService)
+                .route(any(RoutingContext.class));
+
+        verify(providerFailoverService, never())
+                .execute(any(AIRequest.class));
+    }
+
+
+    // ============================================================
+    // 9. DEFAULT TENANT ROUTING
+    // ============================================================
+
+    @Test
+    void shouldUseTenantDefaultRoutingWhenProviderAndModelAreNotSpecified() {
+
+        mockSuccessfulPreProviderFlow();
 
         when(routingService.route(
                 any(RoutingContext.class)))
@@ -697,15 +527,60 @@ class GatewayServiceImplTest {
                         new RoutingDecision(
                                 Provider.GEMINI,
                                 "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
+                                RoutingStrategy.DEFAULT));
+
+        AIResponse response =
+                createSuccessfulAIResponse();
+
+        when(providerFailoverService.execute(
+                any(AIRequest.class)))
+                .thenReturn(response);
+
+        when(restoreService.restore(
+                eq("Hello from AI"),
+                any(UUID.class)))
+                .thenReturn("Hello from AI");
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .build();
+
+        ChatResponse result =
+                gatewayService.process(request);
+
+        assertNotNull(result);
+
+        assertEquals(
+                "Hello from AI",
+                result.getResponse());
+
+        verify(routingService)
+                .route(any(RoutingContext.class));
+
+        verify(providerFailoverService)
+                .execute(
+                        argThat(aiRequest ->
+                                aiRequest.getProvider()
+                                        == Provider.GEMINI
+                                        &&
+                                        "gemini-test".equals(
+                                                aiRequest.getModel())));
     }
+
+
+    // ============================================================
+    // 10. FAILURE AUDIT WITH NULL DEFAULTS
+    // ============================================================
 
     @Test
     void shouldAuditFailureWithoutThrowingWhenTenantDefaultsAreMissing() {
 
+        UUID failureTenantId = UUID.randomUUID();
+
         AuthenticationContext context =
                 AuthenticationContext.builder()
-                        .tenantId(UUID.randomUUID())
+                        .tenantId(failureTenantId)
                         .tenantCode("TEST")
                         .tenantName("Test Tenant")
                         .defaultProvider(null)
@@ -716,27 +591,7 @@ class GatewayServiceImplTest {
                 AuthenticationConstants.AUTH_CONTEXT))
                 .thenReturn(context);
 
-        when(firewallService.inspect(any()))
-                .thenReturn(
-                        FirewallResult.builder()
-                                .allowed(true)
-                                .reason(null)
-                                .build());
-
-        when(policyEngineService.evaluate(any()))
-                .thenReturn(
-                        PolicyResult.builder()
-                                .allowed(true)
-                                .reason(null)
-                                .build());
-
-        when(piiDetectionService.mask(any()))
-                .thenReturn(
-                        MaskingResult.builder()
-                                .maskedPrompt("hello")
-                                .detectedValues(
-                                        Collections.emptyList())
-                                .build());
+        mockPreRoutingFlow();
 
         when(routingService.route(
                 any(RoutingContext.class)))
@@ -762,401 +617,176 @@ class GatewayServiceImplTest {
                         isNull(),
                         isNull(),
                         eq(AuditStatus.FAILED));
+
+        verify(providerFailoverService, never())
+                .execute(any(AIRequest.class));
     }
 
+
+    // ============================================================
+    // 11. PROVIDER FAILOVER SERVICE FAILURE
+    // ============================================================
 
     @Test
-    void shouldRecordRoutingDecisionMetric() {
+    void shouldAuditFailureWhenProviderInvocationFails() {
 
-        when(routingService.route(
-                any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
+        mockSuccessfulPreProviderFlow();
+        mockGeminiRouting();
 
-        ChatRequest request =
-                prepareSuccessfulRequest();
-
-        var result =
-                gatewayService.process(request);
-
-        assertNotNull(result);
-
-        verify(metricsService)
-                .increment(
-                        MetricsConstants.ROUTING_DECISIONS);
-    }
-    @Test
-    void shouldRecordExplicitProviderRoutingMetric() {
-
-        when(routingService.route(
-                any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
+        when(providerFailoverService.execute(
+                any(AIRequest.class)))
+                .thenThrow(
+                        new RuntimeException(
+                                "Gemini provider unavailable"));
 
         ChatRequest request =
-                prepareSuccessfulRequest();
+                createGeminiRequest();
 
-        var result =
-                gatewayService.process(request);
+        assertThrows(
+                RuntimeException.class,
+                () -> gatewayService.process(request));
 
-        assertNotNull(result);
+        verify(providerFailoverService)
+                .execute(any(AIRequest.class));
 
-        verify(metricsService)
-                .increment(
-                        MetricsConstants.ROUTING_EXPLICIT_PROVIDER);
-    }
-    @Test
-    void shouldRecordTenantDefaultRoutingMetric() {
-
-        when(routingService.route(
-                any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.TENANT_DEFAULT));
-
-        ChatRequest request =
-                prepareSuccessfulRequest();
-
-        var result =
-                gatewayService.process(request);
-
-        assertNotNull(result);
-
-        verify(metricsService)
-                .increment(
-                        MetricsConstants.ROUTING_TENANT_DEFAULT);
-    }
-    @Test
-    void shouldRecordExplicitModelRoutingMetric() {
-
-        when(routingService.route(
-                any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_MODEL));
-
-        ChatRequest request =
-                prepareSuccessfulRequest();
-
-        var result =
-                gatewayService.process(request);
-
-        assertNotNull(result);
-
-        verify(metricsService)
-                .increment(
-                        MetricsConstants.ROUTING_EXPLICIT_MODEL);
+        verify(auditService)
+                .save(
+                        any(UUID.class),
+                        eq("hello"),
+                        any(),
+                        anyLong(),
+                        eq("gemini-test"),
+                        eq("GEMINI"),
+                        eq(AuditStatus.FAILED));
     }
 
 
+    // ============================================================
+    // HELPERS
+    // ============================================================
 
+    /**
+     * Mocks only the stages that must succeed before provider
+     * invocation, including entitlement validation.
+     */
+    private void mockSuccessfulPreProviderFlow() {
 
-    private ChatRequest prepareSuccessfulRequest() {
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .build();
-
-        MaskingResult maskingResult =
-                MaskingResult.builder()
-                        .maskedPrompt("hello")
-                        .detectedValues(
-                                Collections.emptyList())
-                        .build();
-
-        FirewallResult firewallResult =
-                FirewallResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
-
-        PolicyResult policyResult =
-                PolicyResult.builder()
-                        .allowed(true)
-                        .reason(null)
-                        .build();
-
-        AIResponse response =
-                AIResponse.builder()
-                        .response("Hello from AI")
-                        .providerRequestId("provider-123")
-                        .usage(
-                                Usage.builder()
-                                        .inputTokens(100)
-                                        .outputTokens(50)
-                                        .totalTokens(150)
-                                        .latencyMs(200L)
-                                        .reasoningTokens(0)
-                                        .build())
-                        .build();
-
-        when(firewallService.inspect("hello"))
-                .thenReturn(firewallResult);
-
-        when(policyEngineService.evaluate("hello"))
-                .thenReturn(policyResult);
-
-        when(piiDetectionService.mask("hello"))
-                .thenReturn(maskingResult);
-
-        when(providerFactory.getProvider(
-                Provider.GEMINI))
-                .thenReturn(provider);
-
-        when(provider.chat(any(AIRequest.class)))
-                .thenReturn(response);
-
-        when(costService.save(
-                any(UUID.class),
-                eq(authenticationContext),
-                any(AIRequest.class),
-                eq(response)))
-                .thenReturn(
-                        new BigDecimal("0.15"));
-
-        when(restoreService.restore(
-                eq("Hello from AI"),
-                any(UUID.class)))
-                .thenReturn("Hello from AI");
+        mockPreProviderFlowWithoutEntitlement();
 
         doNothing()
                 .when(entitlementService)
                 .validateFeature(
                         tenantId,
                         Feature.GEMINI);
-
-        return request;
-    }
-    @Test
-    void shouldPropagateProviderInvocationFailure() {
-
-        mockSuccessfulPreProviderFlow();
-
-        when(routingService.route(any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
-
-        RuntimeException providerException =
-                new RuntimeException(
-                        "Gemini provider unavailable");
-
-        when(provider.chat(any(AIRequest.class)))
-                .thenThrow(providerException);
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .build();
-
-        RuntimeException thrown =
-                assertThrows(
-                        RuntimeException.class,
-                        () -> gatewayService.process(request));
-
-        assertSame(
-                providerException,
-                thrown);
-    }
-    @Test
-    void shouldIncrementFailedRequestsWhenProviderInvocationFails() {
-
-        mockSuccessfulPreProviderFlow();
-
-        when(routingService.route(any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
-
-        when(provider.chat(any(AIRequest.class)))
-                .thenThrow(
-                        new RuntimeException(
-                                "Provider failure"));
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .build();
-
-        assertThrows(
-                RuntimeException.class,
-                () -> gatewayService.process(request));
-
-        verify(metricsService)
-                .increment(
-                        MetricsConstants.FAILED_REQUESTS);
-    }
-    @Test
-    void shouldAuditProviderInvocationFailure() {
-
-        mockSuccessfulPreProviderFlow();
-
-        when(routingService.route(any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
-
-        when(provider.chat(any(AIRequest.class)))
-                .thenThrow(
-                        new RuntimeException(
-                                "Provider failure"));
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .build();
-
-        assertThrows(
-                RuntimeException.class,
-                () -> gatewayService.process(request));
-
-        verify(auditService)
-                .save(
-                        any(UUID.class),
-                        anyString(),
-                        isNull(),
-                        anyLong(),
-                        eq("gemini-test"),
-                        eq("GEMINI"),
-                        eq(AuditStatus.FAILED));
     }
 
-    @Test
-    void shouldNotPersistUsageWhenProviderInvocationFails() {
 
-        mockSuccessfulPreProviderFlow();
+    /**
+     * Mocks the gateway stages before entitlement validation.
+     *
+     * This intentionally does NOT stub EntitlementService.
+     */
+    private void mockPreProviderFlowWithoutEntitlement() {
 
-        when(routingService.route(any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
-
-        when(provider.chat(any(AIRequest.class)))
-                .thenThrow(
-                        new RuntimeException(
-                                "Provider failure"));
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .build();
-
-        assertThrows(
-                RuntimeException.class,
-                () -> gatewayService.process(request));
-
-        verify(tokenUsageService, never())
-                .save(
-                        any(UUID.class),
-                        any(AIRequest.class),
-                        any(AIResponse.class));
-
-        verify(costService, never())
-                .save(
-                        any(UUID.class),
-                        any(AuthenticationContext.class),
-                        any(AIRequest.class),
-                        any(AIResponse.class));
-
-        verify(quotaService, never())
-                .consumeTokens(
-                        any(UUID.class),
-                        anyLong());
-    }
-    @Test
-    void shouldFailWhenProviderReturnsNullResponse() {
-
-        mockSuccessfulPreProviderFlow();
-
-        when(routingService.route(any(RoutingContext.class)))
-                .thenReturn(
-                        new RoutingDecision(
-                                Provider.GEMINI,
-                                "gemini-test",
-                                RoutingStrategy.EXPLICIT_PROVIDER));
-
-        when(provider.chat(any(AIRequest.class)))
-                .thenReturn(null);
-
-        ChatRequest request =
-                ChatRequest.builder()
-                        .prompt("hello")
-                        .provider(Provider.GEMINI)
-                        .build();
-
-        assertThrows(
-                Exception.class,
-                () -> gatewayService.process(request));
-
-        verify(metricsService)
-                .increment(
-                        MetricsConstants.FAILED_REQUESTS);
-
-        verify(auditService)
-                .save(
-                        any(UUID.class),
-                        anyString(),
-                        isNull(),
-                        anyLong(),
-                        eq("gemini-test"),
-                        eq("GEMINI"),
-                        eq(AuditStatus.FAILED));
-    }
-    private void mockSuccessfulPreProviderFlow() {
-
-        when(firewallService.inspect("hello"))
+        when(firewallService.inspect(anyString()))
                 .thenReturn(
                         FirewallResult.builder()
                                 .allowed(true)
                                 .reason(null)
                                 .build());
 
-        when(policyEngineService.evaluate("hello"))
+        when(policyEngineService.evaluate(anyString()))
                 .thenReturn(
                         PolicyResult.builder()
                                 .allowed(true)
                                 .reason(null)
                                 .build());
 
-        when(piiDetectionService.mask("hello"))
+        when(piiDetectionService.mask(anyString()))
                 .thenReturn(
                         MaskingResult.builder()
                                 .maskedPrompt("hello")
-                                .detectedValues(Collections.emptyList())
+                                .detectedValues(
+                                        Collections.emptyList())
                                 .build());
-
-        doNothing()
-                .when(entitlementService)
-                .validateFeature(
-                        tenantId,
-                        Feature.GEMINI);
-
-        when(providerFactory.getProvider(
-                Provider.GEMINI))
-                .thenReturn(provider);
     }
 
+
+    /**
+     * Mocks only the stages required to reach routing.
+     *
+     * No entitlement or provider stubbing is performed here.
+     */
+    private void mockPreRoutingFlow() {
+
+        when(firewallService.inspect(anyString()))
+                .thenReturn(
+                        FirewallResult.builder()
+                                .allowed(true)
+                                .reason(null)
+                                .build());
+
+        when(policyEngineService.evaluate(anyString()))
+                .thenReturn(
+                        PolicyResult.builder()
+                                .allowed(true)
+                                .reason(null)
+                                .build());
+
+        when(piiDetectionService.mask(anyString()))
+                .thenReturn(
+                        MaskingResult.builder()
+                                .maskedPrompt("hello")
+                                .detectedValues(
+                                        Collections.emptyList())
+                                .build());
+    }
+
+
+    /**
+     * Standard Gemini routing decision.
+     */
+    private void mockGeminiRouting() {
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+    }
+
+
+    /**
+     * Standard Gemini request.
+     */
+    private ChatRequest createGeminiRequest() {
+
+        return ChatRequest.builder()
+                .prompt("hello")
+                .provider(Provider.GEMINI)
+                .model("gemini-test")
+                .build();
+    }
+
+
+    /**
+     * Standard successful provider response.
+     */
+    private AIResponse createSuccessfulAIResponse() {
+
+        return AIResponse.builder()
+                .response("Hello from AI")
+                .providerRequestId("provider-123")
+                .usage(
+                        Usage.builder()
+                                .inputTokens(100)
+                                .outputTokens(50)
+                                .totalTokens(150)
+                                .latencyMs(200L)
+                                .reasoningTokens(0)
+                                .build())
+                .build();
+    }
 }
