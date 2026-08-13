@@ -922,6 +922,225 @@ class GatewayServiceImplTest {
 
         return request;
     }
+    @Test
+    void shouldPropagateProviderInvocationFailure() {
 
+        mockSuccessfulPreProviderFlow();
+
+        when(routingService.route(any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        RuntimeException providerException =
+                new RuntimeException(
+                        "Gemini provider unavailable");
+
+        when(provider.chat(any(AIRequest.class)))
+                .thenThrow(providerException);
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.GEMINI)
+                        .build();
+
+        RuntimeException thrown =
+                assertThrows(
+                        RuntimeException.class,
+                        () -> gatewayService.process(request));
+
+        assertSame(
+                providerException,
+                thrown);
+    }
+    @Test
+    void shouldIncrementFailedRequestsWhenProviderInvocationFails() {
+
+        mockSuccessfulPreProviderFlow();
+
+        when(routingService.route(any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        when(provider.chat(any(AIRequest.class)))
+                .thenThrow(
+                        new RuntimeException(
+                                "Provider failure"));
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.GEMINI)
+                        .build();
+
+        assertThrows(
+                RuntimeException.class,
+                () -> gatewayService.process(request));
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.FAILED_REQUESTS);
+    }
+    @Test
+    void shouldAuditProviderInvocationFailure() {
+
+        mockSuccessfulPreProviderFlow();
+
+        when(routingService.route(any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        when(provider.chat(any(AIRequest.class)))
+                .thenThrow(
+                        new RuntimeException(
+                                "Provider failure"));
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.GEMINI)
+                        .build();
+
+        assertThrows(
+                RuntimeException.class,
+                () -> gatewayService.process(request));
+
+        verify(auditService)
+                .save(
+                        any(UUID.class),
+                        anyString(),
+                        isNull(),
+                        anyLong(),
+                        eq("gemini-test"),
+                        eq("GEMINI"),
+                        eq(AuditStatus.FAILED));
+    }
+
+    @Test
+    void shouldNotPersistUsageWhenProviderInvocationFails() {
+
+        mockSuccessfulPreProviderFlow();
+
+        when(routingService.route(any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        when(provider.chat(any(AIRequest.class)))
+                .thenThrow(
+                        new RuntimeException(
+                                "Provider failure"));
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.GEMINI)
+                        .build();
+
+        assertThrows(
+                RuntimeException.class,
+                () -> gatewayService.process(request));
+
+        verify(tokenUsageService, never())
+                .save(
+                        any(UUID.class),
+                        any(AIRequest.class),
+                        any(AIResponse.class));
+
+        verify(costService, never())
+                .save(
+                        any(UUID.class),
+                        any(AuthenticationContext.class),
+                        any(AIRequest.class),
+                        any(AIResponse.class));
+
+        verify(quotaService, never())
+                .consumeTokens(
+                        any(UUID.class),
+                        anyLong());
+    }
+    @Test
+    void shouldFailWhenProviderReturnsNullResponse() {
+
+        mockSuccessfulPreProviderFlow();
+
+        when(routingService.route(any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        when(provider.chat(any(AIRequest.class)))
+                .thenReturn(null);
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.GEMINI)
+                        .build();
+
+        assertThrows(
+                Exception.class,
+                () -> gatewayService.process(request));
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.FAILED_REQUESTS);
+
+        verify(auditService)
+                .save(
+                        any(UUID.class),
+                        anyString(),
+                        isNull(),
+                        anyLong(),
+                        eq("gemini-test"),
+                        eq("GEMINI"),
+                        eq(AuditStatus.FAILED));
+    }
+    private void mockSuccessfulPreProviderFlow() {
+
+        when(firewallService.inspect("hello"))
+                .thenReturn(
+                        FirewallResult.builder()
+                                .allowed(true)
+                                .reason(null)
+                                .build());
+
+        when(policyEngineService.evaluate("hello"))
+                .thenReturn(
+                        PolicyResult.builder()
+                                .allowed(true)
+                                .reason(null)
+                                .build());
+
+        when(piiDetectionService.mask("hello"))
+                .thenReturn(
+                        MaskingResult.builder()
+                                .maskedPrompt("hello")
+                                .detectedValues(Collections.emptyList())
+                                .build());
+
+        doNothing()
+                .when(entitlementService)
+                .validateFeature(
+                        tenantId,
+                        Feature.GEMINI);
+
+        when(providerFactory.getProvider(
+                Provider.GEMINI))
+                .thenReturn(provider);
+    }
 
 }
