@@ -13,6 +13,7 @@ import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.firewall.service.PromptFireWallService;
 import com.ai.gateway.metrics.GatewayMetricsService;
+import com.ai.gateway.metrics.MetricsConstants;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.provider.AIProvider;
@@ -746,4 +747,181 @@ class GatewayServiceImplTest {
                         isNull(),
                         eq(AuditStatus.FAILED));
     }
+
+
+    @Test
+    void shouldRecordRoutingDecisionMetric() {
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        ChatRequest request =
+                prepareSuccessfulRequest();
+
+        var result =
+                gatewayService.process(request);
+
+        assertNotNull(result);
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_DECISIONS);
+    }
+    @Test
+    void shouldRecordExplicitProviderRoutingMetric() {
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        ChatRequest request =
+                prepareSuccessfulRequest();
+
+        var result =
+                gatewayService.process(request);
+
+        assertNotNull(result);
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_EXPLICIT_PROVIDER);
+    }
+    @Test
+    void shouldRecordTenantDefaultRoutingMetric() {
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.TENANT_DEFAULT));
+
+        ChatRequest request =
+                prepareSuccessfulRequest();
+
+        var result =
+                gatewayService.process(request);
+
+        assertNotNull(result);
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_TENANT_DEFAULT);
+    }
+    @Test
+    void shouldRecordExplicitModelRoutingMetric() {
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.GEMINI,
+                                "gemini-test",
+                                RoutingStrategy.EXPLICIT_MODEL));
+
+        ChatRequest request =
+                prepareSuccessfulRequest();
+
+        var result =
+                gatewayService.process(request);
+
+        assertNotNull(result);
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_EXPLICIT_MODEL);
+    }
+
+
+
+
+    private ChatRequest prepareSuccessfulRequest() {
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .build();
+
+        MaskingResult maskingResult =
+                MaskingResult.builder()
+                        .maskedPrompt("hello")
+                        .detectedValues(
+                                Collections.emptyList())
+                        .build();
+
+        FirewallResult firewallResult =
+                FirewallResult.builder()
+                        .allowed(true)
+                        .reason(null)
+                        .build();
+
+        PolicyResult policyResult =
+                PolicyResult.builder()
+                        .allowed(true)
+                        .reason(null)
+                        .build();
+
+        AIResponse response =
+                AIResponse.builder()
+                        .response("Hello from AI")
+                        .providerRequestId("provider-123")
+                        .usage(
+                                Usage.builder()
+                                        .inputTokens(100)
+                                        .outputTokens(50)
+                                        .totalTokens(150)
+                                        .latencyMs(200L)
+                                        .reasoningTokens(0)
+                                        .build())
+                        .build();
+
+        when(firewallService.inspect("hello"))
+                .thenReturn(firewallResult);
+
+        when(policyEngineService.evaluate("hello"))
+                .thenReturn(policyResult);
+
+        when(piiDetectionService.mask("hello"))
+                .thenReturn(maskingResult);
+
+        when(providerFactory.getProvider(
+                Provider.GEMINI))
+                .thenReturn(provider);
+
+        when(provider.chat(any(AIRequest.class)))
+                .thenReturn(response);
+
+        when(costService.save(
+                any(UUID.class),
+                eq(authenticationContext),
+                any(AIRequest.class),
+                eq(response)))
+                .thenReturn(
+                        new BigDecimal("0.15"));
+
+        when(restoreService.restore(
+                eq("Hello from AI"),
+                any(UUID.class)))
+                .thenReturn("Hello from AI");
+
+        doNothing()
+                .when(entitlementService)
+                .validateFeature(
+                        tenantId,
+                        Feature.GEMINI);
+
+        return request;
+    }
+
+
 }

@@ -24,5 +24,16 @@ public final class MetricsConstants {
     public static final String GEMINI_REQUESTS = "GEMINI_REQUESTS";
     public static final String CLAUDE_REQUESTS = "CLAUDE_REQUESTS";
     public static final String OLLAMA_REQUESTS = "OLLAMA_REQUESTS";
+    public static final String ROUTING_DECISIONS =
+            "gateway.routing.decisions";
+
+    public static final String ROUTING_EXPLICIT_PROVIDER =
+            "ROUTING_EXPLICIT_PROVIDER";
+
+    public static final String ROUTING_EXPLICIT_MODEL =
+            "ROUTING_EXPLICIT_MODEL";
+
+    public static final String ROUTING_TENANT_DEFAULT =
+            "ROUTING_TENANT_DEFAULT";
 
 }
