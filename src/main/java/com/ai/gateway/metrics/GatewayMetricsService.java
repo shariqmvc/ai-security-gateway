@@ -48,6 +48,14 @@ public class GatewayMetricsService {
                 MetricsConstants.ACCESS_DENIED,
                 new AtomicLong());
 
+        counters.put(
+                MetricsConstants.ROUTING_FAILOVER_ATTEMPTS,
+                new AtomicLong());
+
+        counters.put(
+                MetricsConstants.ROUTING_FAILOVER_SUCCESS,
+                new AtomicLong());
+
     }
 
     public void increment(String metric) {

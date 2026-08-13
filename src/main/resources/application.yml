@@ -54,7 +54,17 @@ ollama:
 security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
-
 gateway:
   rate-limit:
     requests-per-minute: 60
+  routing:
+    failover:
+      enabled: false
+      max-attempts: 2
+      providers:
+        GEMINI:
+          - OPENAI
+        OPENAI:
+          - GEMINI
+        OLLAMA:
+          - GEMINI

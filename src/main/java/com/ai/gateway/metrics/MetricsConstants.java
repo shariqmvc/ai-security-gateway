@@ -36,4 +36,10 @@ public final class MetricsConstants {
     public static final String ROUTING_TENANT_DEFAULT =
             "ROUTING_TENANT_DEFAULT";
 
+    public static final String ROUTING_FAILOVER_ATTEMPTS =
+            "ROUTING_FAILOVER_ATTEMPTS";
+
+    public static final String ROUTING_FAILOVER_SUCCESS =
+            "ROUTING_FAILOVER_SUCCESS";
+
 }
