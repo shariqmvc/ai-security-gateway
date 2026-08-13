@@ -9,6 +9,7 @@ import com.ai.gateway.entitlement.annotation.RequiresFeature;
 import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.mapper.ProviderFeatureMapper;
 import com.ai.gateway.entitlement.service.EntitlementService;
+import com.ai.gateway.failover.ProviderFailoverService;
 import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
@@ -18,7 +19,6 @@ import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.metrics.MetricsConstants;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
-import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.quota.service.QuotaService;
 import com.ai.gateway.routing.RoutingContext;
@@ -66,6 +66,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final QuotaService quotaService;
 
     private final RoutingService routingService;
+
+    private final ProviderFailoverService providerFailoverService;
 
   //  private final BudgetService budgetService;
 
@@ -382,12 +384,7 @@ public class GatewayServiceImpl implements GatewayService {
     private AIResponse invokeProvider(
             AIRequest request) {
 
-        AIProvider provider =
-                providerFactory.getProvider(
-                        request.getProvider());
-
-        return provider.chat(request);
-
+        return providerFailoverService.execute(request);
     }
 
     private void persistUsage(

@@ -7,6 +7,7 @@ import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.*;
 import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.service.EntitlementService;
+import com.ai.gateway.failover.ProviderFailoverService;
 import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
@@ -109,6 +110,9 @@ class GatewayServiceImplTest {
     @Mock
     private RoutingService routingService;
 
+    @Mock
+    private ProviderFailoverService providerFailoverService;
+
 
     @BeforeEach
     void setUp() {
@@ -130,6 +134,18 @@ class GatewayServiceImplTest {
         when(httpServletRequest.getAttribute(
                 AuthenticationConstants.AUTH_CONTEXT))
                 .thenReturn(authenticationContext);
+
+        lenient().when(providerFailoverService.execute(
+                any(AIRequest.class)))
+                .thenAnswer(invocation ->
+                        providerFactory.getProvider(
+                                invocation.getArgument(
+                                        0,
+                                        AIRequest.class)
+                                        .getProvider())
+                                .chat(invocation.getArgument(
+                                        0,
+                                        AIRequest.class)));
 
         RequestContextHolder.setRequestAttributes(
                 servletRequestAttributes);
