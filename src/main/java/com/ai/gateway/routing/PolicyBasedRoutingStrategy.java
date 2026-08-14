@@ -2,12 +2,19 @@ package com.ai.gateway.routing;
 
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
+import com.ai.gateway.routing.engine.CandidateEligibilityFilter;
+import com.ai.gateway.routing.engine.CandidateModelResolver;
+import com.ai.gateway.routing.engine.CandidateProviderResolver;
+import com.ai.gateway.routing.engine.RoutingCandidate;
 import com.ai.gateway.routing.policy.RoutingPolicy;
 import com.ai.gateway.routing.policy.RoutingPolicyService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @Order(3)
@@ -19,6 +26,15 @@ public class PolicyBasedRoutingStrategy
 
     private final ProviderModelRegistryService
             providerModelRegistryService;
+
+    private final CandidateProviderResolver
+            candidateProviderResolver;
+
+    private final CandidateModelResolver
+            candidateModelResolver;
+
+    private final CandidateEligibilityFilter
+            candidateEligibilityFilter;
 
     @Override
     public boolean supports(
@@ -32,8 +48,8 @@ public class PolicyBasedRoutingStrategy
         }
 
         /*
-         * Step 2 intentionally supports only requests where the
-         * caller has not explicitly selected a provider or model.
+         * Policy-based routing applies only when the caller
+         * has not explicitly selected a provider or model.
          *
          * Explicit provider/model routing remains higher priority.
          */
@@ -61,46 +77,199 @@ public class PolicyBasedRoutingStrategy
                     "Routing policy is disabled.");
         }
 
-        Provider provider =
+        /*
+         * Policy contract validation must happen BEFORE
+         * candidate resolution.
+         *
+         * This preserves the semantic distinction between:
+         *
+         * 1. invalid policy configuration
+         * 2. valid policy with no available candidates
+         */
+        Provider preferredProvider =
                 policy.preferredProvider();
 
-        String model =
+        String preferredModel =
                 policy.preferredModel();
 
-        if (provider == null) {
+        if (preferredProvider == null) {
             throw new BusinessException(
                     "Routing policy does not define a provider.");
         }
 
-        if (model == null || model.isBlank()) {
+        if (preferredModel == null
+                || preferredModel.isBlank()) {
+
             throw new BusinessException(
                     "Routing policy does not define a model.");
         }
 
-        if (!policy.allowsProvider(provider)) {
+        if (!policy.allowsProvider(
+                preferredProvider)) {
+
             throw new BusinessException(
                     "Provider "
-                            + provider
+                            + preferredProvider
                             + " is not allowed by routing policy.");
         }
 
-        if (!policy.allowsModel(model)) {
+        if (!policy.allowsModel(
+                preferredModel)) {
+
             throw new BusinessException(
                     "Model "
-                            + model
+                            + preferredModel
                             + " is not allowed by routing policy.");
         }
 
+        /*
+         * 6.5 Candidate Provider Resolution
+         */
+        List<Provider> providers =
+                candidateProviderResolver.resolve(policy);
+
+        if (providers == null
+                || providers.isEmpty()) {
+
+            throw new BusinessException(
+                    "No eligible provider is available for routing.");
+        }
+
+        /*
+         * 6.5 Candidate Model Resolution
+         *
+         * Models are resolved per provider so that
+         * invalid provider/model combinations can never
+         * be constructed.
+         */
+        List<RoutingCandidate> candidates =
+                buildCandidates(
+                        providers,
+                        policy);
+
+        if (candidates.isEmpty()) {
+
+            throw new BusinessException(
+                    "No eligible model is available for routing.");
+        }
+
+        /*
+         * 6.5.3 Candidate Eligibility Filtering
+         */
+        List<RoutingCandidate> eligibleCandidates =
+                candidateEligibilityFilter.filter(
+                        candidates,
+                        policy);
+
+        if (eligibleCandidates == null
+                || eligibleCandidates.isEmpty()) {
+
+            throw new BusinessException(
+                    "No eligible routing candidate is available.");
+        }
+
+        /*
+         * Select the preferred provider/model pair if it
+         * survived candidate generation and eligibility.
+         *
+         * Otherwise use the first eligible candidate.
+         */
+        RoutingCandidate selected =
+                selectCandidate(
+                        policy,
+                        eligibleCandidates);
+
+        /*
+         * Final registry validation.
+         */
         providerModelRegistryService.requireProvider(
-                provider);
+                selected.provider());
 
         providerModelRegistryService.requireModel(
-                provider,
-                model);
+                selected.provider(),
+                selected.model());
 
         return new RoutingDecision(
-                provider,
-                model,
+                selected.provider(),
+                selected.model(),
                 RoutingStrategy.POLICY_BASED);
+    }
+
+    private List<RoutingCandidate> buildCandidates(
+            List<Provider> providers,
+            RoutingPolicy policy) {
+
+        List<RoutingCandidate> candidates =
+                new ArrayList<>();
+
+        for (Provider provider : providers) {
+
+            if (provider == null) {
+                continue;
+            }
+
+            List<String> models =
+                    candidateModelResolver.resolve(
+                            provider,
+                            policy);
+
+            if (models == null
+                    || models.isEmpty()) {
+                continue;
+            }
+
+            for (String model : models) {
+
+                if (model == null
+                        || model.isBlank()) {
+                    continue;
+                }
+
+                candidates.add(
+                        new RoutingCandidate(
+                                provider,
+                                model));
+            }
+        }
+
+        return candidates;
+    }
+
+    private RoutingCandidate selectCandidate(
+            RoutingPolicy policy,
+            List<RoutingCandidate> candidates) {
+
+        Provider preferredProvider =
+                policy.preferredProvider();
+
+        String preferredModel =
+                policy.preferredModel();
+
+        /*
+         * Exact preferred provider/model pair wins if
+         * it is present in the eligible candidate set.
+         */
+        if (preferredProvider != null
+                && preferredModel != null
+                && !preferredModel.isBlank()) {
+
+            for (RoutingCandidate candidate : candidates) {
+
+                if (preferredProvider.equals(
+                        candidate.provider())
+                        && preferredModel.equals(
+                        candidate.model())) {
+
+                    return candidate;
+                }
+            }
+        }
+
+        /*
+         * No scoring/ranking yet.
+         *
+         * Deterministic first eligible candidate.
+         */
+        return candidates.get(0);
     }
 }

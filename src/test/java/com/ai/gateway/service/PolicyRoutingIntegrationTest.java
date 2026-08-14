@@ -11,6 +11,11 @@ import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.RoutingStrategy;
 import com.ai.gateway.routing.TenantDefaultRoutingStrategy;
+import com.ai.gateway.routing.engine.CandidateEligibilityFilter;
+import com.ai.gateway.routing.engine.CandidateModelResolver;
+import com.ai.gateway.routing.engine.CandidateProviderResolver;
+import com.ai.gateway.routing.engine.RoutingCandidate;
+import com.ai.gateway.routing.policy.RoutingPolicy;
 import com.ai.gateway.routing.policy.RoutingPolicyService;
 import com.ai.gateway.routing.registry.ModelDefinition;
 import com.ai.gateway.routing.registry.ModelRegistry;
@@ -20,16 +25,26 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 class PolicyRoutingIntegrationTest {
 
     private ProviderModelRegistryService registryService;
+
     private ModelRegistry modelRegistry;
+
     private RoutingPolicyService routingPolicyService;
+
+    private CandidateProviderResolver candidateProviderResolver;
+
+    private CandidateModelResolver candidateModelResolver;
+
+    private CandidateEligibilityFilter candidateEligibilityFilter;
 
     private RoutingService routingService;
 
@@ -47,6 +62,15 @@ class PolicyRoutingIntegrationTest {
         routingPolicyService =
                 mock(RoutingPolicyService.class);
 
+        candidateProviderResolver =
+                mock(CandidateProviderResolver.class);
+
+        candidateModelResolver =
+                mock(CandidateModelResolver.class);
+
+        candidateEligibilityFilter =
+                mock(CandidateEligibilityFilter.class);
+
         ExplicitProviderRoutingStrategy
                 explicitProvider =
                 new ExplicitProviderRoutingStrategy(
@@ -63,7 +87,10 @@ class PolicyRoutingIntegrationTest {
                 policyBased =
                 new PolicyBasedRoutingStrategy(
                         routingPolicyService,
-                        registryService);
+                        registryService,
+                        candidateProviderResolver,
+                        candidateModelResolver,
+                        candidateEligibilityFilter);
 
         TenantDefaultRoutingStrategy
                 tenantDefault =
@@ -102,11 +129,17 @@ class PolicyRoutingIntegrationTest {
                                 request,
                                 authenticationContext));
 
+        assertNotNull(decision);
+
         assertEquals(
                 RoutingStrategy.EXPLICIT_PROVIDER,
                 decision.strategy());
 
-        verifyNoInteractions(routingPolicyService);
+        verifyNoInteractions(
+                routingPolicyService,
+                candidateProviderResolver,
+                candidateModelResolver,
+                candidateEligibilityFilter);
     }
 
     @Test
@@ -120,7 +153,7 @@ class PolicyRoutingIntegrationTest {
 
         when(modelRegistry.findByModel("gemini-test"))
                 .thenReturn(
-                        java.util.Optional.of(
+                        Optional.of(
                                 new ModelDefinition(
                                         Provider.GEMINI,
                                         "gemini-test",
@@ -134,11 +167,17 @@ class PolicyRoutingIntegrationTest {
                                 request,
                                 authenticationContext));
 
+        assertNotNull(decision);
+
         assertEquals(
                 RoutingStrategy.EXPLICIT_MODEL,
                 decision.strategy());
 
-        verifyNoInteractions(routingPolicyService);
+        verifyNoInteractions(
+                routingPolicyService,
+                candidateProviderResolver,
+                candidateModelResolver,
+                candidateEligibilityFilter);
     }
 
     @Test
@@ -149,22 +188,47 @@ class PolicyRoutingIntegrationTest {
                         .prompt("hello")
                         .build();
 
+        RoutingPolicy policy =
+                new RoutingPolicy(
+                        true,
+                        List.of(Provider.GEMINI),
+                        List.of("gemini-test"),
+                        Provider.GEMINI,
+                        "gemini-test");
+
         when(routingPolicyService.resolve(
                 request,
                 authenticationContext))
+                .thenReturn(policy);
+
+        when(candidateProviderResolver.resolve(policy))
                 .thenReturn(
-                        new com.ai.gateway.routing.policy.RoutingPolicy(
-                                true,
-                                List.of(Provider.GEMINI),
-                                List.of("gemini-test"),
-                                Provider.GEMINI,
-                                "gemini-test"));
+                        List.of(Provider.GEMINI));
+
+        RoutingCandidate candidate =
+                new RoutingCandidate(
+                        Provider.GEMINI,
+                        "gemini-test");
+
+        when(candidateModelResolver.resolve(
+                Provider.GEMINI,
+                policy))
+                .thenReturn(
+                        List.of("gemini-test"));
+
+        when(candidateEligibilityFilter.filter(
+                List.of(candidate),
+                policy))
+                .thenReturn(
+                        List.of(candidate));
 
         RoutingDecision decision =
                 routingService.route(
                         new RoutingContext(
                                 request,
                                 authenticationContext));
+
+        assertNotNull(decision);
 
         assertEquals(
                 RoutingStrategy.POLICY_BASED,
@@ -178,29 +242,191 @@ class PolicyRoutingIntegrationTest {
                 "gemini-test",
                 decision.model());
 
-        verify(routingPolicyService)
+        verify(candidateProviderResolver)
+                .resolve(policy);
+
+        verify(candidateModelResolver)
                 .resolve(
-                        request,
-                        authenticationContext);
+                        Provider.GEMINI,
+                        policy);
+
+        verify(candidateEligibilityFilter)
+                .filter(
+                        List.of(candidate),
+                        policy);
     }
 
     @Test
-    void shouldUseTenantDefaultWhenPolicyStrategyDoesNotSupportRequest() {
+    void shouldRouteUsingFirstEligibleCandidateWhenPreferredPairIsUnavailable() {
 
         ChatRequest request =
                 ChatRequest.builder()
                         .prompt("hello")
                         .build();
 
-        /*
-         * This test is intentionally NOT expected to reach tenant default
-         * with the current RoutingPolicyService implementation because
-         * PolicyBasedRoutingStrategy supports requests without explicit
-         * provider/model.
-         *
-         * It documents the precedence boundary and should be replaced by
-         * the policy-disabled/fallback behavior once policy resolution
-         * supports a disabled policy.
-         */
+        RoutingPolicy policy =
+                new RoutingPolicy(
+                        true,
+                        List.of(
+                                Provider.OPENAI,
+                                Provider.GEMINI),
+                        List.of(
+                                "gpt-test",
+                                "gemini-test"),
+                        Provider.GEMINI,
+                        "gemini-test");
+
+        when(routingPolicyService.resolve(
+                request,
+                authenticationContext))
+                .thenReturn(policy);
+
+        when(candidateProviderResolver.resolve(policy))
+                .thenReturn(
+                        List.of(Provider.OPENAI));
+
+        RoutingCandidate candidate =
+                new RoutingCandidate(
+                        Provider.OPENAI,
+                        "gpt-test");
+
+        when(candidateModelResolver.resolve(
+                Provider.OPENAI,
+                policy))
+                .thenReturn(
+                        List.of("gpt-test"));
+
+        when(candidateEligibilityFilter.filter(
+                List.of(candidate),
+                policy))
+                .thenReturn(
+                        List.of(candidate));
+
+        RoutingDecision decision =
+                routingService.route(
+                        new RoutingContext(
+                                request,
+                                authenticationContext));
+
+        assertEquals(
+                RoutingStrategy.POLICY_BASED,
+                decision.strategy());
+
+        assertEquals(
+                Provider.OPENAI,
+                decision.provider());
+
+        assertEquals(
+                "gpt-test",
+                decision.model());
+    }
+
+    @Test
+    void shouldNotCreateWrongProviderModelPair() {
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .build();
+
+        RoutingPolicy policy =
+                new RoutingPolicy(
+                        true,
+                        List.of(
+                                Provider.OPENAI,
+                                Provider.GEMINI),
+                        List.of(
+                                "gpt-test",
+                                "gemini-test"),
+                        Provider.GEMINI,
+                        "gemini-test");
+
+        when(routingPolicyService.resolve(
+                request,
+                authenticationContext))
+                .thenReturn(policy);
+
+        when(candidateProviderResolver.resolve(policy))
+                .thenReturn(
+                        List.of(
+                                Provider.OPENAI,
+                                Provider.GEMINI));
+
+        RoutingCandidate openAiCandidate =
+                new RoutingCandidate(
+                        Provider.OPENAI,
+                        "gpt-test");
+
+        RoutingCandidate geminiCandidate =
+                new RoutingCandidate(
+                        Provider.GEMINI,
+                        "gemini-test");
+
+        when(candidateModelResolver.resolve(
+                Provider.OPENAI,
+                policy))
+                .thenReturn(
+                        List.of("gpt-test"));
+
+        when(candidateModelResolver.resolve(
+                Provider.GEMINI,
+                policy))
+                .thenReturn(
+                        List.of("gemini-test"));
+
+        when(candidateEligibilityFilter.filter(
+                List.of(
+                        openAiCandidate,
+                        geminiCandidate),
+                policy))
+                .thenReturn(
+                        List.of(
+                                openAiCandidate,
+                                geminiCandidate));
+
+        RoutingDecision decision =
+                routingService.route(
+                        new RoutingContext(
+                                request,
+                                authenticationContext));
+
+        assertEquals(
+                Provider.GEMINI,
+                decision.provider());
+
+        assertEquals(
+                "gemini-test",
+                decision.model());
+
+        verify(candidateModelResolver)
+                .resolve(
+                        Provider.OPENAI,
+                        policy);
+
+        verify(candidateModelResolver)
+                .resolve(
+                        Provider.GEMINI,
+                        policy);
+    }
+
+    /*
+     * This test is intentionally left as a documentation boundary.
+     *
+     * PolicyBasedRoutingStrategy currently supports requests without
+     * explicit provider/model selection, therefore such a request reaches
+     * policy routing before TenantDefaultRoutingStrategy.
+     *
+     * Tenant-default fallback should be tested once policy resolution
+     * explicitly supports a disabled/unavailable policy fallback path.
+     */
+    @Test
+    void shouldDocumentTenantDefaultPrecedenceBoundary() {
+
+        ChatRequest request =
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .build();
+
+        assertNotNull(request);
     }
 }
