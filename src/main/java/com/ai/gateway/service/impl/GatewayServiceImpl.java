@@ -24,6 +24,7 @@ import com.ai.gateway.quota.service.QuotaService;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
+import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,6 +67,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final QuotaService quotaService;
 
     private final RoutingService routingService;
+
+    private final RoutingAnalyticsService routingAnalyticsService;
 
     private final ProviderFailoverService providerFailoverService;
 
@@ -323,6 +326,9 @@ public class GatewayServiceImpl implements GatewayService {
                             new RoutingContext(
                                     request,
                                     auth));
+
+            routingAnalyticsService.recordDecision(
+                    routingDecision);
 
             metricsService.increment(
                     MetricsConstants.ROUTING_DECISIONS);

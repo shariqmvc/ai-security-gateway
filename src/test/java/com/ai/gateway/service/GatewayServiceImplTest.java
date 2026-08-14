@@ -27,6 +27,7 @@ import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.RoutingStrategy;
+import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
 import com.ai.gateway.service.impl.GatewayServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -104,6 +105,9 @@ class GatewayServiceImplTest {
     private UUID tenantId;
 
     private AuthenticationContext authenticationContext;
+
+    @Mock
+    private RoutingAnalyticsService routingAnalyticsService;
 
 
     // ============================================================

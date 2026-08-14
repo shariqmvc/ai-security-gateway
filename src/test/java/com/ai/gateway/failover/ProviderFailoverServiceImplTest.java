@@ -7,6 +7,7 @@ import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.metrics.MetricsConstants;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
+import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
 import com.ai.gateway.routing.registry.ModelDefinition;
 import com.ai.gateway.routing.registry.ModelStatus;
 import com.ai.gateway.routing.registry.ProviderDefinition;
@@ -49,6 +50,9 @@ class ProviderFailoverServiceImplTest {
 
     private AIRequest primaryRequest;
     private AIResponse response;
+    @Mock
+    private RoutingAnalyticsService routingAnalyticsService;
+
 
     @BeforeEach
     void setUp() {
@@ -66,7 +70,8 @@ class ProviderFailoverServiceImplTest {
                 providerFactory,
                 registry,
                 properties,
-                metricsService);
+                metricsService,
+                routingAnalyticsService);
 
         primaryRequest = AIRequest.builder()
                 .provider(Provider.GEMINI)
@@ -99,6 +104,7 @@ class ProviderFailoverServiceImplTest {
                 .increment(MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
         verify(metricsService, never())
                 .increment(MetricsConstants.ROUTING_FAILOVER_SUCCESS);
+        verifyNoInteractions(routingAnalyticsService);
     }
 
     @Test
@@ -151,6 +157,15 @@ class ProviderFailoverServiceImplTest {
         verify(metricsService)
                 .increment(
                         MetricsConstants.ROUTING_FAILOVER_SUCCESS);
+
+        verify(routingAnalyticsService)
+                .recordFailoverAttempt();
+
+        verify(routingAnalyticsService)
+                .recordFailoverSuccess();
+
+        verify(routingAnalyticsService, never())
+                .recordFailoverFailure();
     }
 
     @Test
@@ -177,6 +192,8 @@ class ProviderFailoverServiceImplTest {
         verify(providerFactory, never())
                 .getProvider(Provider.OPENAI);
         verifyNoInteractions(registry);
+
+        verifyNoInteractions(routingAnalyticsService);
     }
 
     @Test
@@ -200,6 +217,7 @@ class ProviderFailoverServiceImplTest {
 
         assertSame(failure, thrown);
         verifyNoInteractions(registry);
+        verifyNoInteractions(routingAnalyticsService);
     }
 
     @Test
@@ -245,6 +263,15 @@ class ProviderFailoverServiceImplTest {
         assertTrue(
                 List.of(thrown.getSuppressed())
                         .contains(fallbackFailure));
+
+        verify(routingAnalyticsService)
+                .recordFailoverAttempt();
+
+        verify(routingAnalyticsService)
+                .recordFailoverFailure();
+
+        verify(routingAnalyticsService, never())
+                .recordFailoverSuccess();
     }
 
     @Test
@@ -291,6 +318,15 @@ class ProviderFailoverServiceImplTest {
 
         verify(providerFactory, never())
                 .getProvider(Provider.CLAUDE);
+        verify(routingAnalyticsService)
+                .recordFailoverAttempt();
+
+        verify(routingAnalyticsService)
+                .recordFailoverFailure();
+
+        verify(routingAnalyticsService, never())
+                .recordFailoverSuccess();
+
     }
 
     @Test
@@ -337,6 +373,15 @@ class ProviderFailoverServiceImplTest {
 
         verify(openAiProvider, times(1))
                 .chat(any(AIRequest.class));
+
+        verify(routingAnalyticsService)
+                .recordFailoverAttempt();
+
+        verify(routingAnalyticsService)
+                .recordFailoverFailure();
+
+        verify(routingAnalyticsService, never())
+                .recordFailoverSuccess();
     }
 
     private ProviderDefinition enabledProvider(Provider provider) {
