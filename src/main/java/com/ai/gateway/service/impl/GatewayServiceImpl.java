@@ -343,6 +343,10 @@ public class GatewayServiceImpl implements GatewayService {
                         metricsService.increment(
                                 MetricsConstants.ROUTING_EXPLICIT_MODEL);
 
+                case POLICY_BASED ->
+                        metricsService.increment(
+                                MetricsConstants.ROUTING_POLICY_BASED);
+
                 case TENANT_DEFAULT ->
                         metricsService.increment(
                                 MetricsConstants.ROUTING_TENANT_DEFAULT);
