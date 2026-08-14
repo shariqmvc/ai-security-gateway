@@ -39,7 +39,7 @@ openai:
 
 gemini:
   api:
-    key: AQ.Ab8RN6Lb69fHm67Hj-NXCwYU06D-SoQxsXE68mB4WAM5PpMzcg
+    key: AQ.Ab8RN6JWz0GJjF-bhjflzJUN8lio9UDHkMF-95B2s3JZmkTIWw
 
   base:
     url: https://generativelanguage.googleapis.com
