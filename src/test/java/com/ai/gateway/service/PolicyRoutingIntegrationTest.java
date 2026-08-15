@@ -11,6 +11,7 @@ import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.RoutingStrategy;
 import com.ai.gateway.routing.TenantDefaultRoutingStrategy;
+import com.ai.gateway.routing.constraint.CandidateConstraintEvaluator;
 import com.ai.gateway.routing.engine.CandidateEligibilityFilter;
 import com.ai.gateway.routing.engine.CandidateModelResolver;
 import com.ai.gateway.routing.engine.CandidateProviderResolver;
@@ -46,6 +47,8 @@ class PolicyRoutingIntegrationTest {
 
     private CandidateEligibilityFilter candidateEligibilityFilter;
 
+    private CandidateConstraintEvaluator candidateConstraintEvaluator;
+
     private RoutingService routingService;
 
     private AuthenticationContext authenticationContext;
@@ -71,6 +74,12 @@ class PolicyRoutingIntegrationTest {
         candidateEligibilityFilter =
                 mock(CandidateEligibilityFilter.class);
 
+        candidateConstraintEvaluator =
+                mock(CandidateConstraintEvaluator.class);
+
+        when(candidateConstraintEvaluator.filter(anyList(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
         ExplicitProviderRoutingStrategy
                 explicitProvider =
                 new ExplicitProviderRoutingStrategy(
@@ -90,7 +99,8 @@ class PolicyRoutingIntegrationTest {
                         registryService,
                         candidateProviderResolver,
                         candidateModelResolver,
-                        candidateEligibilityFilter);
+                        candidateEligibilityFilter,
+                        candidateConstraintEvaluator);
 
         TenantDefaultRoutingStrategy
                 tenantDefault =

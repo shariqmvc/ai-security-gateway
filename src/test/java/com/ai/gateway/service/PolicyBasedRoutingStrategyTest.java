@@ -8,6 +8,7 @@ import com.ai.gateway.routing.PolicyBasedRoutingStrategy;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingStrategy;
+import com.ai.gateway.routing.constraint.CandidateConstraintEvaluator;
 import com.ai.gateway.routing.engine.CandidateEligibilityFilter;
 import com.ai.gateway.routing.engine.CandidateModelResolver;
 import com.ai.gateway.routing.engine.CandidateProviderResolver;
@@ -45,6 +46,9 @@ class PolicyBasedRoutingStrategyTest {
     @Mock
     private CandidateEligibilityFilter candidateEligibilityFilter;
 
+    @Mock
+    private CandidateConstraintEvaluator candidateConstraintEvaluator;
+
     private PolicyBasedRoutingStrategy strategy;
 
     private AuthenticationContext authenticationContext;
@@ -58,7 +62,13 @@ class PolicyBasedRoutingStrategyTest {
                         providerModelRegistryService,
                         candidateProviderResolver,
                         candidateModelResolver,
-                        candidateEligibilityFilter);
+                        candidateEligibilityFilter,
+                        candidateConstraintEvaluator);
+
+        lenient().when(candidateConstraintEvaluator.filter(
+                anyList(),
+                any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         authenticationContext =
                 AuthenticationContext.builder()
@@ -243,7 +253,8 @@ class PolicyBasedRoutingStrategyTest {
                 providerModelRegistryService,
                 candidateProviderResolver,
                 candidateModelResolver,
-                candidateEligibilityFilter);
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator);
     }
 
     @Test
@@ -280,7 +291,8 @@ class PolicyBasedRoutingStrategyTest {
                 providerModelRegistryService,
                 candidateProviderResolver,
                 candidateModelResolver,
-                candidateEligibilityFilter);
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator);
     }
 
     @Test
@@ -317,7 +329,8 @@ class PolicyBasedRoutingStrategyTest {
                 providerModelRegistryService,
                 candidateProviderResolver,
                 candidateModelResolver,
-                candidateEligibilityFilter);
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator);
     }
 
     @Test
@@ -354,7 +367,8 @@ class PolicyBasedRoutingStrategyTest {
                 providerModelRegistryService,
                 candidateProviderResolver,
                 candidateModelResolver,
-                candidateEligibilityFilter);
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator);
     }
 
     @Test
@@ -391,7 +405,8 @@ class PolicyBasedRoutingStrategyTest {
                 providerModelRegistryService,
                 candidateProviderResolver,
                 candidateModelResolver,
-                candidateEligibilityFilter);
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator);
     }
 
     @Test
@@ -428,7 +443,8 @@ class PolicyBasedRoutingStrategyTest {
                 providerModelRegistryService,
                 candidateProviderResolver,
                 candidateModelResolver,
-                candidateEligibilityFilter);
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator);
     }
 
     @Test
