@@ -31,7 +31,7 @@ logging:
     org.hibernate.SQL: DEBUG
 
 openai:
-  api-key: ${OPENAI_API_KEY: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}
+  api-key: ${OPENAI_API_KEY}
   model: gpt-5
   url: https://api.openai.com/v1/responses
   connect-timeout: 5s
@@ -39,7 +39,7 @@ openai:
 
 gemini:
   api:
-    key: AQ.Ab8RN6JWz0GJjF-bhjflzJUN8lio9UDHkMF-95B2s3JZmkTIWw
+    key: ${GEMINI_API_KEY}
 
   base:
     url: https://generativelanguage.googleapis.com
