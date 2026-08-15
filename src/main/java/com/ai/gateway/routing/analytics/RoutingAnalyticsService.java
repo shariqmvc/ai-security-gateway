@@ -31,6 +31,10 @@ public class RoutingAnalyticsService {
     private final AtomicLong failoverFailures =
             new AtomicLong();
 
+    private final AtomicLong intelligentDecisions = new AtomicLong();
+    private final AtomicLong unityDecisions = new AtomicLong();
+    private final Map<String, AtomicLong> decisionsByPriority = new ConcurrentHashMap<>();
+
     public void recordDecision(RoutingDecision decision) {
 
         if (decision == null) {
@@ -45,6 +49,23 @@ public class RoutingAnalyticsService {
                             decision.strategy().name(),
                             key -> new AtomicLong())
                     .incrementAndGet();
+        }
+
+        if (decision.metadata() != null) {
+            if (decision.metadata().explanation() != null) {
+                intelligentDecisions.incrementAndGet();
+            }
+            if (decision.metadata().extensiveResearchEnabled()) {
+                unityDecisions.incrementAndGet();
+            }
+            if (decision.metadata().explanation() != null) {
+                decision.metadata().explanation().appliedSignals().stream()
+                        .filter(signal -> signal.startsWith("routing-priority:"))
+                        .findFirst()
+                        .ifPresent(signal -> decisionsByPriority
+                                .computeIfAbsent(signal.substring("routing-priority:".length()), k -> new AtomicLong())
+                                .incrementAndGet());
+            }
         }
 
         if (decision.provider() != null) {
@@ -93,7 +114,10 @@ public class RoutingAnalyticsService {
                 snapshot(decisionsByProviderModel),
                 failoverAttempts.get(),
                 failoverSuccesses.get(),
-                failoverFailures.get()
+                failoverFailures.get(),
+                intelligentDecisions.get(),
+                unityDecisions.get(),
+                snapshot(decisionsByPriority)
         );
     }
 

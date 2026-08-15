@@ -1,15 +1,11 @@
 package com.ai.gateway.routing;
 
+import com.ai.gateway.routing.intelligence.RoutingDecisionExplanation;
+
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Diagnostic metadata produced by routing.
- *
- * <p>Metadata is intentionally additive: existing routing consumers can
- * continue using provider/model/strategy while observability and routing
- * analytics can inspect why a policy candidate was selected.</p>
- */
+/** Diagnostic metadata produced by routing. */
 public record RoutingDecisionMetadata(
         Double selectedScore,
         Integer selectedRank,
@@ -17,7 +13,8 @@ public record RoutingDecisionMetadata(
         String selectionReason,
         boolean extensiveResearchEnabled,
         String executionRole,
-        List<RoutingCandidateMetadata> rankedCandidates) {
+        List<RoutingCandidateMetadata> rankedCandidates,
+        RoutingDecisionExplanation explanation) {
 
     public RoutingDecisionMetadata {
         if (selectedScore != null
@@ -30,14 +27,23 @@ public record RoutingDecisionMetadata(
         if (candidateCount != null && candidateCount < 0) {
             throw new IllegalArgumentException("Candidate count cannot be negative.");
         }
-        rankedCandidates = rankedCandidates == null
-                ? List.of()
-                : List.copyOf(rankedCandidates);
+        rankedCandidates = rankedCandidates == null ? List.of() : List.copyOf(rankedCandidates);
+    }
+
+    public RoutingDecisionMetadata(
+            Double selectedScore,
+            Integer selectedRank,
+            Integer candidateCount,
+            String selectionReason,
+            boolean extensiveResearchEnabled,
+            String executionRole,
+            List<RoutingCandidateMetadata> rankedCandidates) {
+        this(selectedScore, selectedRank, candidateCount, selectionReason,
+                extensiveResearchEnabled, executionRole, rankedCandidates, null);
     }
 
     public static RoutingDecisionMetadata empty() {
-        return new RoutingDecisionMetadata(
-                null, null, null, null, false, null, List.of());
+        return new RoutingDecisionMetadata(null, null, null, null, false, null, List.of(), null);
     }
 
     public record RoutingCandidateMetadata(
@@ -52,9 +58,7 @@ public record RoutingDecisionMetadata(
             if (Double.isNaN(score) || Double.isInfinite(score)) {
                 throw new IllegalArgumentException("Candidate score must be finite.");
             }
-            if (rank < 1) {
-                throw new IllegalArgumentException("Candidate rank must be positive.");
-            }
+            if (rank < 1) throw new IllegalArgumentException("Candidate rank must be positive.");
         }
     }
 }

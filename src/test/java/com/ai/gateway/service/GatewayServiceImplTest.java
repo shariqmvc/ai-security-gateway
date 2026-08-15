@@ -28,6 +28,7 @@ import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.RoutingStrategy;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
+import com.ai.gateway.routing.intelligence.RoutingRuntimeSignalService;
 import com.ai.gateway.service.impl.GatewayServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -108,6 +109,8 @@ class GatewayServiceImplTest {
 
     @Mock
     private RoutingAnalyticsService routingAnalyticsService;
+    @Mock
+    private RoutingRuntimeSignalService routingRuntimeSignalService;
 
 
     // ============================================================

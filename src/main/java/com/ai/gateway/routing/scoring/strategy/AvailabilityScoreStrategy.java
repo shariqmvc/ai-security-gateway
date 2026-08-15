@@ -24,9 +24,11 @@ public class AvailabilityScoreStrategy implements CandidateScoreStrategy {
             RoutingCandidate candidate,
             CandidateScoringContext context) {
 
-        double value = properties.getAvailability().getOrDefault(
+        double value = context.runtimeSignals().availability().getOrDefault(
                 key(candidate),
-                properties.getDefaults().getAvailability());
+                properties.getAvailability().getOrDefault(
+                        key(candidate),
+                        properties.getDefaults().getAvailability()));
 
         return Math.max(0.0, Math.min(1.0, value));
     }

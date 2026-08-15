@@ -31,6 +31,7 @@ public enum Feature {
     // Advanced AI
     RAG,
     MCP,
+    EXTENSIVE_RESEARCH,
 
     // Administration
     DASHBOARD,

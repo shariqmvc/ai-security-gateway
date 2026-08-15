@@ -76,7 +76,8 @@ public class PlanDefaultsProviderImpl
                             Feature.OLLAMA,
                             Feature.RATE_LIMITING,
                             Feature.QUOTA,
-                            Feature.BUDGET
+                            Feature.BUDGET,
+                            Feature.EXTENSIVE_RESEARCH
                     ))
                     .requestsPerMinute(1_000)
                     .requestsPerDay(100_000)

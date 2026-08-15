@@ -15,6 +15,10 @@ import com.ai.gateway.routing.scoring.ScoredCandidate;
 import com.ai.gateway.routing.scoring.CandidateScoreComponent;
 import com.ai.gateway.routing.scoring.CandidateScoreDimension;
 import com.ai.gateway.routing.scoring.CandidateScoringEngine;
+import com.ai.gateway.routing.intelligence.RoutingDecisionContext;
+import com.ai.gateway.routing.intelligence.RoutingDecisionExplanation;
+import com.ai.gateway.routing.intelligence.RoutingDecisionIntelligence;
+import com.ai.gateway.routing.intelligence.NoopRoutingDecisionIntelligence;
 import com.ai.gateway.routing.selection.CandidateSelectionEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
@@ -51,6 +55,9 @@ public class PolicyBasedRoutingStrategy
     private final CandidateSelectionEngine
             candidateSelectionEngine;
 
+    private final RoutingDecisionIntelligence
+            routingDecisionIntelligence;
+
     /**
      * Spring production constructor. The complete routing pipeline is:
      * resolution -> eligibility -> hard constraints -> scoring -> selection.
@@ -64,7 +71,8 @@ public class PolicyBasedRoutingStrategy
             CandidateEligibilityFilter candidateEligibilityFilter,
             CandidateConstraintEvaluator candidateConstraintEvaluator,
             CandidateScoringEngine candidateScoringEngine,
-            CandidateSelectionEngine candidateSelectionEngine) {
+            CandidateSelectionEngine candidateSelectionEngine,
+            RoutingDecisionIntelligence routingDecisionIntelligence) {
 
         this.routingPolicyService = routingPolicyService;
         this.providerModelRegistryService = providerModelRegistryService;
@@ -74,6 +82,29 @@ public class PolicyBasedRoutingStrategy
         this.candidateConstraintEvaluator = candidateConstraintEvaluator;
         this.candidateScoringEngine = candidateScoringEngine;
         this.candidateSelectionEngine = candidateSelectionEngine;
+        this.routingDecisionIntelligence = routingDecisionIntelligence;
+    }
+    public PolicyBasedRoutingStrategy(
+            RoutingPolicyService routingPolicyService,
+            ProviderModelRegistryService providerModelRegistryService,
+            CandidateProviderResolver candidateProviderResolver,
+            CandidateModelResolver candidateModelResolver,
+            CandidateEligibilityFilter candidateEligibilityFilter,
+            CandidateConstraintEvaluator candidateConstraintEvaluator,
+            CandidateScoringEngine candidateScoringEngine,
+            CandidateSelectionEngine candidateSelectionEngine) {
+
+        this(
+                routingPolicyService,
+                providerModelRegistryService,
+                candidateProviderResolver,
+                candidateModelResolver,
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator,
+                candidateScoringEngine,
+                candidateSelectionEngine,
+                new NoopRoutingDecisionIntelligence()
+        );
     }
 
     /**
@@ -98,7 +129,8 @@ public class PolicyBasedRoutingStrategy
                 candidateEligibilityFilter,
                 candidateConstraintEvaluator,
                 new CompatibilityScoringEngine(),
-                new com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl());
+                new com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl(),
+                new NoopRoutingDecisionIntelligence());
     }
 
     @Override
@@ -187,6 +219,9 @@ public class PolicyBasedRoutingStrategy
                             + " is not allowed by routing policy.");
         }
 
+        RoutingDecisionContext decisionContext =
+                routingDecisionIntelligence.context(context);
+
         /*
          * 6.5 Candidate Provider Resolution
          */
@@ -255,6 +290,19 @@ public class PolicyBasedRoutingStrategy
         }
 
         /*
+         * 6.6.2 Capability Matching
+         */
+        List<RoutingCandidate> capabilityEligibleCandidates =
+                routingDecisionIntelligence.applyCapabilityMatching(
+                        constraintEligibleCandidates, decisionContext);
+
+        if (capabilityEligibleCandidates == null
+                || capabilityEligibleCandidates.isEmpty()) {
+            throw new BusinessException(
+                    "No routing candidate satisfies the required capabilities.");
+        }
+
+        /*
          * 6.5.5 Candidate Scoring
          *
          * Hard-constraint-eligible candidates are now scored as soft
@@ -262,11 +310,11 @@ public class PolicyBasedRoutingStrategy
          * 6.5.4.
          */
         CandidateScoringContext scoringContext =
-                CandidateScoringContext.standard(policy);
+                routingDecisionIntelligence.scoringContext(policy, decisionContext);
 
         List<ScoredCandidate> scoredCandidates =
                 candidateScoringEngine.score(
-                        constraintEligibleCandidates,
+                        capabilityEligibleCandidates,
                         scoringContext);
 
         if (scoredCandidates == null
@@ -324,6 +372,11 @@ public class PolicyBasedRoutingStrategy
                             index + 1));
         }
 
+        RoutingDecisionExplanation explanation =
+                routingDecisionIntelligence.explain(
+                        decisionContext, rankedCandidates.size(),
+                        selectedRank == 1 ? "HIGHEST_SCORE" : "DETERMINISTIC_RANKING");
+
         RoutingDecisionMetadata metadata =
                 new RoutingDecisionMetadata(
                         selectedScoredCandidate.totalScore(),
@@ -334,7 +387,8 @@ public class PolicyBasedRoutingStrategy
                                 : "DETERMINISTIC_RANKING",
                         scoringContext.extensiveResearchEnabled(),
                         scoringContext.executionRole(),
-                        rankedMetadata);
+                        rankedMetadata,
+                        explanation);
 
         /*
          * Final registry validation.

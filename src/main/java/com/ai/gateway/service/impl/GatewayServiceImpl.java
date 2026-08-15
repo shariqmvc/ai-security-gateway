@@ -25,6 +25,8 @@ import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
+import com.ai.gateway.routing.engine.RoutingCandidate;
+import com.ai.gateway.routing.intelligence.RoutingRuntimeSignalService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -70,6 +72,8 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final RoutingAnalyticsService routingAnalyticsService;
 
+    private final RoutingRuntimeSignalService routingRuntimeSignalService;
+
     private final ProviderFailoverService providerFailoverService;
 
   //  private final BudgetService budgetService;
@@ -92,11 +96,17 @@ public class GatewayServiceImpl implements GatewayService {
 
         AuthenticationContext auth = getAuthenticationContext();
         AIRequest aiRequest = null;
-
-
+        boolean providerInvocationStarted = false;
+        long providerInvocationStart = 0L;
 
         try {
 
+
+            if (request.isExtensiveResearch()) {
+                entitlementService.validateFeature(
+                        auth.getTenantId(),
+                        Feature.EXTENSIVE_RESEARCH);
+            }
 
             // -------------------------------
             // Prompt Firewall
@@ -131,8 +141,15 @@ public class GatewayServiceImpl implements GatewayService {
             // Provider Invocation
             // -------------------------------
 
+            providerInvocationStarted = true;
+            providerInvocationStart = System.currentTimeMillis();
+
             AIResponse aiResponse =
                     invokeProvider(aiRequest);
+
+            routingRuntimeSignalService.recordSuccess(
+                    new RoutingCandidate(aiRequest.getProvider(), aiRequest.getModel()),
+                    System.currentTimeMillis() - providerInvocationStart);
 
             // -------------------------------
             // Token Usage
@@ -169,6 +186,11 @@ public class GatewayServiceImpl implements GatewayService {
                     .build();
 
         } catch (Exception ex) {
+
+            if (providerInvocationStarted && aiRequest != null) {
+                routingRuntimeSignalService.recordFailure(
+                        new RoutingCandidate(aiRequest.getProvider(), aiRequest.getModel()));
+            }
 
             long latency =
                     System.currentTimeMillis() - start;

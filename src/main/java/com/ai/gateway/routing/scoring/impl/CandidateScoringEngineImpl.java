@@ -46,7 +46,7 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
             return List.of();
         }
 
-        Map<CandidateScoreDimension, Double> weights = weights();
+        Map<CandidateScoreDimension, Double> weights = weights(context);
 
         Map<CandidateScoreDimension, List<Double>> rawValues =
                 new EnumMap<>(CandidateScoreDimension.class);
@@ -104,7 +104,7 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
         return List.copyOf(result);
     }
 
-    private Map<CandidateScoreDimension, Double> weights() {
+    private Map<CandidateScoreDimension, Double> weights(CandidateScoringContext context) {
         Map<CandidateScoreDimension, Double> weights =
                 new EnumMap<>(CandidateScoreDimension.class);
 
@@ -116,6 +116,10 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
         weights.put(CandidateScoreDimension.AVAILABILITY, configured.getAvailability());
         weights.put(CandidateScoreDimension.POLICY_PREFERENCE,
                 configured.getPolicyPreference());
+
+        if (context != null && !context.weightOverrides().isEmpty()) {
+            context.weightOverrides().forEach(weights::put);
+        }
 
         for (double weight : weights.values()) {
             if (weight < 0.0 || Double.isNaN(weight) || Double.isInfinite(weight)) {
