@@ -68,3 +68,15 @@ gateway:
           - GEMINI
         OLLAMA:
           - GEMINI
+
+    scoring:
+      weights:
+        cost: 0.30
+        latency: 0.25
+        availability: 0.20
+        policy-preference: 0.25
+      defaults:
+        latency-ms: 1000
+        availability: 1.0
+      latency-ms: {}
+      availability: {}

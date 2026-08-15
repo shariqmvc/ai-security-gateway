@@ -1,0 +1,12 @@
+package com.ai.gateway.routing.scoring;
+
+/**
+ * Configurable dimensions used to score an already hard-constraint-eligible
+ * routing candidate.
+ */
+public enum CandidateScoreDimension {
+    COST,
+    LATENCY,
+    AVAILABILITY,
+    POLICY_PREFERENCE
+}
