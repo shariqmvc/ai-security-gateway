@@ -47,6 +47,10 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     "AI request and primary provider are required.");
         }
 
+        /*
+         * Failover is disabled: execute the primary provider directly.
+         * No failover metrics or analytics are recorded.
+         */
         if (!properties.isEnabled()) {
             return invoke(request);
         }
@@ -55,84 +59,141 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
         Set<Provider> attempted = new HashSet<>();
         Throwable primaryFailure = null;
+        Throwable lastFailure = null;
 
         Provider primary = request.getProvider();
-        AIRequest current = request;
+        List<Provider> fallbacks =
+                properties.fallbacksFor(primary);
 
-        List<Provider> fallbacks = properties.fallbacksFor(primary);
+        /*
+         * Attempt #1: primary provider.
+         */
+        attempted.add(primary);
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            return invoke(request);
 
-            Provider provider = current.getProvider();
+        } catch (Exception ex) {
 
-            if (!attempted.add(provider)) {
+            primaryFailure = ex;
+            lastFailure = ex;
+
+            recordProviderFailure(request, ex);
+        }
+
+        /*
+         * If maxAttempts == 1, there is no opportunity for failover.
+         */
+        if (maxAttempts <= 1) {
+            throw propagate(
+                    primaryFailure,
+                    lastFailure);
+        }
+
+        /*
+         * Attempts after the primary are bounded by maxAttempts.
+         *
+         * Example:
+         *   maxAttempts = 2
+         *   attempt 1 = primary
+         *   attempt 2 = first fallback
+         */
+        int fallbackAttempts = 0;
+
+        for (Provider fallback : fallbacks) {
+
+            /*
+             * The configured fallback list may contain:
+             * - null entries
+             * - duplicate providers
+             * - the primary provider
+             */
+            if (fallback == null
+                    || attempted.contains(fallback)) {
                 continue;
             }
 
+            /*
+             * Total attempts includes the primary attempt.
+             */
+            if (fallbackAttempts + 1 >= maxAttempts) {
+                break;
+            }
+
+            /*
+             * Resolve and validate the fallback provider/model before
+             * recording a failover attempt. This is important:
+             *
+             * An unavailable configured fallback is not an actual
+             * provider execution attempt.
+             */
+            AIRequest fallbackRequest =
+                    buildFallbackRequest(
+                            request,
+                            fallback);
+
+            if (fallbackRequest == null) {
+                continue;
+            }
+
+            attempted.add(fallback);
+            fallbackAttempts++;
+
+            /*
+             * We are now actually failing over to another provider.
+             */
+            metricsService.increment(
+                    MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
+
+            routingAnalyticsService.recordFailoverAttempt();
+
             try {
-                AIResponse response = invoke(current);
 
-                if (attempt > 0) {
-                    metricsService.increment(
-                            MetricsConstants.ROUTING_FAILOVER_SUCCESS);
-                    routingAnalyticsService.recordFailoverSuccess();
+                AIResponse response =
+                        invoke(fallbackRequest);
 
-                    log.warn(
-                            "Provider failover succeeded: primary={} fallback={} model={}",
-                            primary,
-                            provider,
-                            current.getModel());
-                }
+                /*
+                 * Failover succeeded.
+                 */
+                metricsService.increment(
+                        MetricsConstants.ROUTING_FAILOVER_SUCCESS);
+
+                routingAnalyticsService.recordFailoverSuccess();
 
                 return response;
 
             } catch (Exception ex) {
 
-                recordProviderFailure(current, ex);
+                lastFailure = ex;
 
-                if (attempt == 0) {
-                    primaryFailure = ex;
-                } else {
-                    routingAnalyticsService.recordFailoverFailure();
-                }
+                recordProviderFailure(
+                        fallbackRequest,
+                        ex);
 
-                if (attempt + 1 >= maxAttempts) {
-                    throw propagate(primaryFailure, ex);
-                }
-
-                log.warn(
-                        "Provider execution failed: provider={} model={} attempt={} error={}",
-                        provider,
-                        current.getModel(),
-                        attempt + 1,
-                        ex.getMessage());
-
-                AIRequest fallbackRequest =
-                        nextFallbackRequest(
-                                request,
-                                fallbacks,
-                                attempted);
-
-                if (fallbackRequest == null) {
-                    throw propagate(primaryFailure, ex);
-                }
-
-                metricsService.increment(
-                        MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
-
-                routingAnalyticsService.recordFailoverAttempt();
-
-                metricsService.incrementProviderRequest(
-                        fallbackRequest.getProvider());
-
-                current = fallbackRequest;
+                /*
+                 * Do not immediately throw.
+                 * Continue to the next configured fallback.
+                 */
             }
         }
 
+        /*
+         * We reached this point only after at least one actual
+         * fallback execution failed.
+         *
+         * Therefore record failover failure exactly once.
+         */
+        if (fallbackAttempts > 0) {
+            routingAnalyticsService.recordFailoverFailure();
+        }
+
+        /*
+         * Preserve the original primary failure as the main exception.
+         * The final fallback failure is retained as a suppressed exception.
+         */
         throw propagate(
                 primaryFailure,
-                new IllegalStateException(
-                        "Provider failover exhausted."));
+                lastFailure);
     }
 
     private AIResponse invoke(AIRequest request) {
@@ -165,46 +226,40 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     ex.getClass().getSimpleName());
         }
     }
-
-    private AIRequest nextFallbackRequest(
+    private AIRequest buildFallbackRequest(
             AIRequest primaryRequest,
-            List<Provider> fallbacks,
-            Set<Provider> attempted) {
+            Provider fallback) {
 
-        for (Provider fallback : fallbacks) {
+        try {
 
-            if (fallback == null || attempted.contains(fallback)) {
-                continue;
-            }
+            providerModelRegistryService.requireProvider(fallback);
 
-            try {
-                providerModelRegistryService.requireProvider(fallback);
+            String fallbackModelId =
+                    defaultModel(fallback);
 
-                String fallbackModelId = defaultModel(fallback);
+            var fallbackModel =
+                    providerModelRegistryService.requireModel(
+                            fallback,
+                            fallbackModelId);
 
-                var fallbackModel =
-                        providerModelRegistryService.requireModel(
-                                fallback,
-                                fallbackModelId);
+            return AIRequest.builder()
+                    .provider(fallback)
+                    .model(fallbackModel.modelId())
+                    .prompt(primaryRequest.getPrompt())
+                    .build();
 
-                return AIRequest.builder()
-                        .provider(fallback)
-                        .model(fallbackModel.modelId())
-                        .prompt(primaryRequest.getPrompt())
-                        .build();
+        } catch (Exception ex) {
 
-            } catch (Exception ex) {
+            log.warn(
+                    "Configured fallback unavailable: primary={} fallback={} error={}",
+                    primaryRequest.getProvider(),
+                    fallback,
+                    ex.getMessage());
 
-                log.warn(
-                        "Configured fallback unavailable: primary={} fallback={} error={}",
-                        primaryRequest.getProvider(),
-                        fallback,
-                        ex.getMessage());
-            }
+            return null;
         }
-
-        return null;
     }
+
 
     private String defaultModel(Provider provider) {
         return providerFactory

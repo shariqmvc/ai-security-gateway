@@ -1,2 +1,5 @@
 # Project exclude paths
 /target/
+# Local environment and IDE files
+.evn
+.idea/
