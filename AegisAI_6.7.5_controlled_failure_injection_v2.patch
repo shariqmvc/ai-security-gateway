@@ -1,0 +1,112 @@
+--- a/src/main/java/com/ai/gateway/failover/FailoverProperties.java
++++ b/src/main/java/com/ai/gateway/failover/FailoverProperties.java
+@@ -30,6 +30,12 @@
+     private Map<Provider, List<Provider>> providers =
+             new EnumMap<>(Provider.class);
+ 
++    /**
++     * Controlled provider-runtime failure injection for local/integration validation.
++     * Disabled by default and intended only for controlled testing.
++     */
++    private FailureInjection failureInjection = new FailureInjection();
++
+     public List<Provider> fallbacksFor(Provider provider) {
+         if (provider == null || providers == null) {
+             return List.of();
+@@ -42,4 +48,21 @@
+ 
+         return new ArrayList<>(configured);
+     }
++
++    @Getter
++    @Setter
++    public static class FailureInjection {
++        private boolean enabled = false;
++        private Provider provider;
++        private String model;
++        private String failureType = "PROVIDER_ERROR";
++
++        public boolean matches(Provider provider, String model) {
++            return enabled
++                    && this.provider != null
++                    && this.provider == provider
++                    && this.model != null
++                    && this.model.equals(model);
++        }
++    }
+ }
+--- a/src/main/java/com/ai/gateway/failover/ProviderFailoverServiceImpl.java
++++ b/src/main/java/com/ai/gateway/failover/ProviderFailoverServiceImpl.java
+@@ -8,6 +8,8 @@
+ import com.ai.gateway.provider.AIProvider;
+ import com.ai.gateway.provider.AIProviderFactory;
+ import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
++import com.ai.gateway.routing.engine.RoutingCandidate;
++import com.ai.gateway.routing.health.RoutingHealthService;
+ import com.ai.gateway.routing.registry.ProviderModelRegistryService;
+ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
+@@ -34,6 +36,7 @@
+     private final FailoverProperties properties;
+     private final GatewayMetricsService metricsService;
+     private final RoutingAnalyticsService routingAnalyticsService;
++    private final RoutingHealthService routingHealthService;
+ 
+     @Override
+     public AIResponse execute(AIRequest request) {
+@@ -83,6 +86,8 @@
+                 return response;
+ 
+             } catch (Exception ex) {
++
++                recordProviderFailure(current, ex);
+ 
+                 if (attempt == 0) {
+                     primaryFailure = ex;
+@@ -130,10 +135,30 @@
+     }
+ 
+     private AIResponse invoke(AIRequest request) {
++        if (properties.getFailureInjection() != null
++                && properties.getFailureInjection()
++                .matches(request.getProvider(), request.getModel())) {
++            String type = properties.getFailureInjection().getFailureType();
++            throw new IllegalStateException(
++                    "Controlled provider failure injection: " + type);
++        }
++
+         AIProvider provider =
+                 providerFactory.getProvider(request.getProvider());
+ 
+         return provider.chat(request);
++    }
++
++    private void recordProviderFailure(AIRequest request, Exception ex) {
++        if (request == null
++                || request.getProvider() == null
++                || request.getModel() == null) {
++            return;
++        }
++
++        routingHealthService.recordFailure(
++                new RoutingCandidate(request.getProvider(), request.getModel()),
++                ex.getClass().getSimpleName());
+     }
+ 
+     private AIRequest nextFallbackRequest(
+--- a/src/main/resources/application.yml
++++ b/src/main/resources/application.yml
+@@ -68,6 +68,13 @@
+           - GEMINI
+         OLLAMA:
+           - GEMINI
++      failure-injection:
++        # Controlled runtime failure injection for 6.7 validation.
++        # MUST remain disabled outside local/integration testing.
++        enabled: ${ROUTING_FAILURE_INJECTION_ENABLED:false}
++        provider: ${ROUTING_FAILURE_INJECTION_PROVIDER:}
++        model: ${ROUTING_FAILURE_INJECTION_MODEL:}
++        failure-type: ${ROUTING_FAILURE_INJECTION_TYPE:PROVIDER_ERROR}
+ 
+     scoring:
+       weights:

@@ -68,6 +68,13 @@ gateway:
           - GEMINI
         OLLAMA:
           - GEMINI
+      failure-injection:
+        # Controlled runtime failure injection for 6.7 validation.
+        # MUST remain disabled outside local/integration testing.
+        enabled: ${ROUTING_FAILURE_INJECTION_ENABLED:false}
+        provider: ${ROUTING_FAILURE_INJECTION_PROVIDER:}
+        model: ${ROUTING_FAILURE_INJECTION_MODEL:}
+        failure-type: ${ROUTING_FAILURE_INJECTION_TYPE:PROVIDER_ERROR}
 
     scoring:
       weights:

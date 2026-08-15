@@ -30,6 +30,12 @@ public class FailoverProperties {
     private Map<Provider, List<Provider>> providers =
             new EnumMap<>(Provider.class);
 
+    /**
+     * Controlled provider-runtime failure injection for local/integration validation.
+     * Disabled by default and intended only for controlled testing.
+     */
+    private FailureInjection failureInjection = new FailureInjection();
+
     public List<Provider> fallbacksFor(Provider provider) {
         if (provider == null || providers == null) {
             return List.of();
@@ -41,5 +47,22 @@ public class FailoverProperties {
         }
 
         return new ArrayList<>(configured);
+    }
+
+    @Getter
+    @Setter
+    public static class FailureInjection {
+        private boolean enabled = false;
+        private Provider provider;
+        private String model;
+        private String failureType = "PROVIDER_ERROR";
+
+        public boolean matches(Provider provider, String model) {
+            return enabled
+                    && this.provider != null
+                    && this.provider == provider
+                    && this.model != null
+                    && this.model.equals(model);
+        }
     }
 }

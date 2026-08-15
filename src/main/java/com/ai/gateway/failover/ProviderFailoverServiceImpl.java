@@ -8,6 +8,8 @@ import com.ai.gateway.metrics.MetricsConstants;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
+import com.ai.gateway.routing.engine.RoutingCandidate;
+import com.ai.gateway.routing.health.RoutingHealthService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     private final FailoverProperties properties;
     private final GatewayMetricsService metricsService;
     private final RoutingAnalyticsService routingAnalyticsService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RoutingHealthService routingHealthService;
 
     @Override
     public AIResponse execute(AIRequest request) {
@@ -84,6 +88,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
             } catch (Exception ex) {
 
+                recordProviderFailure(current, ex);
+
                 if (attempt == 0) {
                     primaryFailure = ex;
                 } else {
@@ -130,10 +136,34 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     }
 
     private AIResponse invoke(AIRequest request) {
+        if (properties.getFailureInjection() != null
+                && properties.getFailureInjection()
+                .matches(request.getProvider(), request.getModel())) {
+            String type = properties.getFailureInjection().getFailureType();
+            throw new IllegalStateException(
+                    "Controlled provider failure injection: " + type);
+        }
+
         AIProvider provider =
                 providerFactory.getProvider(request.getProvider());
 
         return provider.chat(request);
+    }
+
+    private void recordProviderFailure(AIRequest request, Exception ex) {
+        if (request == null
+                || request.getProvider() == null
+                || request.getModel() == null) {
+            return;
+        }
+
+        if (routingHealthService != null) {
+            routingHealthService.recordFailure(
+                    new RoutingCandidate(
+                            request.getProvider(),
+                            request.getModel()),
+                    ex.getClass().getSimpleName());
+        }
     }
 
     private AIRequest nextFallbackRequest(
