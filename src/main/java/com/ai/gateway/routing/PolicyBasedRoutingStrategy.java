@@ -19,6 +19,7 @@ import com.ai.gateway.routing.intelligence.RoutingDecisionContext;
 import com.ai.gateway.routing.intelligence.RoutingDecisionExplanation;
 import com.ai.gateway.routing.intelligence.RoutingDecisionIntelligence;
 import com.ai.gateway.routing.intelligence.NoopRoutingDecisionIntelligence;
+import com.ai.gateway.routing.health.FailureAwareCandidateFilter;
 import com.ai.gateway.routing.selection.CandidateSelectionEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
@@ -58,6 +59,9 @@ public class PolicyBasedRoutingStrategy
     private final RoutingDecisionIntelligence
             routingDecisionIntelligence;
 
+    private final FailureAwareCandidateFilter
+            failureAwareCandidateFilter;
+
     /**
      * Spring production constructor. The complete routing pipeline is:
      * resolution -> eligibility -> hard constraints -> scoring -> selection.
@@ -72,7 +76,8 @@ public class PolicyBasedRoutingStrategy
             CandidateConstraintEvaluator candidateConstraintEvaluator,
             CandidateScoringEngine candidateScoringEngine,
             CandidateSelectionEngine candidateSelectionEngine,
-            RoutingDecisionIntelligence routingDecisionIntelligence) {
+            RoutingDecisionIntelligence routingDecisionIntelligence,
+            FailureAwareCandidateFilter failureAwareCandidateFilter) {
 
         this.routingPolicyService = routingPolicyService;
         this.providerModelRegistryService = providerModelRegistryService;
@@ -83,6 +88,7 @@ public class PolicyBasedRoutingStrategy
         this.candidateScoringEngine = candidateScoringEngine;
         this.candidateSelectionEngine = candidateSelectionEngine;
         this.routingDecisionIntelligence = routingDecisionIntelligence;
+        this.failureAwareCandidateFilter = failureAwareCandidateFilter;
     }
     public PolicyBasedRoutingStrategy(
             RoutingPolicyService routingPolicyService,
@@ -103,7 +109,14 @@ public class PolicyBasedRoutingStrategy
                 candidateConstraintEvaluator,
                 candidateScoringEngine,
                 candidateSelectionEngine,
-                new NoopRoutingDecisionIntelligence()
+                new NoopRoutingDecisionIntelligence(),
+                new FailureAwareCandidateFilter(new com.ai.gateway.routing.health.RoutingHealthService() {
+                    public com.ai.gateway.routing.health.RoutingHealthSnapshot snapshot(com.ai.gateway.routing.engine.RoutingCandidate c) { return null; }
+                    public java.util.List<com.ai.gateway.routing.health.RoutingHealthSnapshot> snapshots() { return java.util.List.of(); }
+                    public void recordSuccess(com.ai.gateway.routing.engine.RoutingCandidate c, long l) {}
+                    public void recordFailure(com.ai.gateway.routing.engine.RoutingCandidate c, String f) {}
+                    public boolean isHealthyForRouting(com.ai.gateway.routing.engine.RoutingCandidate c) { return true; }
+                })
         );
     }
 
@@ -130,7 +143,14 @@ public class PolicyBasedRoutingStrategy
                 candidateConstraintEvaluator,
                 new CompatibilityScoringEngine(),
                 new com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl(),
-                new NoopRoutingDecisionIntelligence());
+                new NoopRoutingDecisionIntelligence(),
+                new FailureAwareCandidateFilter(new com.ai.gateway.routing.health.RoutingHealthService() {
+                    public com.ai.gateway.routing.health.RoutingHealthSnapshot snapshot(com.ai.gateway.routing.engine.RoutingCandidate c) { return null; }
+                    public java.util.List<com.ai.gateway.routing.health.RoutingHealthSnapshot> snapshots() { return java.util.List.of(); }
+                    public void recordSuccess(com.ai.gateway.routing.engine.RoutingCandidate c, long l) {}
+                    public void recordFailure(com.ai.gateway.routing.engine.RoutingCandidate c, String f) {}
+                    public boolean isHealthyForRouting(com.ai.gateway.routing.engine.RoutingCandidate c) { return true; }
+                }));
     }
 
     @Override
@@ -303,6 +323,22 @@ public class PolicyBasedRoutingStrategy
         }
 
         /*
+         * 6.7.4 Failure-Aware Routing
+         *
+         * Recently observed unhealthy candidates are removed before scoring.
+         * Stale/unknown health never becomes a silent hard rejection.
+         */
+        List<RoutingCandidate> healthEligibleCandidates =
+                failureAwareCandidateFilter.filter(
+                        capabilityEligibleCandidates);
+
+        if (healthEligibleCandidates == null
+                || healthEligibleCandidates.isEmpty()) {
+            throw new BusinessException(
+                    "No routing candidate is healthy enough for routing.");
+        }
+
+        /*
          * 6.5.5 Candidate Scoring
          *
          * Hard-constraint-eligible candidates are now scored as soft
@@ -314,7 +350,7 @@ public class PolicyBasedRoutingStrategy
 
         List<ScoredCandidate> scoredCandidates =
                 candidateScoringEngine.score(
-                        capabilityEligibleCandidates,
+                        healthEligibleCandidates,
                         scoringContext);
 
         if (scoredCandidates == null

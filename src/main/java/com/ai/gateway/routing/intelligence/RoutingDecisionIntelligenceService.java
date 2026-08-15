@@ -2,12 +2,12 @@ package com.ai.gateway.routing.intelligence;
 
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.dto.ChatRequest;
+import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.engine.RoutingCandidate;
 import com.ai.gateway.routing.policy.RoutingPolicy;
 import com.ai.gateway.routing.scoring.CandidateScoringContext;
-import com.ai.gateway.exception.BusinessException;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -15,13 +15,26 @@ import java.util.List;
 import java.util.Set;
 
 @Service
-@RequiredArgsConstructor
 public class RoutingDecisionIntelligenceService implements RoutingDecisionIntelligence {
 
     private final CandidateCapabilityMatcher capabilityMatcher;
     private final AdaptiveRoutingScoringService adaptiveScoringService;
     private final RoutingRuntimeSignalService runtimeSignalService;
     private final UnityRoutingProperties unityRoutingProperties;
+
+    @Autowired(required = false)
+    private RoutingOptimizationService optimizationService;
+
+    public RoutingDecisionIntelligenceService(
+            CandidateCapabilityMatcher capabilityMatcher,
+            AdaptiveRoutingScoringService adaptiveScoringService,
+            RoutingRuntimeSignalService runtimeSignalService,
+            UnityRoutingProperties unityRoutingProperties) {
+        this.capabilityMatcher = capabilityMatcher;
+        this.adaptiveScoringService = adaptiveScoringService;
+        this.runtimeSignalService = runtimeSignalService;
+        this.unityRoutingProperties = unityRoutingProperties;
+    }
 
     public RoutingDecisionContext context(RoutingContext routingContext) {
         ChatRequest request = routingContext.request();
@@ -49,19 +62,35 @@ public class RoutingDecisionIntelligenceService implements RoutingDecisionIntell
     }
 
     public CandidateScoringContext scoringContext(RoutingPolicy policy, RoutingDecisionContext context) {
+        RoutingRuntimeSignals signals =
+                context == null ? RoutingRuntimeSignals.empty() : runtimeSignalService.snapshot();
+
+        java.util.Map<com.ai.gateway.routing.scoring.CandidateScoreDimension, Double> weights =
+                context == null ? java.util.Map.of() : adaptiveScoringService.adapt(context);
+
+        if (optimizationService != null && context != null) {
+            weights = optimizationService.optimize(weights, signals, context.routingPriority());
+        }
+
         return new CandidateScoringContext(
                 policy, 1_000, 1_000,
                 context != null && context.extensiveResearchEnabled(),
                 context == null ? null : context.executionRole(),
                 context,
-                context == null ? java.util.Map.of() : adaptiveScoringService.adapt(context),
-                context == null ? RoutingRuntimeSignals.empty() : runtimeSignalService.snapshot());
+                weights,
+                signals);
     }
 
     public RoutingDecisionExplanation explain(RoutingDecisionContext context, int candidateCount, String reason) {
-        List<String> signals = new ArrayList<>(List.of("cost", "latency", "availability", "policy-preference"));
-        if (context != null && context.routingPriority() != RoutingPriority.BALANCED) signals.add("routing-priority:" + context.routingPriority());
-        if (context != null && context.extensiveResearchEnabled()) signals.add("unity:extensive-research");
+        List<String> signals = new ArrayList<>(List.of(
+                "cost", "latency", "availability", "policy-preference",
+                "runtime-health", "failure-aware-routing", "optimization"));
+        if (context != null && context.routingPriority() != RoutingPriority.BALANCED) {
+            signals.add("routing-priority:" + context.routingPriority());
+        }
+        if (context != null && context.extensiveResearchEnabled()) {
+            signals.add("unity:extensive-research");
+        }
         return new RoutingDecisionExplanation(
                 reason, signals, List.of(),
                 context == null ? List.of() : context.requiredCapabilities().stream().toList());
@@ -69,7 +98,10 @@ public class RoutingDecisionIntelligenceService implements RoutingDecisionIntell
 
     private RoutingPriority parsePriority(String value) {
         if (value == null || value.isBlank()) return RoutingPriority.BALANCED;
-        try { return RoutingPriority.valueOf(value.trim().toUpperCase()); }
-        catch (IllegalArgumentException ignored) { return RoutingPriority.BALANCED; }
+        try {
+            return RoutingPriority.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ignored) {
+            return RoutingPriority.BALANCED;
+        }
     }
 }

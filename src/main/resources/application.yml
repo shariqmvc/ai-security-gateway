@@ -81,5 +81,22 @@ gateway:
       latency-ms: {}
       availability: {}
 
+    optimization:
+      enabled: ${ROUTING_OPTIMIZATION_ENABLED:true}
+      degraded-availability-boost: ${ROUTING_OPTIMIZATION_DEGRADED_BOOST:1.25}
+      unhealthy-availability-boost: ${ROUTING_OPTIMIZATION_UNHEALTHY_BOOST:1.35}
+      latency-priority-boost: ${ROUTING_OPTIMIZATION_LATENCY_BOOST:1.15}
+      cost-priority-boost: ${ROUTING_OPTIMIZATION_COST_BOOST:1.15}
+      reliability-priority-boost: ${ROUTING_OPTIMIZATION_RELIABILITY_BOOST:1.15}
+    health:
+      enabled: ${ROUTING_HEALTH_ENABLED:true}
+      reject-unhealthy: ${ROUTING_HEALTH_REJECT_UNHEALTHY:true}
+      min-observations: ${ROUTING_HEALTH_MIN_OBSERVATIONS:3}
+      consecutive-failure-threshold: ${ROUTING_HEALTH_CONSECUTIVE_FAILURE_THRESHOLD:3}
+      degraded-availability: ${ROUTING_HEALTH_DEGRADED_AVAILABILITY:0.90}
+      unhealthy-availability: ${ROUTING_HEALTH_UNHEALTHY_AVAILABILITY:0.70}
+      ewma-alpha: ${ROUTING_HEALTH_EWMA_ALPHA:0.20}
+      signal-ttl-seconds: ${ROUTING_HEALTH_SIGNAL_TTL_SECONDS:300}
+
     unity:
       enabled: false

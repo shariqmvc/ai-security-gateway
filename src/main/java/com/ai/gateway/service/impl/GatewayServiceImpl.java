@@ -27,6 +27,7 @@ import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
 import com.ai.gateway.routing.engine.RoutingCandidate;
 import com.ai.gateway.routing.intelligence.RoutingRuntimeSignalService;
+import com.ai.gateway.routing.health.RoutingOutcomeService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -74,6 +75,9 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final RoutingRuntimeSignalService routingRuntimeSignalService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RoutingOutcomeService routingOutcomeService;
+
     private final ProviderFailoverService providerFailoverService;
 
   //  private final BudgetService budgetService;
@@ -97,6 +101,7 @@ public class GatewayServiceImpl implements GatewayService {
         AuthenticationContext auth = getAuthenticationContext();
         AIRequest aiRequest = null;
         boolean providerInvocationStarted = false;
+        boolean providerInvocationSucceeded = false;
         long providerInvocationStart = 0L;
 
         try {
@@ -147,9 +152,27 @@ public class GatewayServiceImpl implements GatewayService {
             AIResponse aiResponse =
                     invokeProvider(aiRequest);
 
+            providerInvocationSucceeded = true;
+
+            long providerLatency =
+                    System.currentTimeMillis() - providerInvocationStart;
+
             routingRuntimeSignalService.recordSuccess(
                     new RoutingCandidate(aiRequest.getProvider(), aiRequest.getModel()),
-                    System.currentTimeMillis() - providerInvocationStart);
+                    providerLatency);
+
+            if (routingOutcomeService != null) {
+                routingOutcomeService.recordSuccess(
+                        requestId,
+                        auth,
+                        aiRequest,
+                        new RoutingDecision(
+                                aiRequest.getProvider(),
+                                aiRequest.getModel(),
+                                aiRequest.getRoutingStrategy(),
+                                aiRequest.getRoutingDecisionMetadata()),
+                        providerLatency);
+            }
 
             // -------------------------------
             // Token Usage
@@ -187,9 +210,26 @@ public class GatewayServiceImpl implements GatewayService {
 
         } catch (Exception ex) {
 
-            if (providerInvocationStarted && aiRequest != null) {
+            if (providerInvocationStarted && !providerInvocationSucceeded && aiRequest != null) {
+                RoutingCandidate failedCandidate =
+                        new RoutingCandidate(aiRequest.getProvider(), aiRequest.getModel());
                 routingRuntimeSignalService.recordFailure(
-                        new RoutingCandidate(aiRequest.getProvider(), aiRequest.getModel()));
+                        failedCandidate,
+                        ex.getClass().getSimpleName());
+
+                if (routingOutcomeService != null) {
+                    routingOutcomeService.recordFailure(
+                            requestId,
+                            auth,
+                            aiRequest,
+                            new RoutingDecision(
+                                    aiRequest.getProvider(),
+                                    aiRequest.getModel(),
+                                    aiRequest.getRoutingStrategy(),
+                                    aiRequest.getRoutingDecisionMetadata()),
+                            System.currentTimeMillis() - providerInvocationStart,
+                            ex);
+                }
             }
 
             long latency =
@@ -396,6 +436,8 @@ public class GatewayServiceImpl implements GatewayService {
                     .provider(selectedProvider)
                     .model(selectedModel)
                     .prompt(prompt)
+                    .routingDecisionMetadata(routingDecision.metadata())
+                    .routingStrategy(routingDecision.strategy())
                     .build();
         } catch (Exception ex) {
 
