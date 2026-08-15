@@ -10,7 +10,13 @@ import com.ai.gateway.routing.engine.RoutingCandidate;
 import com.ai.gateway.routing.policy.RoutingPolicy;
 import com.ai.gateway.routing.policy.RoutingPolicyService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
-import lombok.RequiredArgsConstructor;
+import com.ai.gateway.routing.scoring.CandidateScoringContext;
+import com.ai.gateway.routing.scoring.ScoredCandidate;
+import com.ai.gateway.routing.scoring.CandidateScoreComponent;
+import com.ai.gateway.routing.scoring.CandidateScoreDimension;
+import com.ai.gateway.routing.scoring.CandidateScoringEngine;
+import com.ai.gateway.routing.selection.CandidateSelectionEngine;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +25,6 @@ import java.util.List;
 
 @Component
 @Order(3)
-@RequiredArgsConstructor
 public class PolicyBasedRoutingStrategy
         implements RoutingStrategyHandler {
 
@@ -39,6 +44,62 @@ public class PolicyBasedRoutingStrategy
 
     private final CandidateConstraintEvaluator
             candidateConstraintEvaluator;
+
+    private final CandidateScoringEngine
+            candidateScoringEngine;
+
+    private final CandidateSelectionEngine
+            candidateSelectionEngine;
+
+    /**
+     * Spring production constructor. The complete routing pipeline is:
+     * resolution -> eligibility -> hard constraints -> scoring -> selection.
+     */
+    @Autowired
+    public PolicyBasedRoutingStrategy(
+            RoutingPolicyService routingPolicyService,
+            ProviderModelRegistryService providerModelRegistryService,
+            CandidateProviderResolver candidateProviderResolver,
+            CandidateModelResolver candidateModelResolver,
+            CandidateEligibilityFilter candidateEligibilityFilter,
+            CandidateConstraintEvaluator candidateConstraintEvaluator,
+            CandidateScoringEngine candidateScoringEngine,
+            CandidateSelectionEngine candidateSelectionEngine) {
+
+        this.routingPolicyService = routingPolicyService;
+        this.providerModelRegistryService = providerModelRegistryService;
+        this.candidateProviderResolver = candidateProviderResolver;
+        this.candidateModelResolver = candidateModelResolver;
+        this.candidateEligibilityFilter = candidateEligibilityFilter;
+        this.candidateConstraintEvaluator = candidateConstraintEvaluator;
+        this.candidateScoringEngine = candidateScoringEngine;
+        this.candidateSelectionEngine = candidateSelectionEngine;
+    }
+
+    /**
+     * Backward-compatible constructor for existing isolated routing tests.
+     *
+     * <p>It preserves the pre-scoring test contract while production Spring
+     * wiring always uses the full constructor above.</p>
+     */
+    public PolicyBasedRoutingStrategy(
+            RoutingPolicyService routingPolicyService,
+            ProviderModelRegistryService providerModelRegistryService,
+            CandidateProviderResolver candidateProviderResolver,
+            CandidateModelResolver candidateModelResolver,
+            CandidateEligibilityFilter candidateEligibilityFilter,
+            CandidateConstraintEvaluator candidateConstraintEvaluator) {
+
+        this(
+                routingPolicyService,
+                providerModelRegistryService,
+                candidateProviderResolver,
+                candidateModelResolver,
+                candidateEligibilityFilter,
+                candidateConstraintEvaluator,
+                new CompatibilityScoringEngine(),
+                new com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl());
+    }
 
     @Override
     public boolean supports(
@@ -194,15 +255,86 @@ public class PolicyBasedRoutingStrategy
         }
 
         /*
-         * Select the preferred provider/model pair if it
-         * survived candidate generation and eligibility.
+         * 6.5.5 Candidate Scoring
          *
-         * Otherwise use the first eligible candidate.
+         * Hard-constraint-eligible candidates are now scored as soft
+         * preferences. Scoring never re-admits a candidate rejected by
+         * 6.5.4.
          */
+        CandidateScoringContext scoringContext =
+                CandidateScoringContext.standard(policy);
+
+        List<ScoredCandidate> scoredCandidates =
+                candidateScoringEngine.score(
+                        constraintEligibleCandidates,
+                        scoringContext);
+
+        if (scoredCandidates == null
+                || scoredCandidates.isEmpty()) {
+
+            throw new BusinessException(
+                    "No routing candidate could be scored.");
+        }
+
+        /*
+         * 6.5.6 Candidate Selection
+         *
+         * Selection operates only on scored candidates and is deterministic.
+         */
+        ScoredCandidate selectedScoredCandidate =
+                candidateSelectionEngine.select(
+                        scoredCandidates);
+
         RoutingCandidate selected =
-                selectCandidate(
-                        policy,
-                        constraintEligibleCandidates);
+                selectedScoredCandidate.candidate();
+
+        /*
+         * 6.5.7 Decision Metadata
+         *
+         * Keep the public routing decision compatible while exposing the
+         * ranked decision context for observability and future analytics.
+         */
+        List<ScoredCandidate> rankedCandidates =
+                candidateSelectionEngine instanceof
+                        com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl
+                        impl
+                        ? impl.rank(scoredCandidates)
+                        : scoredCandidates;
+
+        int selectedRank = 1;
+        for (int index = 0; index < rankedCandidates.size(); index++) {
+            if (rankedCandidates.get(index).candidate().equals(selected)) {
+                selectedRank = index + 1;
+                break;
+            }
+        }
+
+        List<RoutingDecisionMetadata.RoutingCandidateMetadata> rankedMetadata =
+                new ArrayList<>();
+
+        for (int index = 0; index < rankedCandidates.size(); index++) {
+            ScoredCandidate candidate =
+                    rankedCandidates.get(index);
+
+            rankedMetadata.add(
+                    new RoutingDecisionMetadata.RoutingCandidateMetadata(
+                            candidate.candidate().provider().name(),
+                            candidate.candidate().model(),
+                            candidate.totalScore(),
+                            index + 1));
+        }
+
+        RoutingDecisionMetadata metadata =
+                new RoutingDecisionMetadata(
+                        selectedScoredCandidate.totalScore(),
+                        selectedRank,
+                        rankedCandidates.size(),
+                        selectedRank == 1
+                                ? "HIGHEST_SCORE"
+                                : "DETERMINISTIC_RANKING",
+                        scoringContext.extensiveResearchEnabled(),
+                        scoringContext.executionRole(),
+                        rankedMetadata);
 
         /*
          * Final registry validation.
@@ -217,7 +349,8 @@ public class PolicyBasedRoutingStrategy
         return new RoutingDecision(
                 selected.provider(),
                 selected.model(),
-                RoutingStrategy.POLICY_BASED);
+                RoutingStrategy.POLICY_BASED,
+                metadata);
     }
 
     private List<RoutingCandidate> buildCandidates(
@@ -260,41 +393,46 @@ public class PolicyBasedRoutingStrategy
         return candidates;
     }
 
-    private RoutingCandidate selectCandidate(
-            RoutingPolicy policy,
-            List<RoutingCandidate> candidates) {
 
-        Provider preferredProvider =
-                policy.preferredProvider();
+    
+    /**
+     * Compatibility-only scorer used by the legacy six-argument constructor.
+     * Spring never uses this path.
+     */
+    private static final class CompatibilityScoringEngine
+            implements CandidateScoringEngine {
 
-        String preferredModel =
-                policy.preferredModel();
+        @Override
+        public List<ScoredCandidate> score(
+                List<RoutingCandidate> candidates,
+                CandidateScoringContext context) {
 
-        /*
-         * Exact preferred provider/model pair wins if
-         * it is present in the eligible candidate set.
-         */
-        if (preferredProvider != null
-                && preferredModel != null
-                && !preferredModel.isBlank()) {
+            List<ScoredCandidate> result = new ArrayList<>();
 
             for (RoutingCandidate candidate : candidates) {
+                boolean preferred =
+                        context.policy().preferredProvider() == candidate.provider()
+                                && context.policy().preferredModel() != null
+                                && context.policy().preferredModel().equals(candidate.model());
 
-                if (preferredProvider.equals(
-                        candidate.provider())
-                        && preferredModel.equals(
-                        candidate.model())) {
+                double score = preferred ? 1.0 : 0.0;
 
-                    return candidate;
-                }
+                CandidateScoreComponent component =
+                        new CandidateScoreComponent(
+                                CandidateScoreDimension.POLICY_PREFERENCE,
+                                score,
+                                score,
+                                1.0,
+                                score);
+
+                result.add(
+                        new ScoredCandidate(
+                                candidate,
+                                List.of(component),
+                                score));
             }
-        }
 
-        /*
-         * No scoring/ranking yet.
-         *
-         * Deterministic first eligible candidate.
-         */
-        return candidates.get(0);
+            return List.copyOf(result);
+        }
     }
 }
