@@ -1,6 +1,8 @@
 package com.ai.gateway.tenant.dto;
 
 import com.ai.gateway.entitlement.enums.Plan;
+import com.ai.gateway.enums.Provider;
+import com.ai.gateway.tenant.TenantType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -20,4 +22,13 @@ public class TenantRequest {
 
     @NotNull
     private Plan plan;
+
+    @NotNull
+    private TenantType type;
+
+    @NotNull
+    private Provider defaultProvider;
+
+    @NotBlank
+    private String defaultModel;
 }
