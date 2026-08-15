@@ -2,6 +2,7 @@ package com.ai.gateway.routing;
 
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
+import com.ai.gateway.routing.constraint.CandidateConstraintEvaluator;
 import com.ai.gateway.routing.engine.CandidateEligibilityFilter;
 import com.ai.gateway.routing.engine.CandidateModelResolver;
 import com.ai.gateway.routing.engine.CandidateProviderResolver;
@@ -35,6 +36,9 @@ public class PolicyBasedRoutingStrategy
 
     private final CandidateEligibilityFilter
             candidateEligibilityFilter;
+
+    private final CandidateConstraintEvaluator
+            candidateConstraintEvaluator;
 
     @Override
     public boolean supports(
@@ -169,6 +173,27 @@ public class PolicyBasedRoutingStrategy
         }
 
         /*
+         * 6.5.4 Hard Constraint Evaluation
+         *
+         * Eligibility filtering answers whether a candidate is
+         * visible to the routing policy. Hard constraints are the
+         * deterministic safety/availability gate immediately before
+         * scoring. A candidate that fails any mandatory constraint
+         * must never reach candidate scoring or selection.
+         */
+        List<RoutingCandidate> constraintEligibleCandidates =
+                candidateConstraintEvaluator.filter(
+                        eligibleCandidates,
+                        policy);
+
+        if (constraintEligibleCandidates == null
+                || constraintEligibleCandidates.isEmpty()) {
+
+            throw new BusinessException(
+                    "No routing candidate satisfies the required hard constraints.");
+        }
+
+        /*
          * Select the preferred provider/model pair if it
          * survived candidate generation and eligibility.
          *
@@ -177,7 +202,7 @@ public class PolicyBasedRoutingStrategy
         RoutingCandidate selected =
                 selectCandidate(
                         policy,
-                        eligibleCandidates);
+                        constraintEligibleCandidates);
 
         /*
          * Final registry validation.
