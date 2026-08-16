@@ -70,6 +70,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         .defaultModel(
                                 tenant.getDefaultModel())
 
+                        .schemaName(tenant.getSchemaName())
+
                         .build();
 
         return AuthenticationResult.builder()

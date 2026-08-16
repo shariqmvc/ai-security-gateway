@@ -13,6 +13,7 @@ import com.ai.gateway.cost.service.impl.CostServiceImpl;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +40,9 @@ class CostServiceTest {
     private BudgetService budgetService;
 
     @Mock
+    private TenantSchemaRoutingService tenantSchemaRoutingService;
+
+    @Mock
     private AuthenticationContext authenticationContext;
 
     @Mock
@@ -59,7 +63,8 @@ class CostServiceTest {
                 new CostServiceImpl(
                         costCalculator,
                         requestCostRepository,
-                        budgetService);
+                        budgetService,
+                        tenantSchemaRoutingService);
 
         requestId = UUID.randomUUID();
         tenantId = UUID.randomUUID();
@@ -102,6 +107,9 @@ class CostServiceTest {
                 .consume(
                         tenantId,
                         new BigDecimal("0.15"));
+
+        verify(tenantSchemaRoutingService)
+                .useTenantSchema(tenantId);
 
         verify(requestCostRepository)
                 .save(any(RequestCost.class));

@@ -13,9 +13,11 @@ import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,7 +34,10 @@ public class CostServiceImpl implements CostService {
     private final RequestCostRepository requestCostRepository;
     private final BudgetService budgetService;
 
+    private final TenantSchemaRoutingService tenantSchemaRoutingService;
+
     @Override
+    @Transactional
     public BigDecimal save(
             UUID requestId,
             AuthenticationContext context,
@@ -95,7 +100,7 @@ public class CostServiceImpl implements CostService {
                         .createdAt(
                                 LocalDateTime.now())
                         .build();
-
+        tenantSchemaRoutingService.useTenantSchema(context.getTenantId());
         requestCostRepository.save(entity);
 
         return response.getTotalCost();

@@ -3,6 +3,8 @@ package com.ai.gateway.service;
 import com.ai.gateway.budget.BudgetExceededException;
 import com.ai.gateway.budget.service.BudgetService;
 import com.ai.gateway.entitlement.service.EntitlementService;
+import com.ai.gateway.provisioning.TenantSchemaProvisioningService;
+import com.ai.gateway.tenant.Tenant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +34,11 @@ class BudgetConcurrencyTest {
     @Autowired
     private EntitlementService entitlementService;
 
+    @Autowired
+    private TenantSchemaProvisioningService tenantSchemaProvisioningService;
+
     private UUID tenantId;
+    private String schemaName;
 
     @AfterEach
     void cleanup() {
@@ -41,12 +47,24 @@ class BudgetConcurrencyTest {
             return;
         }
 
-        jdbcTemplate.update(
-                """
-                DELETE FROM tenant_budget_usage
-                WHERE tenant_id = ?
-                """,
-                tenantId);
+
+        if (schemaName != null) {
+
+            String quotedSchema =
+                    "\"" + schemaName.replace("\"", "\"\"") + "\"";
+
+            jdbcTemplate.update(
+                    """
+                    DELETE FROM %s.tenant_budget_usage
+                    WHERE tenant_id = ?
+                    """.formatted(quotedSchema),
+                    tenantId);
+
+            jdbcTemplate.execute(
+                    "DROP SCHEMA IF EXISTS "
+                            + quotedSchema
+                            + " CASCADE");
+        }
 
         jdbcTemplate.update(
                 """
@@ -135,13 +153,16 @@ class BudgetConcurrencyTest {
                 firstSucceeded ^ secondSucceeded,
                 "Exactly one request must succeed");
 
+        String quotedSchema =
+                "\"" + schemaName.replace("\"", "\"\"") + "\"";
+
         BigDecimal used =
                 jdbcTemplate.queryForObject(
                         """
                         SELECT amount_used
-                        FROM tenant_budget_usage
+                        FROM %s.tenant_budget_usage
                         WHERE tenant_id = ?
-                        """,
+                        """.formatted(quotedSchema),
                         BigDecimal.class,
                         tenantId);
 
@@ -161,14 +182,34 @@ class BudgetConcurrencyTest {
                     id,
                     tenant_code,
                     tenant_name,
+                    schema_name,
                     plan
                 )
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 id,
                 "BUDGET-CONCURRENT-" + id,
                 "Budget Concurrency Test",
+                "tenant_" + id.toString().replace("-", "").toLowerCase(),
                 "PROFESSIONAL");
+
+        Tenant tenant = jdbcTemplate.queryForObject(
+                """
+                SELECT id, tenant_code, tenant_name, schema_name, plan
+                FROM tenants
+                WHERE id = ?
+                """,
+                (rs, rowNum) -> Tenant.builder()
+                        .id(rs.getObject("id", UUID.class))
+                        .tenantCode(rs.getString("tenant_code"))
+                        .tenantName(rs.getString("tenant_name"))
+                        .schemaName(rs.getString("schema_name"))
+                        .plan(com.ai.gateway.entitlement.enums.Plan.valueOf(
+                                rs.getString("plan")))
+                        .build(),
+                id);
+
+        schemaName = tenantSchemaProvisioningService.provision(tenant);
 
         UUID entitlementId = UUID.randomUUID();
 
@@ -197,7 +238,6 @@ class BudgetConcurrencyTest {
                 budget);
 
         tenantId = id;
-
         return id;
     }
 

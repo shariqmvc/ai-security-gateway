@@ -9,6 +9,7 @@ import com.ai.gateway.quota.dto.QuotaUsageDto;
 import com.ai.gateway.quota.dto.TenantQuotaUsageResponse;
 import com.ai.gateway.quota.exception.QuotaExceededException;
 import com.ai.gateway.quota.service.QuotaService;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,8 @@ public class QuotaServiceImpl implements QuotaService {
     private final TenantQuotaUsageRepository usageRepository;
 
     private final EntitlementService entitlementService;
+    private final TenantSchemaRoutingService tenantSchemaRoutingService;
+
 
     @Override
     @Transactional
@@ -34,6 +37,9 @@ public class QuotaServiceImpl implements QuotaService {
 
         Long limit =
                 entitlement.getRequestsPerDay();
+
+        tenantSchemaRoutingService.useTenantSchema(tenantId);
+
 
         LocalDate today =
                 LocalDate.now();
@@ -73,6 +79,9 @@ public class QuotaServiceImpl implements QuotaService {
         Long limit =
                 entitlement.getMonthlyTokenQuota();
 
+        // Switch transaction to tenant operational schema
+        tenantSchemaRoutingService.useTenantSchema(tenantId);
+
         LocalDate monthStart =
                 YearMonth.now()
                         .atDay(1);
@@ -104,6 +113,8 @@ public class QuotaServiceImpl implements QuotaService {
 
         TenantEntitlementResponse entitlement =
                 entitlementService.get(tenantId);
+
+        tenantSchemaRoutingService.useTenantSchema(tenantId);
 
         LocalDate today =
                 LocalDate.now();

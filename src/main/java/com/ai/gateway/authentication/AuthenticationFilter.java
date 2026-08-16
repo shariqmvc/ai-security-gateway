@@ -1,5 +1,7 @@
 package com.ai.gateway.authentication;
 
+import com.ai.gateway.tenant.TenantContext;
+import com.ai.gateway.tenant.TenantSchemaContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,13 +46,15 @@ public class AuthenticationFilter
         AuthenticationContext context =
                 result.getContext();
 
+        TenantContext.set(context.getTenantId());
+        TenantSchemaContext.set(context.getSchemaName());
+
         Authentication authentication =
                 new UsernamePasswordAuthenticationToken(
                         context,
                         null,
                         List.of(
-                                new SimpleGrantedAuthority(
-                                        "ROLE_USER")));
+                                new SimpleGrantedAuthority("ROLE_USER")));
 
         SecurityContextHolder
                 .getContext()
@@ -60,9 +64,13 @@ public class AuthenticationFilter
                 AuthenticationConstants.AUTH_CONTEXT,
                 context);
 
-        filterChain.doFilter(
-                request,
-                response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantSchemaContext.clear();
+            TenantContext.clear();
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Override

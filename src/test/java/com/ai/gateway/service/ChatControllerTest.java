@@ -70,6 +70,7 @@ class ChatControllerTest {
                         .tenantType(null)
                         .defaultProvider(Provider.GEMINI)
                         .defaultModel("gemini-test")
+                        .schemaName("tenant_test")
                         .build();
 
         AuthenticationResult authenticationResult =
