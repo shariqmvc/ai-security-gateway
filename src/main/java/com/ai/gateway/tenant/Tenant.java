@@ -27,6 +27,9 @@ public class Tenant {
     @Column(nullable = false)
     private String tenantName;
 
+    @Column(name = "schema_name", nullable = false, unique = true)
+    private String schemaName;
+
     @Enumerated(EnumType.STRING)
     private TenantStatus status;
 
