@@ -1,0 +1,109 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/db_gateway
+    username: postgres
+    password: shariq
+  config:
+    import: classpath:firewall-patterns.yml
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+    show-sql: true
+
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+logging:
+  pattern:
+    console: "%d %-5level [%X{requestId}] %logger - %msg%n"
+
+  level:
+    org.hibernate.SQL: DEBUG
+
+openai:
+  api-key: test-openai-key
+  model: gpt-5
+  url: https://api.openai.com/v1/responses
+  connect-timeout: 5s
+  read-timeout: 60s
+
+gemini:
+  api:
+    key: test-gemini-key
+
+  base:
+    url: https://generativelanguage.googleapis.com
+
+  model: gemini-3.6-flash
+
+ollama:
+  base:
+    url: http://localhost:11434
+  model: llama3.1:8b
+
+security:
+  encryption:
+    aes-key: ${AES_KEY:mysecretkey12345}
+gateway:
+  rate-limit:
+    requests-per-minute: 60
+  routing:
+    failover:
+      enabled: false
+      max-attempts: 2
+      providers:
+        GEMINI:
+          - OPENAI
+        OPENAI:
+          - GEMINI
+        OLLAMA:
+          - GEMINI
+      failure-injection:
+        # Controlled runtime failure injection for 6.7 validation.
+        # MUST remain disabled outside local/integration testing.
+        enabled: ${ROUTING_FAILURE_INJECTION_ENABLED:false}
+        provider: ${ROUTING_FAILURE_INJECTION_PROVIDER:}
+        model: ${ROUTING_FAILURE_INJECTION_MODEL:}
+        failure-type: ${ROUTING_FAILURE_INJECTION_TYPE:PROVIDER_ERROR}
+
+    scoring:
+      weights:
+        cost: 0.30
+        latency: 0.25
+        availability: 0.20
+        policy-preference: 0.25
+      defaults:
+        latency-ms: 1000
+        availability: 1.0
+      latency-ms: {}
+      availability: {}
+
+    optimization:
+      enabled: ${ROUTING_OPTIMIZATION_ENABLED:true}
+      degraded-availability-boost: ${ROUTING_OPTIMIZATION_DEGRADED_BOOST:1.25}
+      unhealthy-availability-boost: ${ROUTING_OPTIMIZATION_UNHEALTHY_BOOST:1.35}
+      latency-priority-boost: ${ROUTING_OPTIMIZATION_LATENCY_BOOST:1.15}
+      cost-priority-boost: ${ROUTING_OPTIMIZATION_COST_BOOST:1.15}
+      reliability-priority-boost: ${ROUTING_OPTIMIZATION_RELIABILITY_BOOST:1.15}
+    health:
+      enabled: ${ROUTING_HEALTH_ENABLED:true}
+      reject-unhealthy: ${ROUTING_HEALTH_REJECT_UNHEALTHY:true}
+      min-observations: ${ROUTING_HEALTH_MIN_OBSERVATIONS:3}
+      consecutive-failure-threshold: ${ROUTING_HEALTH_CONSECUTIVE_FAILURE_THRESHOLD:3}
+      degraded-availability: ${ROUTING_HEALTH_DEGRADED_AVAILABILITY:0.90}
+      unhealthy-availability: ${ROUTING_HEALTH_UNHEALTHY_AVAILABILITY:0.70}
+      ewma-alpha: ${ROUTING_HEALTH_EWMA_ALPHA:0.20}
+      signal-ttl-seconds: ${ROUTING_HEALTH_SIGNAL_TTL_SECONDS:300}
+
+    unity:
+      enabled: false

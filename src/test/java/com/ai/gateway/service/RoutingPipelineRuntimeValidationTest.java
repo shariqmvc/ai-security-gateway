@@ -6,6 +6,7 @@ import com.ai.gateway.routing.selection.CandidateSelectionEngine;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * scoring/selection pipeline and the policy routing strategy.</p>
  */
 @SpringBootTest
+@ActiveProfiles("test")
 class RoutingPipelineRuntimeValidationTest {
 
     @Autowired

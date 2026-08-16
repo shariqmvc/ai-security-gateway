@@ -4,9 +4,10 @@ import com.ai.gateway.enums.Provider;
 import com.ai.gateway.routing.engine.RoutingCandidate;
 import com.ai.gateway.routing.scoring.config.RoutingScoringProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
-
+@ActiveProfiles("test")
 class RoutingRuntimeSignalServiceTest {
     @Test
     void runtimeSuccessUpdatesLatencySignal() {

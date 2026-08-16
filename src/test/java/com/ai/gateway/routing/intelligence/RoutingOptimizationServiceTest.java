@@ -2,12 +2,13 @@ package com.ai.gateway.routing.intelligence;
 
 import com.ai.gateway.routing.scoring.CandidateScoreDimension;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.EnumMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-
+@ActiveProfiles("test")
 class RoutingOptimizationServiceTest {
 
     @Test

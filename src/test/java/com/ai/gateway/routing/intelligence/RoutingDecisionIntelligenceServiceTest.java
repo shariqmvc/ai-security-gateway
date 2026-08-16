@@ -8,12 +8,13 @@ import com.ai.gateway.routing.scoring.config.RoutingScoringProperties;
 import com.ai.gateway.routing.scoring.CandidateScoreDimension;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Set;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-
+@ActiveProfiles("test")
 class RoutingDecisionIntelligenceServiceTest {
     @Test
     void buildsContextFromExtensiveResearchRequest() {
