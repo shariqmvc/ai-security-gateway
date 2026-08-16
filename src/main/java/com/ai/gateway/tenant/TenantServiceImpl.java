@@ -1,10 +1,10 @@
 package com.ai.gateway.tenant;
 
-import com.ai.gateway.provisioning.EntitlementProvisioningService;
+import com.ai.gateway.exception.TenantAlreadyExistsException;
+import com.ai.gateway.provisioning.TenantProvisioningService;
 import com.ai.gateway.tenant.dto.TenantRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -16,8 +16,8 @@ public class TenantServiceImpl
 
     private final TenantRepository repository;
 
-    private final EntitlementProvisioningService
-            entitlementProvisioningService;
+    private final TenantProvisioningService
+            tenantProvisioningService;
 
     @Override
     public Optional<Tenant> findByTenantCode(
@@ -28,7 +28,6 @@ public class TenantServiceImpl
     }
 
     @Override
-    @Transactional
     public Tenant create(
             TenantRequest request) {
 
@@ -70,52 +69,40 @@ public class TenantServiceImpl
                     "Tenant default model is required.");
         }
 
-        if (repository.findByTenantCode(
-                request.getTenantCode()).isPresent()) {
-
-            throw new IllegalStateException(
-                    "Tenant already exists: "
-                            + request.getTenantCode());
+        if (repository.findByTenantCode(request.getTenantCode()).isPresent()) {
+            throw new TenantAlreadyExistsException(
+                    request.getTenantCode());
         }
 
         /*
          * Tenant creation establishes the complete tenant
          * identity and default routing configuration.
          *
-         * A newly provisioned tenant is immediately ACTIVE
-         * after successful provisioning.
+         * A newly created tenant starts in REQUESTED state and is
+         * activated only after the provisioning workflow succeeds.
          */
         Tenant tenant =
                 Tenant.builder()
-                        .tenantCode(
-                                request.getTenantCode())
-                        .tenantName(
-                                request.getTenantName())
-                        .status(
-                                TenantStatus.ACTIVE)
-                        .type(
-                                request.getType())
-                        .plan(
-                                request.getPlan())
-                        .defaultProvider(
-                                request.getDefaultProvider())
-                        .defaultModel(
-                                request.getDefaultModel())
-                        .createdAt(
-                                LocalDateTime.now())
+                        .tenantCode(request.getTenantCode())
+                        .tenantName(request.getTenantName())
+                        .status(TenantStatus.REQUESTED)
+                        .type(request.getType())
+                        .plan(request.getPlan())
+                        .defaultProvider(request.getDefaultProvider())
+                        .defaultModel(request.getDefaultModel())
+                        .createdAt(LocalDateTime.now())
                         .build();
 
         Tenant saved =
                 repository.save(tenant);
 
-        /*
-         * Entitlement provisioning remains part of the
-         * same transaction. If provisioning fails, the
-         * tenant creation transaction is rolled back.
-         */
-        entitlementProvisioningService.provision(
+        tenantProvisioningService.provision(
                 saved.getId());
 
-        return saved;
+        return repository.findById(saved.getId())
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Tenant disappeared during provisioning: "
+                                        + saved.getId()));
     }
 }

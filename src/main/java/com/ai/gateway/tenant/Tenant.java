@@ -44,4 +44,17 @@ public class Tenant {
 
     private LocalDateTime createdAt;
 
+    @Column(name = "provisioning_started_at")
+    private LocalDateTime provisioningStartedAt;
+
+    @Column(name = "provisioning_completed_at")
+    private LocalDateTime provisioningCompletedAt;
+
+    @Column(name = "provisioning_failure_reason", length = 1000)
+    private String provisioningFailureReason;
+
+    @Column(name = "provisioning_attempts", nullable = false)
+    @Builder.Default
+    private int provisioningAttempts = 0;
+
 }
