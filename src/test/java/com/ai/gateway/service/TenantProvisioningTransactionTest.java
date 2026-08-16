@@ -1,15 +1,18 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.entitlement.enums.Plan;
+import com.ai.gateway.enums.Provider;
 import com.ai.gateway.provisioning.EntitlementProvisioningService;
 import com.ai.gateway.tenant.TenantRepository;
 import com.ai.gateway.tenant.TenantService;
+import com.ai.gateway.tenant.TenantType;
 import com.ai.gateway.tenant.dto.TenantRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.UUID;
@@ -19,8 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
+@ActiveProfiles("test")
+@TestPropertySource(properties = {
+        "gemini.api.key=test-gemini-key"
+})
 class TenantProvisioningTransactionTest {
 
     @Autowired
@@ -66,6 +74,9 @@ class TenantProvisioningTransactionTest {
                         .tenantCode("ROLLBACK-TEST")
                         .tenantName("Rollback Test Tenant")
                         .plan(Plan.PROFESSIONAL)
+                        .type(TenantType.STANDARD)
+                        .defaultProvider(Provider.GEMINI)
+                        .defaultModel("gemini-3.6-flash")
                         .build();
 
         doThrow(new IllegalStateException(

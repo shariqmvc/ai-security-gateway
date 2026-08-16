@@ -7,11 +7,12 @@ import com.ai.gateway.routing.scoring.CandidateScoreDimension;
 import com.ai.gateway.routing.scoring.ScoredCandidate;
 import com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-
+@ActiveProfiles("test")
 class CandidateSelectionEngineImplTest {
 
     private final CandidateSelectionEngineImpl engine =

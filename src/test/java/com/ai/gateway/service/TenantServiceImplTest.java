@@ -1,10 +1,12 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.entitlement.enums.Plan;
+import com.ai.gateway.enums.Provider;
 import com.ai.gateway.provisioning.EntitlementProvisioningService;
 import com.ai.gateway.tenant.Tenant;
 import com.ai.gateway.tenant.TenantRepository;
 import com.ai.gateway.tenant.TenantServiceImpl;
+import com.ai.gateway.tenant.TenantType;
 import com.ai.gateway.tenant.dto.TenantRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +42,9 @@ class TenantServiceImplTest {
                         .tenantCode("ACME")
                         .tenantName("ACME Corporation")
                         .plan(Plan.PROFESSIONAL)
+                        .type(TenantType.STANDARD)
+                        .defaultProvider(Provider.GEMINI)
+                        .defaultModel("gemini-3.6-flash")
                         .build();
 
         Tenant savedTenant =
@@ -94,6 +99,9 @@ class TenantServiceImplTest {
                         .tenantCode("ACME")
                         .tenantName("ACME Corporation")
                         .plan(Plan.PROFESSIONAL)
+                        .type(TenantType.STANDARD)
+                        .defaultProvider(Provider.GEMINI)
+                        .defaultModel("gemini-3.6-flash")
                         .build();
 
         when(repository.findByTenantCode("ACME"))
@@ -123,6 +131,9 @@ class TenantServiceImplTest {
                         .tenantCode("TEST")
                         .tenantName("Test Tenant")
                         .plan(Plan.STARTER)
+                        .type(TenantType.STANDARD)
+                        .defaultProvider(Provider.OLLAMA)
+                        .defaultModel("llama3.1:8b")
                         .build();
 
         when(repository.findByTenantCode("TEST"))
@@ -168,8 +179,10 @@ class TenantServiceImplTest {
                         .tenantCode("ACME")
                         .tenantName("ACME Corporation")
                         .plan(Plan.PROFESSIONAL)
+                        .type(TenantType.STANDARD)
+                        .defaultProvider(Provider.GEMINI)
+                        .defaultModel("gemini-3.6-flash")
                         .build();
-
         Tenant savedTenant =
                 Tenant.builder()
                         .tenantCode("ACME")
@@ -202,5 +215,38 @@ class TenantServiceImplTest {
 
         verify(entitlementProvisioningService)
                 .provision(savedTenant.getId());
+    }
+
+    @Test
+    void shouldRejectNullRequest() {
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> tenantService.create(null));
+
+        verifyNoInteractions(
+                repository,
+                entitlementProvisioningService);
+    }
+
+    @Test
+    void shouldRejectMissingTenantType() {
+
+        TenantRequest request =
+                TenantRequest.builder()
+                        .tenantCode("ACME")
+                        .tenantName("ACME Corporation")
+                        .plan(Plan.PROFESSIONAL)
+                        .defaultProvider(Provider.GEMINI)
+                        .defaultModel("gemini-3.6-flash")
+                        .build();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> tenantService.create(request));
+
+        verifyNoInteractions(
+                repository,
+                entitlementProvisioningService);
     }
 }

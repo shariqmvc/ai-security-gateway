@@ -9,13 +9,14 @@ import com.ai.gateway.routing.RoutingDecisionMetadata;
 import com.ai.gateway.routing.health.entity.RoutingOutcome;
 import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-
+@ActiveProfiles("test")
 class RoutingOutcomeServiceImplTest {
 
     @Test

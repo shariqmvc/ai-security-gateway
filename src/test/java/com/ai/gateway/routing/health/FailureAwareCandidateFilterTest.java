@@ -3,12 +3,13 @@ package com.ai.gateway.routing.health;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.routing.engine.RoutingCandidate;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
+@ActiveProfiles("test")
 class FailureAwareCandidateFilterTest {
 
     @Test
