@@ -1,5 +1,6 @@
 package com.ai.gateway.tenant;
 
+import com.ai.gateway.provisioning.TenantSchemaNameResolver;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ public class TenantSchemaRoutingService {
 
     private final EntityManager entityManager;
     private final TenantRepository tenantRepository;
+    private final TenantSchemaNameResolver schemaNameResolver;
 
     /**
      * Routes the current transaction using the authenticated tenant context.
@@ -20,7 +22,18 @@ public class TenantSchemaRoutingService {
      * filter has already initialized TenantSchemaContext.
      */
     public void useTenantSchema() {
-        useTenantSchema(TenantSchemaContext.require());
+        UUID tenantId = TenantContext.require();
+        String schemaName = TenantSchemaContext.require();
+
+        String expectedSchema = schemaNameResolver.resolve(
+                Tenant.builder().id(tenantId).build());
+
+        if (!expectedSchema.equals(schemaName)) {
+            throw new IllegalStateException(
+                    "Tenant schema context does not match authenticated tenant.");
+        }
+
+        useTenantSchema(schemaName);
     }
 
     /**
@@ -36,6 +49,19 @@ public class TenantSchemaRoutingService {
                     "Tenant ID cannot be null.");
         }
 
+        /*
+         * Defense in depth: an authenticated tenant request may only route
+         * to its own schema. Calls made by trusted admin/background flows
+         * have no TenantContext and may continue to use an explicit tenantId.
+         */
+        UUID authenticatedTenantId = TenantContext.get();
+        if (authenticatedTenantId != null
+                && !authenticatedTenantId.equals(tenantId)) {
+            throw new TenantAccessDeniedException(
+                    authenticatedTenantId,
+                    tenantId);
+        }
+
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new IllegalStateException(
                         "Tenant not found: " + tenantId));
@@ -44,6 +70,16 @@ public class TenantSchemaRoutingService {
                 || tenant.getSchemaName().isBlank()) {
             throw new IllegalStateException(
                     "Tenant schema name is not configured: " + tenantId);
+        }
+
+        // The tenant schema is derived from the tenant UUID during
+        // provisioning. Refuse metadata that points a tenant at another
+        // tenant's physical schema; otherwise a corrupted/misconfigured
+        // control-plane row could bypass the logical tenant boundary.
+        String expectedSchema = schemaNameResolver.resolve(tenant);
+        if (!expectedSchema.equals(tenant.getSchemaName())) {
+            throw new IllegalStateException(
+                    "Tenant schema does not match tenant identity: " + tenantId);
         }
 
         useTenantSchema(tenant.getSchemaName());
