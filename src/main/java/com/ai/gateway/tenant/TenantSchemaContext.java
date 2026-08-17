@@ -17,6 +17,10 @@ public final class TenantSchemaContext {
         CURRENT_SCHEMA.set(schemaName);
     }
 
+    public static String get() {
+        return CURRENT_SCHEMA.get();
+    }
+
     public static String require() {
         String schemaName = CURRENT_SCHEMA.get();
 

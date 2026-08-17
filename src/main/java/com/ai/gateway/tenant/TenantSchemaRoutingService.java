@@ -55,11 +55,39 @@ public class TenantSchemaRoutingService {
          * have no TenantContext and may continue to use an explicit tenantId.
          */
         UUID authenticatedTenantId = TenantContext.get();
+        String authenticatedSchema = TenantSchemaContext.get();
+
+        // A partially initialized request context is never allowed to route
+        // tenant operational data. This closes the "stale schema only" case
+        // where a thread could carry a schema without its tenant identity.
+        if (authenticatedTenantId == null && authenticatedSchema != null) {
+            throw new IllegalStateException(
+                    "Tenant schema context exists without an authenticated tenant.");
+        }
+
         if (authenticatedTenantId != null
                 && !authenticatedTenantId.equals(tenantId)) {
             throw new TenantAccessDeniedException(
                     authenticatedTenantId,
                     tenantId);
+        }
+
+        if (authenticatedTenantId != null
+                && authenticatedSchema != null) {
+
+            Tenant authenticatedTenant = tenantRepository
+                    .findById(authenticatedTenantId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Authenticated tenant not found: "
+                                    + authenticatedTenantId));
+
+            String expectedAuthenticatedSchema =
+                    schemaNameResolver.resolve(authenticatedTenant);
+
+            if (!expectedAuthenticatedSchema.equals(authenticatedSchema)) {
+                throw new IllegalStateException(
+                        "Authenticated tenant schema context is invalid.");
+            }
         }
 
         Tenant tenant = tenantRepository.findById(tenantId)

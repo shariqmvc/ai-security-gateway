@@ -77,7 +77,12 @@ public class AuthenticationFilter
     protected boolean shouldNotFilter(
             HttpServletRequest request) {
 
-        return request.getServletPath()
-                .startsWith("/admin/");
+        String servletPath = request.getServletPath();
+
+        // Some servlet mocks/containers may return null. A null path must
+        // never cause the authentication filter itself to fail with an NPE.
+        // In that case, fail closed by applying authentication.
+        return servletPath != null
+                && servletPath.startsWith("/admin/");
     }
 }
