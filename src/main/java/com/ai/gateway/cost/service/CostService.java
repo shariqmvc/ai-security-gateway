@@ -17,6 +17,26 @@ public interface CostService {
             AIRequest aiRequest,
             AIResponse aiResponse);
 
+    /**
+     * Performs the synchronous budget guardrail without persisting the final
+     * request-cost row. The guardrail remains on the request critical path.
+     */
+    BigDecimal enforceBudget(
+            UUID requestId,
+            AuthenticationContext context,
+            AIRequest aiRequest,
+            AIResponse aiResponse);
+
+    /**
+     * Persists the already-authorized actual cost. This operation is safe to
+     * execute asynchronously after the HTTP response is ready.
+     */
+    void persist(
+            UUID requestId,
+            AuthenticationContext context,
+            AIRequest aiRequest,
+            AIResponse aiResponse);
+
     CostSummary getOverallSummary();
 
     CostSummary getTenantSummary(UUID tenantId);

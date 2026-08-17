@@ -13,7 +13,7 @@ spring:
     hibernate:
       ddl-auto: validate
 
-    show-sql: true
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
 
     properties:
       hibernate:
@@ -28,7 +28,7 @@ logging:
     console: "%d %-5level [%X{requestId}] %logger - %msg%n"
 
   level:
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:INFO}
 
 openai:
   api-key: ${OPENAI_API_KEY}
@@ -55,15 +55,19 @@ security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
+  provider:
+    http:
+      connect-timeout: ${GATEWAY_PROVIDER_CONNECT_TIMEOUT:5s}
+      read-timeout: ${GATEWAY_PROVIDER_READ_TIMEOUT:30s}
   rate-limit:
     requests-per-minute: 60
   routing:
     failover:
-      enabled: false
-      max-attempts: 2
+      enabled: ${GATEWAY_ROUTING_FAILOVER_ENABLED:true}
+      max-attempts: ${GATEWAY_ROUTING_FAILOVER_MAX_ATTEMPTS:2}
       providers:
         GEMINI:
-          - OPENAI
+          - OLLAMA
         OPENAI:
           - GEMINI
         OLLAMA:

@@ -5,6 +5,7 @@ import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.observability.PerformanceLogger;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.gemini.dto.GeminiContent;
 import com.ai.gateway.provider.gemini.dto.GeminiPart;
@@ -24,6 +25,7 @@ public class GeminiProvider implements AIProvider {
 
     private final RestTemplate restTemplate;
     private final GeminiConfig geminiConfig;
+    private final PerformanceLogger performanceLogger;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -47,9 +49,23 @@ public class GeminiProvider implements AIProvider {
     @Override
     public AIResponse chat(AIRequest request) {
 
+        String requestIdValue = org.slf4j.MDC.get("requestId");
+        java.util.UUID requestId = parseRequestId(requestIdValue);
+        long started = System.nanoTime();
+        performanceLogger.providerStart(
+                requestId,
+                provider().name(),
+                request.getModel(),
+                providerAttempt());
+
+        String selectedModel =
+                request.getModel() != null && !request.getModel().isBlank()
+                        ? request.getModel()
+                        : model;
+
         String url = baseUrl +
                 "/v1beta/models/" +
-                model +
+                selectedModel +
                 ":generateContent?key=" +
                 apiKey;
 
@@ -69,12 +85,31 @@ public class GeminiProvider implements AIProvider {
         HttpEntity<GeminiRequest> entity =
                 new HttpEntity<>(geminiRequest, headers);
 
-        ResponseEntity<GeminiResponse> response =
-                restTemplate.exchange(
-                        url,
-                        HttpMethod.POST,
-                        entity,
-                        GeminiResponse.class);
+        ResponseEntity<GeminiResponse> response;
+        try {
+            response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    entity,
+                    GeminiResponse.class);
+        } catch (RuntimeException ex) {
+            performanceLogger.providerCompleted(
+                    requestId,
+                    provider().name(),
+                    request.getModel(),
+                    providerAttempt(),
+                    elapsedMs(started),
+                    "FAILED:" + ex.getClass().getSimpleName());
+            throw ex;
+        }
+
+        performanceLogger.providerCompleted(
+                requestId,
+                provider().name(),
+                request.getModel(),
+                providerAttempt(),
+                elapsedMs(started),
+                "HTTP_" + response.getStatusCode().value());
 
         String answer =
                 response.getBody()
@@ -108,5 +143,29 @@ public class GeminiProvider implements AIProvider {
                         usage
                 )
                 .build();
+    }
+
+    private int providerAttempt() {
+        String value = org.slf4j.MDC.get("providerAttempt");
+        try {
+            return value == null ? 1 : Math.max(1, Integer.parseInt(value));
+        } catch (NumberFormatException ex) {
+            return 1;
+        }
+    }
+
+    private java.util.UUID parseRequestId(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return java.util.UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 }

@@ -29,6 +29,16 @@ public class RestoreServiceImpl implements RestoreService {
 
     @Override
     public String restore(String response, UUID requestId) {
+            if (response == null || response.isEmpty()) {
+                return response;
+            }
+
+            // Fast path: the overwhelming majority of responses contain no
+            // PII tokens. Avoid a tenant-schema database lookup in that case.
+            if (!TOKEN_PATTERN.matcher(response).find()) {
+                return response;
+            }
+
             List<TokenVault> vaultEntries =
                     tokenVaultService.getTokens(requestId);
 

@@ -17,7 +17,7 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "gateway.routing.failover")
 public class FailoverProperties {
 
-    private boolean enabled = false;
+    private boolean enabled = true;
 
     /**
      * Maximum number of provider attempts, including the primary provider.

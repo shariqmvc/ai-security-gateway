@@ -5,6 +5,7 @@ import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.metrics.MetricsConstants;
+import com.ai.gateway.observability.PerformanceLogger;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
@@ -19,6 +20,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.List;
 import java.util.Set;
@@ -54,6 +58,9 @@ class ProviderFailoverServiceImplTest {
     @Mock
     private RoutingAnalyticsService routingAnalyticsService;
 
+    @Mock
+    private PerformanceLogger performanceLogger;
+
 
     @BeforeEach
     void setUp() {
@@ -72,7 +79,8 @@ class ProviderFailoverServiceImplTest {
                 registry,
                 properties,
                 metricsService,
-                routingAnalyticsService);
+                routingAnalyticsService,
+                performanceLogger);
 
         primaryRequest = AIRequest.builder()
                 .provider(Provider.GEMINI)
@@ -404,4 +412,58 @@ class ProviderFailoverServiceImplTest {
                 ModelStatus.ENABLED,
                 Set.of("CHAT"));
     }
+    @Test
+    void shouldNotFailoverOnNonRetryableHttp400() {
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+
+        HttpClientErrorException failure =
+                HttpClientErrorException.create(
+                        HttpStatus.BAD_REQUEST,
+                        "Bad Request",
+                        HttpHeaders.EMPTY,
+                        null,
+                        null);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(failure);
+
+        HttpClientErrorException thrown =
+                assertThrows(
+                        HttpClientErrorException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertSame(failure, thrown);
+        verify(providerFactory, never()).getProvider(Provider.OPENAI);
+        verifyNoInteractions(registry);
+        verifyNoInteractions(routingAnalyticsService);
+    }
+
+    @Test
+    void shouldAttachActualFallbackProviderAndModelToResponse() {
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+        when(providerFactory.getProvider(Provider.OPENAI))
+                .thenReturn(openAiProvider);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(new RuntimeException("Gemini unavailable"));
+
+        when(openAiProvider.defaultModel())
+                .thenReturn("gpt-test");
+        when(registry.requireProvider(Provider.OPENAI))
+                .thenReturn(enabledProvider(Provider.OPENAI));
+        when(registry.requireModel(Provider.OPENAI, "gpt-test"))
+                .thenReturn(enabledModel(Provider.OPENAI, "gpt-test"));
+        when(openAiProvider.chat(any(AIRequest.class)))
+                .thenReturn(AIResponse.builder().response("fallback").build());
+
+        AIResponse result = service.execute(primaryRequest);
+
+        assertEquals(Provider.OPENAI, result.getProvider());
+        assertEquals("gpt-test", result.getModel());
+    }
+
 }

@@ -55,11 +55,15 @@ security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
+  provider:
+    http:
+      connect-timeout: 2s
+      read-timeout: 5s
   rate-limit:
     requests-per-minute: 60
   routing:
     failover:
-      enabled: false
+      enabled: true
       max-attempts: 2
       providers:
         GEMINI:

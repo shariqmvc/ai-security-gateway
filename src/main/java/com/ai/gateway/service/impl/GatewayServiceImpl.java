@@ -2,32 +2,28 @@ package com.ai.gateway.service.impl;
 
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.budget.service.BudgetService;
-import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.*;
 import com.ai.gateway.entitlement.annotation.RequiresFeature;
 import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.mapper.ProviderFeatureMapper;
 import com.ai.gateway.entitlement.service.EntitlementService;
 import com.ai.gateway.failover.ProviderFailoverService;
-import com.ai.gateway.enums.AuditStatus;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.firewall.FirewallResult;
+import com.ai.gateway.governance.service.GovernanceGuardrailService;
 import com.ai.gateway.firewall.service.PromptFireWallService;
 import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.metrics.MetricsConstants;
+import com.ai.gateway.observability.PerformanceLogger;
+import com.ai.gateway.observability.RequestCorrelationFilter;
+import org.slf4j.MDC;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
-import com.ai.gateway.provider.AIProviderFactory;
-import com.ai.gateway.quota.service.QuotaService;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.routing.intelligence.RoutingRuntimeSignalService;
-import com.ai.gateway.routing.health.RoutingOutcomeService;
 import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,7 +33,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 @Slf4j
@@ -51,36 +46,25 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final RestoreService restoreService;
 
-    private final AuditService auditService;
-
-    private final AIProviderFactory providerFactory;
-
     private final PromptFireWallService firewallService;
 
     private final PolicyEngineService policyEngineService;
 
     private final GatewayMetricsService metricsService;
 
-    private final TokenUsageService tokenUsageService;
-
-    private final CostService costService;
-
     private final EntitlementService entitlementService;
-
-    private final QuotaService quotaService;
 
     private final RoutingService routingService;
 
     private final RoutingAnalyticsService routingAnalyticsService;
 
-    private final RoutingRuntimeSignalService routingRuntimeSignalService;
-
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private RoutingOutcomeService routingOutcomeService;
-
     private final ProviderFailoverService providerFailoverService;
 
-  //  private final BudgetService budgetService;
+    private final PerformanceLogger performanceLogger;
+
+    private final GatewayPostProviderPersistenceService postProviderPersistenceService;
+
+    private final GovernanceGuardrailService governanceGuardrailService;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -88,9 +72,10 @@ public class GatewayServiceImpl implements GatewayService {
 
         metricsService.increment(MetricsConstants.TOTAL_REQUESTS);
 
-        UUID requestId = UUID.randomUUID();
+        UUID requestId = resolveRequestId();
 
-        long start = System.currentTimeMillis();
+        long start = System.nanoTime();
+        performanceLogger.requestStart(requestId, "/api/chat");
 
         String originalPrompt = request.getPrompt();
 
@@ -98,7 +83,9 @@ public class GatewayServiceImpl implements GatewayService {
 
 
 
+        long stageStart = System.nanoTime();
         AuthenticationContext auth = getAuthenticationContext();
+        performanceLogger.stage("AUTHENTICATION", requestId, elapsedMs(stageStart), "SUCCESS");
         AIRequest aiRequest = null;
         boolean providerInvocationStarted = false;
         boolean providerInvocationSucceeded = false;
@@ -107,27 +94,33 @@ public class GatewayServiceImpl implements GatewayService {
         try {
 
 
+            stageStart = System.nanoTime();
             if (request.isExtensiveResearch()) {
                 entitlementService.validateFeature(
                         auth.getTenantId(),
                         Feature.EXTENSIVE_RESEARCH);
             }
+            performanceLogger.stage("ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
 
+            stageStart = System.nanoTime();
             // -------------------------------
             // Prompt Firewall
             // Policy Engine
             // -------------------------------
             validateRequest(originalPrompt);
+            performanceLogger.stage("FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
 
 
 
+            stageStart = System.nanoTime();
             MaskingResult maskingResult =
                     maskPrompt(requestId, originalPrompt);
 
             maskedPrompt =
                     maskingResult.getMaskedPrompt();
+            performanceLogger.stage("PII_MASKING_AND_TOKEN_VAULT", requestId, elapsedMs(stageStart), "SUCCESS");
 
-
+            stageStart = System.nanoTime();
             aiRequest =
                     buildAIRequest(
                             requestId,
@@ -135,6 +128,9 @@ public class GatewayServiceImpl implements GatewayService {
                             auth,
                             maskedPrompt);
 
+            performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            stageStart = System.nanoTime();
             Feature feature =
                     ProviderFeatureMapper.toFeature(
                             aiRequest.getProvider());
@@ -142,66 +138,90 @@ public class GatewayServiceImpl implements GatewayService {
             validateFeature(
                     auth,
                     feature);
+            performanceLogger.stage("PROVIDER_ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
             // -------------------------------
             // Provider Invocation
             // -------------------------------
 
             providerInvocationStarted = true;
-            providerInvocationStart = System.currentTimeMillis();
+            providerInvocationStart = System.nanoTime();
 
             AIResponse aiResponse =
                     invokeProvider(aiRequest);
 
-            providerInvocationSucceeded = true;
-
-            long providerLatency =
-                    System.currentTimeMillis() - providerInvocationStart;
-
-            routingRuntimeSignalService.recordSuccess(
-                    new RoutingCandidate(aiRequest.getProvider(), aiRequest.getModel()),
-                    providerLatency);
-
-            if (routingOutcomeService != null) {
-                routingOutcomeService.recordSuccess(
-                        requestId,
-                        auth,
-                        aiRequest,
-                        new RoutingDecision(
-                                aiRequest.getProvider(),
-                                aiRequest.getModel(),
-                                aiRequest.getRoutingStrategy(),
-                                aiRequest.getRoutingDecisionMetadata()),
-                        providerLatency);
+            if (aiResponse != null && aiResponse.getProvider() != null) {
+                // Failover may have changed the actual execution target.
+                // Carry that target forward so usage, cost, audit and routing
+                // health are attributed to the provider that actually ran.
+                aiRequest.setProvider(aiResponse.getProvider());
+                if (aiResponse.getModel() != null && !aiResponse.getModel().isBlank()) {
+                    aiRequest.setModel(aiResponse.getModel());
+                }
             }
 
-            // -------------------------------
-            // Token Usage
-            // -------------------------------
+            providerInvocationSucceeded = true;
 
+            long providerLatency = elapsedMs(providerInvocationStart);
+            performanceLogger.stage("PROVIDER_EXECUTION", requestId, providerLatency, "SUCCESS");
 
-            persistUsage(
+            // Governance enforcement remains synchronous. Token quota and
+            // budget controls therefore cannot be bypassed by the async path.
+            stageStart = System.nanoTime();
+            enforcePostProviderGuardrails(
                     requestId,
                     auth,
                     aiRequest,
                     aiResponse);
-            // -------------------------------
-            // Restore Response
-            // -------------------------------
+            performanceLogger.stage(
+                    "GOVERNANCE_GUARDRAILS",
+                    requestId,
+                    elapsedMs(stageStart),
+                    "SUCCESS");
 
+            stageStart = System.nanoTime();
             String restored =
                     restoreResponse(
                             requestId,
                             aiResponse);
-
-            long latency =
-                    System.currentTimeMillis() - start;
-
-            auditSuccess(
+            performanceLogger.stage(
+                    "RESPONSE_RESTORE",
                     requestId,
-                    maskedPrompt,
+                    elapsedMs(stageStart),
+                    "SUCCESS");
+
+            long latency = elapsedMs(start);
+            long gatewayOverhead = Math.max(0L, latency - providerLatency);
+
+            RoutingDecision routingDecision =
+                    new RoutingDecision(
+                            aiRequest.getProvider(),
+                            aiRequest.getModel(),
+                            aiRequest.getRoutingStrategy(),
+                            aiRequest.getRoutingDecisionMetadata());
+
+            postProviderPersistenceService.persistSuccess(
+                    requestId,
+                    auth,
                     aiRequest,
                     aiResponse,
+                    routingDecision,
+                    providerLatency,
+                    maskedPrompt,
                     latency);
+
+            performanceLogger.stage(
+                    "POST_PROVIDER_PERSISTENCE_ASYNC",
+                    requestId,
+                    0L,
+                    "QUEUED");
+            performanceLogger.requestCompleted(
+                    requestId,
+                    latency,
+                    aiRequest.getProvider().name(),
+                    aiRequest.getModel(),
+                    "SUCCESS",
+                    providerLatency,
+                    gatewayOverhead);
 
             return ChatResponse.builder()
                     .requestId(requestId)
@@ -210,47 +230,68 @@ public class GatewayServiceImpl implements GatewayService {
 
         } catch (Exception ex) {
 
-            if (providerInvocationStarted && !providerInvocationSucceeded && aiRequest != null) {
-                RoutingCandidate failedCandidate =
-                        new RoutingCandidate(aiRequest.getProvider(), aiRequest.getModel());
-                routingRuntimeSignalService.recordFailure(
-                        failedCandidate,
-                        ex.getClass().getSimpleName());
+            long latency = elapsedMs(start);
+            long providerLatency = providerInvocationStarted
+                    ? elapsedMs(providerInvocationStart)
+                    : 0L;
+            long gatewayOverhead = Math.max(0L, latency - providerLatency);
 
-                if (routingOutcomeService != null) {
-                    routingOutcomeService.recordFailure(
-                            requestId,
-                            auth,
-                            aiRequest,
-                            new RoutingDecision(
-                                    aiRequest.getProvider(),
-                                    aiRequest.getModel(),
-                                    aiRequest.getRoutingStrategy(),
-                                    aiRequest.getRoutingDecisionMetadata()),
-                            System.currentTimeMillis() - providerInvocationStart,
-                            ex);
-                }
-            }
+            RoutingDecision routingDecision = aiRequest == null
+                    ? null
+                    : new RoutingDecision(
+                            aiRequest.getProvider(),
+                            aiRequest.getModel(),
+                            aiRequest.getRoutingStrategy(),
+                            aiRequest.getRoutingDecisionMetadata());
 
-            long latency =
-                    System.currentTimeMillis() - start;
-
-            auditFailure(
+            postProviderPersistenceService.persistFailure(
                     requestId,
+                    auth,
+                    aiRequest,
+                    routingDecision,
+                    providerLatency,
                     maskedPrompt,
                     latency,
-                    aiRequest,
-                    auth);
+                    providerInvocationStarted && !providerInvocationSucceeded,
+                    ex.getClass().getSimpleName());
 
-            metricsService.increment(
-                    MetricsConstants.FAILED_REQUESTS);
-
-
+            performanceLogger.stage(
+                    "POST_PROVIDER_PERSISTENCE_ASYNC",
+                    requestId,
+                    0L,
+                    "QUEUED");
+            performanceLogger.requestCompleted(
+                    requestId,
+                    latency,
+                    aiRequest != null && aiRequest.getProvider() != null
+                            ? aiRequest.getProvider().name()
+                            : null,
+                    aiRequest != null ? aiRequest.getModel() : null,
+                    "FAILED",
+                    providerLatency,
+                    gatewayOverhead);
 
             throw ex;
-
         }
 
+    }
+
+    private UUID resolveRequestId() {
+        String requestId = MDC.get(RequestCorrelationFilter.REQUEST_ID);
+        if (requestId != null) {
+            try {
+                return UUID.fromString(requestId);
+            } catch (IllegalArgumentException ignored) {
+                // Fall through to a new UUID. The correlation filter normally
+                // guarantees a valid UUID, but the service remains safe when
+                // invoked directly from tests or non-HTTP callers.
+            }
+        }
+        return UUID.randomUUID();
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     /**
@@ -280,56 +321,18 @@ public class GatewayServiceImpl implements GatewayService {
 
     }
 
-    private void auditFailure(
+    private void enforcePostProviderGuardrails(
             UUID requestId,
-            String maskedPrompt,
-            long latency,
-            AIRequest aiRequest,
-            AuthenticationContext auth) {
+            AuthenticationContext auth,
+            AIRequest request,
+            AIResponse response) {
 
-        String provider = null;
-        String model = null;
-
-        if (aiRequest != null) {
-
-            if (aiRequest.getProvider() != null) {
-                provider =
-                        aiRequest.getProvider().name();
-            }
-
-            model =
-                    aiRequest.getModel();
-        }
-
-        /*
-         * If AIRequest was not created, fall back to the
-         * authentication/tenant defaults.
-         */
-        if (provider == null
-                && auth != null
-                && auth.getDefaultProvider() != null) {
-
-            provider =
-                    auth.getDefaultProvider().name();
-        }
-
-        if (model == null
-                && auth != null) {
-
-            model =
-                    auth.getDefaultModel();
-        }
-
-        auditService.save(
+        governanceGuardrailService.enforce(
                 requestId,
-                maskedPrompt,
-                null,
-                latency,
-                model,
-                provider,
-                AuditStatus.FAILED);
+                auth,
+                request,
+                response);
     }
-
 
     private void validateRequest(String prompt) {
 
@@ -461,34 +464,6 @@ public class GatewayServiceImpl implements GatewayService {
         return providerFailoverService.execute(request);
     }
 
-    private void persistUsage(
-            UUID requestId,
-            AuthenticationContext auth,
-            AIRequest request,
-            AIResponse response) {
-
-        Usage usage = response.getUsage();
-
-        if (usage == null) {
-            return;
-        }
-
-        quotaService.consumeTokens(
-                auth.getTenantId(),
-                usage.getTotalTokens());
-
-        tokenUsageService.save(
-                requestId,
-                request,
-                response);
-
-        costService.save(
-                requestId,
-                auth,
-                request,
-                response);
-    }
-
     private String restoreResponse(
             UUID requestId,
             AIResponse response) {
@@ -499,28 +474,6 @@ public class GatewayServiceImpl implements GatewayService {
 
     }
 
-    private void auditSuccess(
-            UUID requestId,
-            String prompt,
-            AIRequest request,
-            AIResponse response,
-            long latency) {
-
-        auditService.save(
-                requestId,
-                prompt,
-                response.getResponse(),
-                latency,
-                request.getModel(),
-                request.getProvider().name(),
-                AuditStatus.SUCCESS);
-
-        metricsService.addLatency(latency);
-
-        metricsService.increment(
-                MetricsConstants.SUCCESSFUL_REQUESTS);
-
-    }
     private void validateFeature(
             AuthenticationContext auth,
             Feature feature) {

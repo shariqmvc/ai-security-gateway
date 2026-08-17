@@ -5,6 +5,7 @@ import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.observability.PerformanceLogger;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.gemini.dto.GeminiContent;
 import com.ai.gateway.provider.gemini.dto.GeminiPart;
@@ -27,6 +28,7 @@ public class OllamaProvider implements AIProvider {
 
     private final RestTemplate restTemplate;
     private final OllamaConfig ollamaConfig;
+    private final PerformanceLogger performanceLogger;
 
     @Value("${ollama.base.url}")
     private String baseUrl;
@@ -47,11 +49,20 @@ public class OllamaProvider implements AIProvider {
     @Override
     public AIResponse chat(AIRequest request) {
 
+        java.util.UUID requestId = parseRequestId(org.slf4j.MDC.get("requestId"));
+        long started = System.nanoTime();
+        performanceLogger.providerStart(requestId, provider().name(), request.getModel(), providerAttempt());
+
+        String selectedModel =
+                request.getModel() != null && !request.getModel().isBlank()
+                        ? request.getModel()
+                        : model;
+
         String url = baseUrl + "/api/chat";
 
         OllamaRequest ollamaRequest =
                 OllamaRequest.builder()
-                        .model(model)
+                        .model(selectedModel)
                         .messages(List.of(
                                 OllamaMessage.builder()
                                         .role("user")
@@ -66,12 +77,23 @@ public class OllamaProvider implements AIProvider {
         HttpEntity<OllamaRequest> entity =
                 new HttpEntity<>(ollamaRequest, headers);
 
-        ResponseEntity<OllamaResponse> response =
-                restTemplate.exchange(
-                        url,
-                        HttpMethod.POST,
-                        entity,
-                        OllamaResponse.class);
+        ResponseEntity<OllamaResponse> response;
+        try {
+            response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    entity,
+                    OllamaResponse.class);
+        } catch (RuntimeException ex) {
+            performanceLogger.providerCompleted(
+                    requestId, provider().name(), request.getModel(), providerAttempt(),
+                    elapsedMs(started), "FAILED:" + ex.getClass().getSimpleName());
+            throw ex;
+        }
+
+        performanceLogger.providerCompleted(
+                requestId, provider().name(), request.getModel(), providerAttempt(),
+                elapsedMs(started), "HTTP_" + response.getStatusCode().value());
 
         String answer =
                 response.getBody()
@@ -89,6 +111,25 @@ public class OllamaProvider implements AIProvider {
                 )
                 .build();
     }
+
+    private int providerAttempt() {
+        String value = org.slf4j.MDC.get("providerAttempt");
+        try {
+            return value == null ? 1 : Math.max(1, Integer.parseInt(value));
+        } catch (NumberFormatException ex) {
+            return 1;
+        }
     }
+
+    private java.util.UUID parseRequestId(String value) {
+        if (value == null) return null;
+        try { return java.util.UUID.fromString(value); }
+        catch (IllegalArgumentException ex) { return null; }
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
+    }
+}
 
 

@@ -9,6 +9,8 @@ import com.ai.gateway.provisioning.TenantSchemaNameResolver;
 import com.ai.gateway.tenant.Tenant;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -32,6 +34,46 @@ class TenantOperationalContextSafetyTest {
     void cleanup() {
         TenantSchemaContext.clear();
         TenantContext.clear();
+    }
+
+
+    @Test
+    void shouldNotLeakAppliedSchemaMarkerAcrossTransactions() {
+        UUID tenantId = UUID.randomUUID();
+        String schema = expectedSchema(tenantId);
+
+        TenantContext.set(tenantId);
+        TenantSchemaContext.set(tenantId, schema);
+
+        jakarta.persistence.Query query = mock(jakarta.persistence.Query.class);
+        when(entityManager.createNativeQuery(anyString())).thenReturn(query);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.useTenantSchema(tenantId);
+            verify(entityManager, times(1)).createNativeQuery(anyString());
+
+            for (TransactionSynchronization synchronization :
+                    TransactionSynchronizationManager.getSynchronizations()) {
+                synchronization.afterCompletion(
+                        TransactionSynchronization.STATUS_COMMITTED);
+            }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.useTenantSchema(tenantId);
+            verify(entityManager, times(2)).createNativeQuery(anyString());
+        } finally {
+            for (TransactionSynchronization synchronization :
+                    TransactionSynchronizationManager.getSynchronizations()) {
+                synchronization.afterCompletion(
+                        TransactionSynchronization.STATUS_COMMITTED);
+            }
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

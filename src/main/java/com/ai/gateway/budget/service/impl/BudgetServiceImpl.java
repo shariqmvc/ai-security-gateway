@@ -56,10 +56,8 @@ public class BudgetServiceImpl
         LocalDate monthStart =
                 YearMonth.now().atDay(1);
 
-        repository.createIfAbsent(
-                tenantId,
-                monthStart);
-
+        // Atomic upsert removes the extra createIfAbsent round trip while
+        // preserving the budget limit under concurrent requests.
         int updated =
                 repository.consume(
                         tenantId,
