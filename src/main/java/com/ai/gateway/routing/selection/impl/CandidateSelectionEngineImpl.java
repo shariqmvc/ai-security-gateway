@@ -4,6 +4,7 @@ import com.ai.gateway.routing.scoring.CandidateScoreComponent;
 import com.ai.gateway.routing.scoring.CandidateScoreDimension;
 import com.ai.gateway.routing.scoring.ScoredCandidate;
 import com.ai.gateway.routing.selection.CandidateSelectionEngine;
+import com.ai.gateway.routing.selection.CandidateSelectionResult;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,13 +25,18 @@ public class CandidateSelectionEngineImpl implements CandidateSelectionEngine {
     private static final double SCORE_EPSILON = 1.0e-9;
 
     @Override
-    public ScoredCandidate select(List<ScoredCandidate> candidates) {
+    public CandidateSelectionResult selectWithRanking(List<ScoredCandidate> candidates) {
         if (candidates == null || candidates.isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one scored candidate is required.");
         }
 
-        return rank(candidates).get(0);
+        List<ScoredCandidate> ranked = rank(candidates);
+        if (ranked.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "At least one non-null scored candidate is required.");
+        }
+        return new CandidateSelectionResult(ranked.get(0), ranked);
     }
 
     /**

@@ -78,6 +78,11 @@ public class EntitlementServiceImpl
     public TenantEntitlementDto getDto(
             UUID tenantId) {
 
+        if (tenantId == null) {
+            throw new IllegalArgumentException(
+                    "Tenant ID is required for entitlement lookup.");
+        }
+
         TenantEntitlementDto cached =
                 cache.get(tenantId);
 

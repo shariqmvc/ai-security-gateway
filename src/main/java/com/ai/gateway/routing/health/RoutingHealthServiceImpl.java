@@ -14,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.List;
 
 @Service
@@ -25,18 +26,29 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
     private final RoutingOutcomeRepository outcomeRepository;
     private final RoutingHealthProperties properties;
 
+    /** Read-mostly routing state; DB remains the durable source of truth. */
+    private final ConcurrentMap<RoutingCandidate, RoutingHealthSnapshot> snapshotCache =
+            new ConcurrentHashMap<>();
+
     @Override
-    @Transactional(readOnly = true)
     public RoutingHealthSnapshot snapshot(RoutingCandidate candidate) {
         if (candidate == null) {
             return null;
         }
-        return profileRepository.findByProviderAndModel(candidate.provider(), candidate.model())
+        RoutingHealthSnapshot cached = snapshotCache.get(candidate);
+        if (cached != null) {
+            return refreshFreshness(cached);
+        }
+
+        RoutingHealthSnapshot snapshot = profileRepository
+                .findByProviderAndModel(candidate.provider(), candidate.model())
                 .map(this::toSnapshot)
                 .orElseGet(() -> new RoutingHealthSnapshot(
                         candidate.provider(), candidate.model(),
                         RoutingHealthStatus.UNKNOWN, 0, 0, 0,
                         1.0, 0.0, 0.0, null, false));
+        snapshotCache.put(candidate, snapshot);
+        return snapshot;
     }
 
     @Override
@@ -68,6 +80,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         profile.setLastObservedAt(now);
         refreshDerivedHealth(profile);
         profileRepository.save(profile);
+        snapshotCache.put(new RoutingCandidate(profile.getProvider(), profile.getModel()), toSnapshot(profile));
     }
 
     @Override
@@ -83,10 +96,10 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         profile.setLastObservedAt(now);
         refreshDerivedHealth(profile);
         profileRepository.save(profile);
+        snapshotCache.put(new RoutingCandidate(profile.getProvider(), profile.getModel()), toSnapshot(profile));
     }
 
     @Override
-    @Transactional(readOnly = true)
     public boolean isHealthyForRouting(RoutingCandidate candidate) {
         if (!properties.isEnabled() || !properties.isRejectUnhealthy()) return true;
         RoutingHealthSnapshot snapshot = snapshot(candidate);
@@ -141,6 +154,19 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         } else {
             profile.setHealthStatus(RoutingHealthStatus.HEALTHY);
         }
+    }
+
+
+    private RoutingHealthSnapshot refreshFreshness(RoutingHealthSnapshot snapshot) {
+        boolean fresh = snapshot.lastObservedAt() != null
+                && Duration.between(snapshot.lastObservedAt(), LocalDateTime.now()).getSeconds()
+                <= properties.getSignalTtlSeconds();
+        if (fresh == snapshot.fresh()) return snapshot;
+        return new RoutingHealthSnapshot(
+                snapshot.provider(), snapshot.model(), snapshot.status(),
+                snapshot.successCount(), snapshot.failureCount(), snapshot.consecutiveFailures(),
+                snapshot.availability(), snapshot.ewmaLatencyMs(), snapshot.p95LatencyMs(),
+                snapshot.lastObservedAt(), fresh);
     }
 
     private RoutingHealthSnapshot toSnapshot(RoutingHealthProfile profile) {

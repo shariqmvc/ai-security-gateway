@@ -7,21 +7,20 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
-public class AuthenticationFilter
-        extends OncePerRequestFilter {
+public class AuthenticationFilter extends OncePerRequestFilter {
 
     private final AuthenticationService authenticationService;
 
@@ -32,44 +31,38 @@ public class AuthenticationFilter
             FilterChain filterChain)
             throws ServletException, IOException {
 
-        AuthenticationResult result =
-                authenticationService.authenticate(request);
+        AuthenticationResult result = authenticationService.authenticate(request);
 
         if (!result.isAuthenticated()) {
-
-            response.sendError(
-                    HttpServletResponse.SC_UNAUTHORIZED,
-                    result.getMessage());
-
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, result.getMessage());
             return;
         }
 
-        AuthenticationContext context =
-                result.getContext();
+        AuthenticationContext context = result.getContext();
 
-        TenantContext.set(context.getTenantId());
-        TenantSchemaContext.set(context.getTenantId(), context.getSchemaName());
-        if (context.getTenantId() != null) {
-            MDC.put("tenantId", context.getTenantId().toString());
+        if (!context.isPlatformPrincipal()) {
+            TenantContext.set(context.getTenantId());
+            TenantSchemaContext.set(context.getTenantId(), context.getSchemaName());
+
+            if (context.getTenantId() != null) {
+                MDC.put("tenantId", context.getTenantId().toString());
+            }
+            if (context.getTenantCode() != null) {
+                MDC.put("tenantCode", context.getTenantCode());
+            }
         }
-        if (context.getTenantCode() != null) {
-            MDC.put("tenantCode", context.getTenantCode());
-        }
+
+        String authority = "ROLE_" + context.getRole().name();
 
         Authentication authentication =
                 new UsernamePasswordAuthenticationToken(
                         context,
                         null,
-                        List.of(
-                                new SimpleGrantedAuthority("ROLE_USER")));
+                        List.of(new SimpleGrantedAuthority(authority)));
 
-        SecurityContextHolder
-                .getContext()
-                .setAuthentication(authentication);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        request.setAttribute(
-                AuthenticationConstants.AUTH_CONTEXT,
-                context);
+        request.setAttribute(AuthenticationConstants.AUTH_CONTEXT, context);
 
         try {
             filterChain.doFilter(request, response);
@@ -82,16 +75,15 @@ public class AuthenticationFilter
         }
     }
 
+    /**
+     * Authentication is now required for /admin and /platform APIs as well.
+     * Only explicitly public endpoints can bypass the filter.
+     */
     @Override
-    protected boolean shouldNotFilter(
-            HttpServletRequest request) {
-
+    protected boolean shouldNotFilter(HttpServletRequest request) {
         String servletPath = request.getServletPath();
-
-        // Some servlet mocks/containers may return null. A null path must
-        // never cause the authentication filter itself to fail with an NPE.
-        // In that case, fail closed by applying authentication.
         return servletPath != null
-                && servletPath.startsWith("/admin/");
+                && (servletPath.equals("/actuator/health")
+                || servletPath.startsWith("/public/"));
     }
 }

@@ -1,6 +1,7 @@
 package com.ai.gateway.entity;
 
 import com.ai.gateway.enums.ApiKeyStatus;
+import com.ai.gateway.security.SecurityRole;
 import com.ai.gateway.tenant.Tenant;
 import jakarta.persistence.*;
 import lombok.*;
@@ -33,6 +34,11 @@ public class ApiKey {
 
     @Enumerated(EnumType.STRING)
     private ApiKeyStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    @Builder.Default
+    private SecurityRole role = SecurityRole.TENANT_USER;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

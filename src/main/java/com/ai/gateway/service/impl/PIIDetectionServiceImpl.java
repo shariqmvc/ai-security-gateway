@@ -55,13 +55,13 @@ public class PIIDetectionServiceImpl implements PIIDetectionService {
                         List<DetectedPII> detectedValues) {
 
         Matcher matcher = pattern.matcher(input);
+        if (!matcher.find()) {
+            return input;
+        }
 
-        StringBuffer buffer = new StringBuffer();
-
-        while (matcher.find()) {
-
+        StringBuffer buffer = new StringBuffer(input.length());
+        do {
             String original = matcher.group();
-
             String token = tokenGenerator.nextToken(piiType);
 
             detectedValues.add(
@@ -74,7 +74,7 @@ public class PIIDetectionServiceImpl implements PIIDetectionService {
             matcher.appendReplacement(
                     buffer,
                     Matcher.quoteReplacement(token));
-        }
+        } while (matcher.find());
 
         matcher.appendTail(buffer);
 

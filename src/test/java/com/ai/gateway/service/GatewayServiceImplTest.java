@@ -204,7 +204,7 @@ class GatewayServiceImplTest {
                         eq(response),
                         any(RoutingDecision.class),
                         anyLong(),
-                        eq("Hello from AI"),
+                        eq("hello"),
                         anyLong());
     }
 

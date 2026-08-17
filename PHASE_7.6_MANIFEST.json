@@ -1,0 +1,22 @@
+{
+  "phase": "7.6",
+  "title": "Administrative Authorization & Dashboard Aggregation",
+  "source_zip": "ai-security-gateway (6)(1).zip",
+  "changes": [
+    "Centralized SecurityRole and AuthorizationService",
+    "Platform-vs-tenant principal boundary",
+    "Protected /admin APIs",
+    "Tenant API-key role metadata",
+    "Platform bootstrap X-API-Key via AEGIS_PLATFORM_API_KEY",
+    "Platform and tenant dashboard aggregation APIs",
+    "Tenant isolation authorization tests",
+    "V6 administrative authorization migration",
+    "Updated canonical baseline document"
+  ],
+  "verification": {
+    "maven": "NOT RUN: Maven not installed in execution environment",
+    "java": "21.0.11 available",
+    "source_static_checks": "Performed",
+    "docx": "Generated successfully"
+  }
+}
