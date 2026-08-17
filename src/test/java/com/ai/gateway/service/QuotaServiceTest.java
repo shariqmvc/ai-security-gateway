@@ -130,7 +130,7 @@ class QuotaServiceTest {
         when(
                 usageRepository.consumeTokens(
                         eq(tenantId),
-                        eq(QuotaPeriodType.MONTHLY),
+                        eq(QuotaPeriodType.MONTHLY.name()),
                         eq(
                                 YearMonth.now()
                                         .atDay(1)),
@@ -143,15 +143,6 @@ class QuotaServiceTest {
                         tenantId,
                         500L));
 
-        verify(
-                usageRepository)
-                .createIfAbsent(
-                        eq(tenantId),
-                        eq(QuotaPeriodType.MONTHLY.name()),
-                        eq(
-                                YearMonth.now()
-                                        .atDay(1)));
-
         verify(tenantSchemaRoutingService)
                 .useTenantSchema(tenantId);
 
@@ -159,7 +150,7 @@ class QuotaServiceTest {
                 usageRepository)
                 .consumeTokens(
                         eq(tenantId),
-                        eq(QuotaPeriodType.MONTHLY),
+                        eq(QuotaPeriodType.MONTHLY.name()),
                         eq(
                                 YearMonth.now()
                                         .atDay(1)),
@@ -185,7 +176,7 @@ class QuotaServiceTest {
         when(
                 usageRepository.consumeTokens(
                         eq(tenantId),
-                        eq(QuotaPeriodType.MONTHLY),
+                        eq(QuotaPeriodType.MONTHLY.name()),
                         eq(
                                 YearMonth.now()
                                         .atDay(1)),

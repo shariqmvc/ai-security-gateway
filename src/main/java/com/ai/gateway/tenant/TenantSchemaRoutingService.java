@@ -5,12 +5,17 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class TenantSchemaRoutingService {
+
+    private static final Object APPLIED_SCHEMA_RESOURCE =
+            TenantSchemaRoutingService.class.getName() + ".APPLIED_SCHEMA";
 
     private final EntityManager entityManager;
     private final TenantRepository tenantRepository;
@@ -50,46 +55,45 @@ public class TenantSchemaRoutingService {
         }
 
         /*
-         * Defense in depth: an authenticated tenant request may only route
-         * to its own schema. Calls made by trusted admin/background flows
-         * have no TenantContext and may continue to use an explicit tenantId.
+         * Fast path for authenticated request flows. AuthenticationFilter has
+         * already established the tenant id and schema together. Validate the
+         * deterministic schema mapping before reusing it, but do not perform
+         * another control-plane tenant SELECT on every quota/budget operation.
          */
         UUID authenticatedTenantId = TenantContext.get();
         String authenticatedSchema = TenantSchemaContext.get();
 
-        // A partially initialized request context is never allowed to route
-        // tenant operational data. This closes the "stale schema only" case
-        // where a thread could carry a schema without its tenant identity.
         if (authenticatedTenantId == null && authenticatedSchema != null) {
             throw new IllegalStateException(
                     "Tenant schema context exists without an authenticated tenant.");
         }
 
-        if (authenticatedTenantId != null
-                && !authenticatedTenantId.equals(tenantId)) {
-            throw new TenantAccessDeniedException(
-                    authenticatedTenantId,
-                    tenantId);
-        }
+        if (authenticatedTenantId != null) {
+            if (!authenticatedTenantId.equals(tenantId)) {
+                throw new TenantAccessDeniedException(
+                        authenticatedTenantId,
+                        tenantId);
+            }
 
-        if (authenticatedTenantId != null
-                && authenticatedSchema != null) {
+            if (authenticatedSchema == null || authenticatedSchema.isBlank()) {
+                throw new IllegalStateException(
+                        "Authenticated tenant schema context is missing.");
+            }
 
-            Tenant authenticatedTenant = tenantRepository
-                    .findById(authenticatedTenantId)
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Authenticated tenant not found: "
-                                    + authenticatedTenantId));
+            String expectedSchema = schemaNameResolver.resolve(
+                    Tenant.builder().id(tenantId).build());
 
-            String expectedAuthenticatedSchema =
-                    schemaNameResolver.resolve(authenticatedTenant);
-
-            if (!expectedAuthenticatedSchema.equals(authenticatedSchema)) {
+            if (!expectedSchema.equals(authenticatedSchema)) {
                 throw new IllegalStateException(
                         "Authenticated tenant schema context is invalid.");
             }
+
+            useTenantSchema(authenticatedSchema);
+            return;
         }
 
+        // Admin/background/concurrency flows have no authenticated request
+        // context, so retain the persisted lookup and schema-identity check.
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new IllegalStateException(
                         "Tenant not found: " + tenantId));
@@ -100,10 +104,6 @@ public class TenantSchemaRoutingService {
                     "Tenant schema name is not configured: " + tenantId);
         }
 
-        // The tenant schema is derived from the tenant UUID during
-        // provisioning. Refuse metadata that points a tenant at another
-        // tenant's physical schema; otherwise a corrupted/misconfigured
-        // control-plane row could bypass the logical tenant boundary.
         String expectedSchema = schemaNameResolver.resolve(tenant);
         if (!expectedSchema.equals(tenant.getSchemaName())) {
             throw new IllegalStateException(
@@ -120,8 +120,52 @@ public class TenantSchemaRoutingService {
                     "Invalid tenant schema name: " + schemaName);
         }
 
+        // SET LOCAL is transaction-scoped. Avoid issuing the same database
+        // command repeatedly within one transaction.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            Object applied = TransactionSynchronizationManager.getResource(
+                    APPLIED_SCHEMA_RESOURCE);
+            if (schemaName.equals(applied)) {
+                return;
+            }
+
+            // A resource with a different schema belongs to the current
+            // transaction only if it was explicitly registered by this
+            // service. Replace it before applying the requested schema.
+            // The resource is transaction-scoped and is removed again in
+            // afterCompletion below, so it cannot leak between pooled threads.
+            if (applied != null) {
+                TransactionSynchronizationManager.unbindResource(
+                        APPLIED_SCHEMA_RESOURCE);
+            }
+        } else if (TransactionSynchronizationManager.hasResource(
+                APPLIED_SCHEMA_RESOURCE)) {
+            // Defensive cleanup for threads that may have executed older
+            // versions of this service, which could leave the marker bound.
+            TransactionSynchronizationManager.unbindResource(
+                    APPLIED_SCHEMA_RESOURCE);
+        }
+
         entityManager.createNativeQuery(
-                "SET LOCAL search_path TO \"" + schemaName + "\"")
-                .executeUpdate();
+                "SET LOCAL search_path TO \"" + schemaName + "\""
+        ).executeUpdate();
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.bindResource(
+                    APPLIED_SCHEMA_RESOURCE,
+                    schemaName);
+
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (TransactionSynchronizationManager.hasResource(
+                                    APPLIED_SCHEMA_RESOURCE)) {
+                                TransactionSynchronizationManager.unbindResource(
+                                        APPLIED_SCHEMA_RESOURCE);
+                            }
+                        }
+                    });
+        }
     }
 }

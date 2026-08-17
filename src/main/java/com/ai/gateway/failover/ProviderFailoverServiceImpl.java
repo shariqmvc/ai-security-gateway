@@ -5,6 +5,8 @@ import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.metrics.MetricsConstants;
+import com.ai.gateway.observability.PerformanceLogger;
+import org.slf4j.MDC;
 import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
@@ -14,6 +16,8 @@ import com.ai.gateway.routing.registry.ProviderModelRegistryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.HashSet;
 import java.util.List;
@@ -36,6 +40,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     private final FailoverProperties properties;
     private final GatewayMetricsService metricsService;
     private final RoutingAnalyticsService routingAnalyticsService;
+    private final PerformanceLogger performanceLogger;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private RoutingHealthService routingHealthService;
 
@@ -52,7 +57,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
          * No failover metrics or analytics are recorded.
          */
         if (!properties.isEnabled()) {
-            return invoke(request);
+            return invoke(request, 1);
         }
 
         int maxAttempts = Math.max(1, properties.getMaxAttempts());
@@ -64,14 +69,21 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         Provider primary = request.getProvider();
         List<Provider> fallbacks =
                 properties.fallbacksFor(primary);
-
+        log.info(
+                "FAILOVER_PLAN requestId={} primary={} enabled={} maxAttempts={} configuredFallbacks={}",
+                requestId(),
+                primary,
+                properties.isEnabled(),
+                maxAttempts,
+                fallbacks
+        );
         /*
          * Attempt #1: primary provider.
          */
         attempted.add(primary);
 
         try {
-            return invoke(request);
+            return invoke(request, 1);
 
         } catch (Exception ex) {
 
@@ -79,8 +91,26 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             lastFailure = ex;
 
             recordProviderFailure(request, ex);
-        }
 
+            if (!isRetryableFailure(ex)) {
+                log.info(
+                        "FAILOVER_NOT_RETRYABLE requestId={} provider={} failureType={}",
+                        requestId(),
+                        primary,
+                        ex.getClass().getSimpleName());
+                throw propagate(primaryFailure, lastFailure);
+            }
+        }
+        log.info(
+                "FAILOVER_DECISION requestId={} primary={} primaryFailure={} maxAttempts={} fallbackCount={}",
+                requestId(),
+                primary,
+                primaryFailure != null
+                        ? primaryFailure.getClass().getSimpleName()
+                        : null,
+                maxAttempts,
+                fallbacks != null ? fallbacks.size() : 0
+        );
         /*
          * If maxAttempts == 1, there is no opportunity for failover.
          */
@@ -119,7 +149,14 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             if (fallbackAttempts + 1 >= maxAttempts) {
                 break;
             }
-
+            log.info(
+                    "FAILOVER_CANDIDATE requestId={} primary={} fallback={} fallbackAttempt={} maxAttempts={}",
+                    requestId(),
+                    primary,
+                    fallback,
+                    fallbackAttempts + 1,
+                    maxAttempts
+            );
             /*
              * Resolve and validate the fallback provider/model before
              * recording a failover attempt. This is important:
@@ -133,11 +170,25 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                             fallback);
 
             if (fallbackRequest == null) {
+
+                log.warn(
+                        "FAILOVER_CANDIDATE_REJECTED requestId={} primary={} fallback={}",
+                        requestId(),
+                        primary,
+                        fallback
+                );
+
                 continue;
             }
 
             attempted.add(fallback);
             fallbackAttempts++;
+
+            performanceLogger.failover(
+                    requestId(),
+                    primary.name(),
+                    fallback.name(),
+                    fallbackAttempts + 1);
 
             /*
              * We are now actually failing over to another provider.
@@ -150,7 +201,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             try {
 
                 AIResponse response =
-                        invoke(fallbackRequest);
+                        invoke(fallbackRequest, fallbackAttempts + 1);
 
                 /*
                  * Failover succeeded.
@@ -170,9 +221,18 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         fallbackRequest,
                         ex);
 
+                if (!isRetryableFailure(ex)) {
+                    log.info(
+                            "FAILOVER_FALLBACK_NOT_RETRYABLE requestId={} provider={} failureType={}",
+                            requestId(),
+                            fallback,
+                            ex.getClass().getSimpleName());
+                    break;
+                }
+
                 /*
-                 * Do not immediately throw.
-                 * Continue to the next configured fallback.
+                 * Continue to the next configured fallback only for a
+                 * transient/retryable provider failure.
                  */
             }
         }
@@ -196,7 +256,21 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 lastFailure);
     }
 
-    private AIResponse invoke(AIRequest request) {
+    private java.util.UUID requestId() {
+        String value = MDC.get("requestId");
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return java.util.UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
+            log.debug("Invalid requestId in MDC: {}", value);
+            return null;
+        }
+    }
+
+    private AIResponse invoke(AIRequest request, int attempt) {
         if (properties.getFailureInjection() != null
                 && properties.getFailureInjection()
                 .matches(request.getProvider(), request.getModel())) {
@@ -208,7 +282,22 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         AIProvider provider =
                 providerFactory.getProvider(request.getProvider());
 
-        return provider.chat(request);
+        String previousAttempt = MDC.get("providerAttempt");
+        MDC.put("providerAttempt", String.valueOf(attempt));
+        try {
+            AIResponse response = provider.chat(request);
+            if (response != null) {
+                response.setProvider(request.getProvider());
+                response.setModel(request.getModel());
+            }
+            return response;
+        } finally {
+            if (previousAttempt == null) {
+                MDC.remove("providerAttempt");
+            } else {
+                MDC.put("providerAttempt", previousAttempt);
+            }
+        }
     }
 
     private void recordProviderFailure(AIRequest request, Exception ex) {
@@ -246,6 +335,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     .provider(fallback)
                     .model(fallbackModel.modelId())
                     .prompt(primaryRequest.getPrompt())
+                    .routingDecisionMetadata(primaryRequest.getRoutingDecisionMetadata())
+                    .routingStrategy(primaryRequest.getRoutingStrategy())
                     .build();
 
         } catch (Exception ex) {
@@ -265,6 +356,35 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         return providerFactory
                 .getProvider(provider)
                 .defaultModel();
+    }
+
+    /**
+     * Only transient provider failures should trigger another provider call.
+     * HTTP 4xx errors such as invalid requests or authentication failures are
+     * not made better by failover. Network/timeout failures and 408/429/5xx
+     * responses are considered retryable. Unknown provider runtime failures
+     * remain retryable for backwards compatibility with provider adapters and
+     * controlled failure injection tests.
+     */
+    private boolean isRetryableFailure(Throwable failure) {
+        Throwable current = failure;
+
+        while (current != null) {
+            if (current instanceof ResourceAccessException) {
+                return true;
+            }
+
+            if (current instanceof RestClientResponseException responseException) {
+                int status = responseException.getStatusCode().value();
+                return status == 408
+                        || status == 429
+                        || status >= 500;
+            }
+
+            current = current.getCause();
+        }
+
+        return true;
     }
 
     private RuntimeException propagate(

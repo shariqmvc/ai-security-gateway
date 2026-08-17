@@ -22,14 +22,18 @@ public interface TenantBudgetUsageRepository
             UUID tenantId,
             LocalDate periodStart);
 
+    /** Atomic monthly budget consume: insert-or-update in one DB round trip. */
     @Modifying
     @Transactional
     @Query(value = """
-            UPDATE TENANT_BUDGET_USAGE
-            SET amount_used = amount_used + :amount
-            WHERE tenant_id = :tenantId
-              AND period_start = :periodStart
-              AND amount_used + :amount <= :budget
+            INSERT INTO TENANT_BUDGET_USAGE
+                (id, tenant_id, period_start, amount_used, version)
+            SELECT gen_random_uuid(), :tenantId, :periodStart, :amount, 0
+            WHERE :amount <= :budget
+            ON CONFLICT (tenant_id, period_start)
+            DO UPDATE SET
+                amount_used = TENANT_BUDGET_USAGE.amount_used + EXCLUDED.amount_used
+            WHERE TENANT_BUDGET_USAGE.amount_used + EXCLUDED.amount_used <= :budget
             """,
             nativeQuery = true)
     int consume(

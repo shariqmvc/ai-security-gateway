@@ -34,18 +34,24 @@ public interface TenantQuotaUsageRepository
             @Param("periodStart") LocalDate periodStart,
             @Param("limit") Long limit);
 
+    /** Atomic monthly token consume: insert-or-update in one DB round trip. */
     @Modifying
-    @Query("""
-            UPDATE TenantQuotaUsage q
-               SET q.tokenCount = q.tokenCount + :tokens
-             WHERE q.tenantId = :tenantId
-               AND q.periodType = :periodType
-               AND q.periodStart = :periodStart
-               AND q.tokenCount + :tokens <= :limit
-            """)
+    @Query(value = """
+        INSERT INTO TENANT_QUOTA_USAGE
+            (id, tenant_id, period_type, period_start,
+             request_count, token_count, version)
+        SELECT gen_random_uuid(), :tenantId, :periodType, :periodStart,
+               0, :tokens, 0
+        WHERE :tokens <= :limit
+        ON CONFLICT (tenant_id, period_type, period_start)
+        DO UPDATE SET
+            token_count = TENANT_QUOTA_USAGE.token_count + EXCLUDED.token_count
+        WHERE TENANT_QUOTA_USAGE.token_count + EXCLUDED.token_count <= :limit
+        """,
+            nativeQuery = true)
     int consumeTokens(
             @Param("tenantId") UUID tenantId,
-            @Param("periodType") QuotaPeriodType periodType,
+            @Param("periodType") String periodType,
             @Param("periodStart") LocalDate periodStart,
             @Param("tokens") Long tokens,
             @Param("limit") Long limit);

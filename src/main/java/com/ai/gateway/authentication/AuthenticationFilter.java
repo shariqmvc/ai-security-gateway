@@ -13,6 +13,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.util.List;
@@ -47,7 +48,13 @@ public class AuthenticationFilter
                 result.getContext();
 
         TenantContext.set(context.getTenantId());
-        TenantSchemaContext.set(context.getSchemaName());
+        TenantSchemaContext.set(context.getTenantId(), context.getSchemaName());
+        if (context.getTenantId() != null) {
+            MDC.put("tenantId", context.getTenantId().toString());
+        }
+        if (context.getTenantCode() != null) {
+            MDC.put("tenantCode", context.getTenantCode());
+        }
 
         Authentication authentication =
                 new UsernamePasswordAuthenticationToken(
@@ -70,6 +77,8 @@ public class AuthenticationFilter
             TenantSchemaContext.clear();
             TenantContext.clear();
             SecurityContextHolder.clearContext();
+            MDC.remove("tenantId");
+            MDC.remove("tenantCode");
         }
     }
 

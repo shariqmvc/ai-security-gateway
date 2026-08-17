@@ -2,8 +2,6 @@ package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.budget.service.BudgetService;
-import com.ai.gateway.cost.service.CostService;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.ChatRequest;
@@ -17,12 +15,12 @@ import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.failover.ProviderFailoverService;
 import com.ai.gateway.firewall.FirewallResult;
+import com.ai.gateway.governance.service.GovernanceGuardrailService;
 import com.ai.gateway.firewall.service.PromptFireWallService;
 import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.quota.exception.QuotaExceededException;
-import com.ai.gateway.quota.service.QuotaService;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
@@ -30,6 +28,7 @@ import com.ai.gateway.routing.RoutingStrategy;
 import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
 import com.ai.gateway.routing.intelligence.RoutingRuntimeSignalService;
 import com.ai.gateway.service.impl.GatewayServiceImpl;
+import com.ai.gateway.observability.PerformanceLogger;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,15 +76,6 @@ class GatewayServiceImplTest {
     private TokenUsageService tokenUsageService;
 
     @Mock
-    private CostService costService;
-
-    @Mock
-    private QuotaService quotaService;
-
-    @Mock
-    private BudgetService budgetService;
-
-    @Mock
     private EntitlementService entitlementService;
 
     @Mock
@@ -100,6 +90,9 @@ class GatewayServiceImplTest {
     @Mock
     private ProviderFailoverService providerFailoverService;
 
+    @Mock
+    private GovernanceGuardrailService governanceGuardrailService;
+
     @InjectMocks
     private GatewayServiceImpl gatewayService;
 
@@ -111,6 +104,12 @@ class GatewayServiceImplTest {
     private RoutingAnalyticsService routingAnalyticsService;
     @Mock
     private RoutingRuntimeSignalService routingRuntimeSignalService;
+
+    @Mock
+    private PerformanceLogger performanceLogger;
+
+    @Mock
+    private GatewayPostProviderPersistenceService postProviderPersistenceService;
 
 
     // ============================================================
@@ -167,14 +166,6 @@ class GatewayServiceImplTest {
                 any(AIRequest.class)))
                 .thenReturn(response);
 
-        when(costService.save(
-                any(UUID.class),
-                eq(authenticationContext),
-                any(AIRequest.class),
-                eq(response)))
-                .thenReturn(
-                        new BigDecimal("0.15"));
-
         when(restoreService.restore(
                 eq("Hello from AI"),
                 any(UUID.class)))
@@ -198,23 +189,23 @@ class GatewayServiceImplTest {
         verify(providerFailoverService)
                 .execute(any(AIRequest.class));
 
-        verify(quotaService)
-                .consumeTokens(
-                        eq(tenantId),
-                        eq(150L));
-
-        verify(costService)
-                .save(
+        verify(governanceGuardrailService)
+                .enforce(
                         any(UUID.class),
                         eq(authenticationContext),
                         any(AIRequest.class),
                         eq(response));
 
-        verify(tokenUsageService)
-                .save(
+        verify(postProviderPersistenceService)
+                .persistSuccess(
                         any(UUID.class),
+                        eq(authenticationContext),
                         any(AIRequest.class),
-                        eq(response));
+                        eq(response),
+                        any(RoutingDecision.class),
+                        anyLong(),
+                        eq("Hello from AI"),
+                        anyLong());
     }
 
 
@@ -253,28 +244,23 @@ class GatewayServiceImplTest {
         verify(providerFailoverService)
                 .execute(any(AIRequest.class));
 
-        verify(quotaService, never())
-                .consumeTokens(
-                        any(UUID.class),
-                        anyLong());
-
         verify(tokenUsageService, never())
                 .save(
                         any(UUID.class),
                         any(AIRequest.class),
                         any(AIResponse.class));
 
-        verify(costService, never())
-                .save(
+        verify(postProviderPersistenceService)
+                .persistSuccess(
                         any(UUID.class),
-                        any(AuthenticationContext.class),
+                        eq(authenticationContext),
                         any(AIRequest.class),
-                        any(AIResponse.class));
+                        eq(response),
+                        any(RoutingDecision.class),
+                        anyLong(),
+                        eq("hello"),
+                        anyLong());
 
-        verify(budgetService, never())
-                .consume(
-                        any(UUID.class),
-                        any(BigDecimal.class));
     }
 
 
@@ -339,10 +325,12 @@ class GatewayServiceImplTest {
         doThrow(
                 new QuotaExceededException(
                         "Daily token quota exceeded"))
-                .when(quotaService)
-                .consumeTokens(
-                        tenantId,
-                        150L);
+                .when(governanceGuardrailService)
+                .enforce(
+                        any(UUID.class),
+                        eq(authenticationContext),
+                        any(AIRequest.class),
+                        eq(response));
 
         ChatRequest request =
                 createGeminiRequest();
@@ -354,13 +342,8 @@ class GatewayServiceImplTest {
         verify(providerFailoverService)
                 .execute(any(AIRequest.class));
 
-        verify(quotaService)
-                .consumeTokens(
-                        tenantId,
-                        150L);
-
-        verify(costService, never())
-                .save(
+        verify(governanceGuardrailService)
+                .enforce(
                         any(UUID.class),
                         eq(authenticationContext),
                         any(AIRequest.class),
@@ -615,15 +598,17 @@ class GatewayServiceImplTest {
                 BusinessException.class,
                 () -> gatewayService.process(request));
 
-        verify(auditService)
-                .save(
+        verify(postProviderPersistenceService)
+                .persistFailure(
                         any(UUID.class),
-                        eq("hello"),
+                        eq(context),
+                        isNull(),
                         isNull(),
                         anyLong(),
-                        isNull(),
-                        isNull(),
-                        eq(AuditStatus.FAILED));
+                        eq("hello"),
+                        anyLong(),
+                        eq(false),
+                        eq("BusinessException"));
 
         verify(providerFailoverService, never())
                 .execute(any(AIRequest.class));
@@ -656,15 +641,17 @@ class GatewayServiceImplTest {
         verify(providerFailoverService)
                 .execute(any(AIRequest.class));
 
-        verify(auditService)
-                .save(
+        verify(postProviderPersistenceService)
+                .persistFailure(
                         any(UUID.class),
-                        eq("hello"),
-                        any(),
+                        eq(authenticationContext),
+                        any(AIRequest.class),
+                        any(RoutingDecision.class),
                         anyLong(),
-                        eq("gemini-test"),
-                        eq("GEMINI"),
-                        eq(AuditStatus.FAILED));
+                        eq("hello"),
+                        anyLong(),
+                        eq(true),
+                        eq("RuntimeException"));
     }
 
 

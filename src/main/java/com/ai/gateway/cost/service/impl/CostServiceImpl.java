@@ -46,49 +46,60 @@ public class CostServiceImpl implements CostService {
             AIRequest aiRequest,
             AIResponse aiResponse) {
 
+        BigDecimal totalCost = enforceBudget(requestId, context, aiRequest, aiResponse);
+        persist(requestId, context, aiRequest, aiResponse);
+        return totalCost;
+    }
+
+    @Override
+    @Transactional
+    public BigDecimal enforceBudget(
+            UUID requestId,
+            AuthenticationContext context,
+            AIRequest aiRequest,
+            AIResponse aiResponse) {
+
         if (context == null || context.getTenantId() == null) {
             throw new IllegalStateException(
                     "Authenticated tenant context is required for cost persistence.");
         }
 
-        // The authenticated request context is authoritative. An arbitrary
-        // AuthenticationContext object must never be able to redirect a
-        // tenant operational write.
+        tenantAccessGuard.requireAccess(context.getTenantId());
+
+        CostResponse response = calculate(aiRequest, aiResponse);
+        BigDecimal totalCost = response.getTotalCost();
+
+        // Budget enforcement is a governance control and therefore remains
+        // synchronous. Only the non-critical persistence is moved async.
+        budgetService.consume(context.getTenantId(), totalCost);
+
+        return totalCost;
+    }
+
+    @Override
+    @Transactional
+    public void persist(
+            UUID requestId,
+            AuthenticationContext context,
+            AIRequest aiRequest,
+            AIResponse aiResponse) {
+
+        if (context == null || context.getTenantId() == null) {
+            throw new IllegalStateException(
+                    "Authenticated tenant context is required for cost persistence.");
+        }
+
         tenantAccessGuard.requireAccess(context.getTenantId());
         tenantSchemaRoutingService.useTenantSchema();
 
         Usage usage = aiResponse.getUsage();
-
         if (usage == null
                 || usage.getInputTokens() == null
                 || usage.getOutputTokens() == null) {
-
-            log.debug(
-                    "Token usage unavailable. Skipping cost calculation.");
-
-            return BigDecimal.ZERO;
+            return;
         }
 
-        CostRequest request =
-                CostRequest.builder()
-                        .provider(aiRequest.getProvider())
-                        .model(aiRequest.getModel())
-                        .inputTokens(
-                                usage.getInputTokens())
-                        .outputTokens(
-                                usage.getOutputTokens())
-                        .build();
-
-        CostResponse response =
-                costCalculator.calculate(request);
-
-        BigDecimal totalCost =
-                response.getTotalCost();
-
-        // Enforce budget before persisting cost.
-        budgetService.consume(
-                context.getTenantId(),
-                totalCost);
+        CostResponse response = calculate(aiRequest, aiResponse);
 
         RequestCost entity =
                 RequestCost.builder()
@@ -96,26 +107,42 @@ public class CostServiceImpl implements CostService {
                         .tenantId(context.getTenantId())
                         .provider(aiRequest.getProvider())
                         .model(aiRequest.getModel())
-                        .inputTokens(
-                                usage.getInputTokens())
-                        .outputTokens(
-                                usage.getOutputTokens())
-                        .totalTokens(
-                                usage.getTotalTokens())
-                        .inputCost(
-                                response.getInputCost())
-                        .outputCost(
-                                response.getOutputCost())
-                        .totalCost(
-                                response.getTotalCost())
-                        .reasoningTokens(
-                                usage.getReasoningTokens())
-                        .createdAt(
-                                LocalDateTime.now())
+                        .inputTokens(usage.getInputTokens())
+                        .outputTokens(usage.getOutputTokens())
+                        .totalTokens(usage.getTotalTokens())
+                        .inputCost(response.getInputCost())
+                        .outputCost(response.getOutputCost())
+                        .totalCost(response.getTotalCost())
+                        .reasoningTokens(usage.getReasoningTokens())
+                        .createdAt(LocalDateTime.now())
                         .build();
         requestCostRepository.save(entity);
+    }
 
-        return response.getTotalCost();
+    private CostResponse calculate(
+            AIRequest aiRequest,
+            AIResponse aiResponse) {
+
+        Usage usage = aiResponse.getUsage();
+        if (usage == null
+                || usage.getInputTokens() == null
+                || usage.getOutputTokens() == null) {
+            return CostResponse.builder()
+                    .inputCost(BigDecimal.ZERO)
+                    .outputCost(BigDecimal.ZERO)
+                    .totalCost(BigDecimal.ZERO)
+                    .build();
+        }
+
+        CostRequest request =
+                CostRequest.builder()
+                        .provider(aiRequest.getProvider())
+                        .model(aiRequest.getModel())
+                        .inputTokens(usage.getInputTokens())
+                        .outputTokens(usage.getOutputTokens())
+                        .build();
+
+        return costCalculator.calculate(request);
     }
 
     @Override

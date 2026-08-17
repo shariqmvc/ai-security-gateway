@@ -82,19 +82,14 @@ public class QuotaServiceImpl implements QuotaService {
         // Switch transaction to tenant operational schema
         tenantSchemaRoutingService.useTenantSchema(tenantId);
 
-        LocalDate monthStart =
-                YearMonth.now()
-                        .atDay(1);
+        LocalDate monthStart = YearMonth.now().atDay(1);
 
-        ensureUsageRow(
-                tenantId,
-                QuotaPeriodType.MONTHLY,
-                monthStart);
-
+        // Atomic upsert: avoids a separate createIfAbsent statement on every
+        // request while preserving the limit under concurrent requests.
         int updated =
                 usageRepository.consumeTokens(
                         tenantId,
-                        QuotaPeriodType.MONTHLY,
+                        QuotaPeriodType.MONTHLY.name(),
                         monthStart,
                         tokens,
                         limit);
