@@ -13,9 +13,12 @@ import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.tenant.TenantAccessGuard;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,7 +35,11 @@ public class CostServiceImpl implements CostService {
     private final RequestCostRepository requestCostRepository;
     private final BudgetService budgetService;
 
+    private final TenantSchemaRoutingService tenantSchemaRoutingService;
+    private final TenantAccessGuard tenantAccessGuard;
+
     @Override
+    @Transactional
     public BigDecimal save(
             UUID requestId,
             AuthenticationContext context,
@@ -95,38 +102,58 @@ public class CostServiceImpl implements CostService {
                         .createdAt(
                                 LocalDateTime.now())
                         .build();
-
+        // The authenticated tenant owns the request; never route using a
+        // tenant identifier supplied by the client.
+        tenantSchemaRoutingService.useTenantSchema();
         requestCostRepository.save(entity);
 
         return response.getTotalCost();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CostSummary getOverallSummary() {
 
+        tenantSchemaRoutingService.useTenantSchema();
         return requestCostRepository.getOverallSummary();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CostSummary getTenantSummary(UUID tenantId) {
 
+        tenantAccessGuard.requireAccess(tenantId);
+        tenantSchemaRoutingService.useTenantSchema();
+
+        // The path variable is safe to use after requireAccess() because
+        // requireAccess() has already established that it exactly matches
+        // the authenticated tenant. Do not resolve the tenant a second time
+        // through an independent ThreadLocal lookup; doing so makes this
+        // service unnecessarily dependent on request-context state and can
+        // make unit/background tests appear to query a null tenant.
         return requestCostRepository.getTenantSummary(tenantId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CostSummary getProviderSummary(
             Provider provider) {
 
+        tenantSchemaRoutingService.useTenantSchema();
         return requestCostRepository.getProviderSummary(provider);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CostSummary getModelSummary(String model) {
+        tenantSchemaRoutingService.useTenantSchema();
         return requestCostRepository.getModelSummary(model);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CostSummary getTodaySummary() {
+        tenantSchemaRoutingService.useTenantSchema();
         LocalDate today = LocalDate.now();
 
         return requestCostRepository.getSummaryBetween(
@@ -135,7 +162,9 @@ public class CostServiceImpl implements CostService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CostSummary getMonthlySummary() {
+        tenantSchemaRoutingService.useTenantSchema();
         LocalDate firstDay =
                 LocalDate.now()
                         .withDayOfMonth(1);

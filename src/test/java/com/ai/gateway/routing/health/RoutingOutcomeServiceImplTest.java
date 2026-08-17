@@ -8,6 +8,7 @@ import com.ai.gateway.routing.RoutingStrategy;
 import com.ai.gateway.routing.RoutingDecisionMetadata;
 import com.ai.gateway.routing.health.entity.RoutingOutcome;
 import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -22,7 +23,12 @@ class RoutingOutcomeServiceImplTest {
     @Test
     void persistsSuccessOutcomeWithDecisionMetadata() {
         RoutingOutcomeRepository repository = mock(RoutingOutcomeRepository.class);
-        RoutingOutcomeServiceImpl service = new RoutingOutcomeServiceImpl(repository);
+        TenantSchemaRoutingService schemaRoutingService =
+                mock(TenantSchemaRoutingService.class);
+        RoutingOutcomeServiceImpl service =
+                new RoutingOutcomeServiceImpl(
+                        repository,
+                        schemaRoutingService);
 
         UUID requestId = UUID.randomUUID();
         AIRequest request = AIRequest.builder()
@@ -44,13 +50,22 @@ class RoutingOutcomeServiceImplTest {
                                 java.util.List.of(),
                                 java.util.List.of()));
 
+        AuthenticationContext auth =
+                AuthenticationContext.builder()
+                        .tenantId(UUID.randomUUID())
+                        .schemaName("tenant_test")
+                        .build();
+
         service.recordSuccess(
-                requestId, null, request,
+                requestId, auth, request,
                 new RoutingDecision(Provider.OPENAI, "gpt-5",
                         RoutingStrategy.POLICY_BASED, metadata),
                 320);
 
         var captor = org.mockito.ArgumentCaptor.forClass(RoutingOutcome.class);
+        verify(schemaRoutingService)
+                .useTenantSchema(auth.getTenantId());
+
         verify(repository).save(captor.capture());
 
         RoutingOutcome outcome = captor.getValue();

@@ -7,6 +7,7 @@ import com.ai.gateway.budget.repository.TenantBudgetUsageRepository;
 import com.ai.gateway.budget.service.impl.BudgetServiceImpl;
 import com.ai.gateway.entitlement.dto.TenantEntitlementResponse;
 import com.ai.gateway.entitlement.service.EntitlementService;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,9 @@ class BudgetServiceTest {
     private BudgetServiceImpl budgetService;
 
     private UUID tenantId;
+
+    @Mock
+    private TenantSchemaRoutingService tenantSchemaRoutingService;
 
     @BeforeEach
     void setUp() {

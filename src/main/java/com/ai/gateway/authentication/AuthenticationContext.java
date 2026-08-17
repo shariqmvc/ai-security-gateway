@@ -29,4 +29,6 @@ public class AuthenticationContext {
 
     private final String defaultModel;
 
+    private final String schemaName;
+
 }

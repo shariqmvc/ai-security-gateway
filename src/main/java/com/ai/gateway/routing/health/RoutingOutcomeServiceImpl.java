@@ -6,6 +6,7 @@ import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingDecisionMetadata;
 import com.ai.gateway.routing.health.entity.RoutingOutcome;
 import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,8 @@ import java.util.UUID;
 public class RoutingOutcomeServiceImpl implements RoutingOutcomeService {
 
     private final RoutingOutcomeRepository repository;
+    private final TenantSchemaRoutingService
+            tenantSchemaRoutingService;
 
     @Override
     @Transactional
@@ -35,9 +38,16 @@ public class RoutingOutcomeServiceImpl implements RoutingOutcomeService {
 
     private void save(UUID requestId, AuthenticationContext auth, AIRequest request,
                       RoutingDecision decision, long latencyMs, boolean success, String failureCategory) {
-        if (requestId == null || request == null || request.getProvider() == null || request.getModel() == null) {
+
+        if (requestId == null || request == null
+                || request.getProvider() == null
+                || request.getModel() == null
+                || auth == null
+                || auth.getTenantId() == null) {
             return;
         }
+
+        tenantSchemaRoutingService.useTenantSchema(auth.getTenantId());
 
         RoutingDecisionMetadata metadata = decision == null ? null : decision.metadata();
 

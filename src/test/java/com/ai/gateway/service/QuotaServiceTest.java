@@ -6,6 +6,7 @@ import com.ai.gateway.enums.QuotaPeriodType;
 import com.ai.gateway.quota.TenantQuotaUsageRepository;
 import com.ai.gateway.quota.exception.QuotaExceededException;
 import com.ai.gateway.quota.service.impl.QuotaServiceImpl;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +30,9 @@ class QuotaServiceTest {
 
     @Mock
     private EntitlementService entitlementService;
+
+    @Mock
+    private TenantSchemaRoutingService tenantSchemaRoutingService;
 
     @InjectMocks
     private QuotaServiceImpl quotaService;
@@ -66,6 +70,9 @@ class QuotaServiceTest {
                         eq(tenantId),
                         eq(QuotaPeriodType.DAILY.name()),
                         any(LocalDate.class));
+
+        verify(tenantSchemaRoutingService)
+                .useTenantSchema(tenantId);
 
         verify(
                 usageRepository)
@@ -144,6 +151,9 @@ class QuotaServiceTest {
                         eq(
                                 YearMonth.now()
                                         .atDay(1)));
+
+        verify(tenantSchemaRoutingService)
+                .useTenantSchema(tenantId);
 
         verify(
                 usageRepository)

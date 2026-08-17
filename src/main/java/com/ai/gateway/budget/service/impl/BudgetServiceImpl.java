@@ -6,6 +6,7 @@ import com.ai.gateway.budget.repository.TenantBudgetUsageRepository;
 import com.ai.gateway.budget.service.BudgetService;
 import com.ai.gateway.entitlement.dto.TenantEntitlementResponse;
 import com.ai.gateway.entitlement.service.EntitlementService;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,8 @@ public class BudgetServiceImpl
 
     private final EntitlementService entitlementService;
 
+    private final TenantSchemaRoutingService tenantSchemaRoutingService;
+
     @Override
     @Transactional
     public void consume(
@@ -31,12 +34,11 @@ public class BudgetServiceImpl
             BigDecimal amount) {
 
         if (amount == null
-                || amount.compareTo(
-                BigDecimal.ZERO) <= 0) {
-
+                || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
 
+        // CONTROL PLANE
         TenantEntitlementResponse entitlement =
                 entitlementService.get(tenantId);
 
@@ -44,11 +46,12 @@ public class BudgetServiceImpl
                 entitlement.getMonthlyBudget();
 
         if (budget == null
-                || budget.compareTo(
-                BigDecimal.ZERO) <= 0) {
-
+                || budget.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
+
+        // TENANT OPERATIONAL PLANE
+        tenantSchemaRoutingService.useTenantSchema(tenantId);
 
         LocalDate monthStart =
                 YearMonth.now().atDay(1);
@@ -65,7 +68,6 @@ public class BudgetServiceImpl
                         budget);
 
         if (updated == 0) {
-
             throw new BudgetExceededException(
                     "Monthly budget exceeded.");
         }
@@ -76,11 +78,15 @@ public class BudgetServiceImpl
     public BudgetUsageResponse getUsage(
             UUID tenantId) {
 
+        // CONTROL PLANE
         TenantEntitlementResponse entitlement =
                 entitlementService.get(tenantId);
 
         BigDecimal budget =
                 entitlement.getMonthlyBudget();
+
+        // TENANT OPERATIONAL PLANE
+        tenantSchemaRoutingService.useTenantSchema(tenantId);
 
         LocalDate monthStart =
                 YearMonth.now().atDay(1);
@@ -90,18 +96,13 @@ public class BudgetServiceImpl
                         .findByTenantIdAndPeriodStart(
                                 tenantId,
                                 monthStart)
-                        .map(
-                                usage ->
-                                        usage.getAmountUsed())
-                        .orElse(
-                                BigDecimal.ZERO);
+                        .map(usage -> usage.getAmountUsed())
+                        .orElse(BigDecimal.ZERO);
 
         BigDecimal remaining =
                 budget.subtract(used);
 
-        if (remaining.compareTo(
-                BigDecimal.ZERO) < 0) {
-
+        if (remaining.compareTo(BigDecimal.ZERO) < 0) {
             remaining = BigDecimal.ZERO;
         }
 

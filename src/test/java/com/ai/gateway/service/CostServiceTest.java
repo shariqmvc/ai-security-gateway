@@ -13,6 +13,8 @@ import com.ai.gateway.cost.service.impl.CostServiceImpl;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.tenant.TenantAccessGuard;
+import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +41,12 @@ class CostServiceTest {
     private BudgetService budgetService;
 
     @Mock
+    private TenantSchemaRoutingService tenantSchemaRoutingService;
+
+    @Mock
+    private TenantAccessGuard tenantAccessGuard;
+
+    @Mock
     private AuthenticationContext authenticationContext;
 
     @Mock
@@ -59,23 +67,28 @@ class CostServiceTest {
                 new CostServiceImpl(
                         costCalculator,
                         requestCostRepository,
-                        budgetService);
+                        budgetService,
+                        tenantSchemaRoutingService,
+                        tenantAccessGuard);
 
         requestId = UUID.randomUUID();
         tenantId = UUID.randomUUID();
 
-        when(authenticationContext.getTenantId())
-                .thenReturn(tenantId);
+        // Keep common test setup free of stubs that are only needed by the
+        // save() scenarios. Mockito strictness should catch genuinely
+        // unnecessary stubbing in authorization-only tests.
 
-        when(aiRequest.getProvider())
-                .thenReturn(Provider.OPENAI);
-
-        when(aiRequest.getModel())
-                .thenReturn("gpt-test");
     }
 
     @Test
     void shouldConsumeBudgetUsingCalculatedCost() {
+
+        when(authenticationContext.getTenantId())
+                .thenReturn(tenantId);
+        when(aiRequest.getProvider())
+                .thenReturn(Provider.OPENAI);
+        when(aiRequest.getModel())
+                .thenReturn("gpt-test");
 
         when(response.getUsage())
                 .thenReturn(
@@ -103,12 +116,22 @@ class CostServiceTest {
                         tenantId,
                         new BigDecimal("0.15"));
 
+        verify(tenantSchemaRoutingService)
+                .useTenantSchema();
+
         verify(requestCostRepository)
                 .save(any(RequestCost.class));
     }
 
     @Test
     void shouldNotPersistCostWhenBudgetExceeded() {
+
+        when(authenticationContext.getTenantId())
+                .thenReturn(tenantId);
+        when(aiRequest.getProvider())
+                .thenReturn(Provider.OPENAI);
+        when(aiRequest.getModel())
+                .thenReturn("gpt-test");
 
         when(response.getUsage())
                 .thenReturn(
@@ -144,5 +167,38 @@ class CostServiceTest {
 
         verify(requestCostRepository, never())
                 .save(any(RequestCost.class));
+    }
+
+    @Test
+    void shouldAuthorizeRequestedTenantBeforeRoutingTenantSchema() {
+
+        when(requestCostRepository.getTenantSummary(tenantId))
+                .thenReturn(null);
+
+        costService.getTenantSummary(tenantId);
+
+        verify(tenantAccessGuard)
+                .requireAccess(tenantId);
+        verify(tenantSchemaRoutingService)
+                .useTenantSchema();
+        verify(requestCostRepository)
+                .getTenantSummary(tenantId);
+    }
+
+    @Test
+    void shouldNotRouteOrQueryWhenTenantAuthorizationFails() {
+
+        doThrow(new RuntimeException("denied"))
+                .when(tenantAccessGuard)
+                .requireAccess(tenantId);
+
+        assertThrows(
+                RuntimeException.class,
+                () -> costService.getTenantSummary(tenantId));
+
+        verify(tenantSchemaRoutingService, never())
+                .useTenantSchema();
+        verify(requestCostRepository, never())
+                .getTenantSummary(any(UUID.class));
     }
 }
