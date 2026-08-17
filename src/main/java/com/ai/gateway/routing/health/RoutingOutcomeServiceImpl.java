@@ -6,6 +6,7 @@ import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingDecisionMetadata;
 import com.ai.gateway.routing.health.entity.RoutingOutcome;
 import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
+import com.ai.gateway.tenant.TenantAccessGuard;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class RoutingOutcomeServiceImpl implements RoutingOutcomeService {
     private final RoutingOutcomeRepository repository;
     private final TenantSchemaRoutingService
             tenantSchemaRoutingService;
+    private final TenantAccessGuard tenantAccessGuard;
 
     @Override
     @Transactional
@@ -47,7 +49,8 @@ public class RoutingOutcomeServiceImpl implements RoutingOutcomeService {
             return;
         }
 
-        tenantSchemaRoutingService.useTenantSchema(auth.getTenantId());
+        tenantAccessGuard.requireAccess(auth.getTenantId());
+        tenantSchemaRoutingService.useTenantSchema();
 
         RoutingDecisionMetadata metadata = decision == null ? null : decision.metadata();
 

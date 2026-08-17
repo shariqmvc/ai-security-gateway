@@ -46,6 +46,17 @@ public class CostServiceImpl implements CostService {
             AIRequest aiRequest,
             AIResponse aiResponse) {
 
+        if (context == null || context.getTenantId() == null) {
+            throw new IllegalStateException(
+                    "Authenticated tenant context is required for cost persistence.");
+        }
+
+        // The authenticated request context is authoritative. An arbitrary
+        // AuthenticationContext object must never be able to redirect a
+        // tenant operational write.
+        tenantAccessGuard.requireAccess(context.getTenantId());
+        tenantSchemaRoutingService.useTenantSchema();
+
         Usage usage = aiResponse.getUsage();
 
         if (usage == null
@@ -102,9 +113,6 @@ public class CostServiceImpl implements CostService {
                         .createdAt(
                                 LocalDateTime.now())
                         .build();
-        // The authenticated tenant owns the request; never route using a
-        // tenant identifier supplied by the client.
-        tenantSchemaRoutingService.useTenantSchema();
         requestCostRepository.save(entity);
 
         return response.getTotalCost();

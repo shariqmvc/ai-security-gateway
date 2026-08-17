@@ -8,7 +8,10 @@ import com.ai.gateway.routing.RoutingStrategy;
 import com.ai.gateway.routing.RoutingDecisionMetadata;
 import com.ai.gateway.routing.health.entity.RoutingOutcome;
 import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
+import com.ai.gateway.tenant.TenantContext;
+import com.ai.gateway.tenant.TenantAccessGuard;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -20,15 +23,22 @@ import static org.mockito.Mockito.*;
 @ActiveProfiles("test")
 class RoutingOutcomeServiceImplTest {
 
+    @AfterEach
+    void cleanup() {
+        TenantContext.clear();
+    }
+
     @Test
     void persistsSuccessOutcomeWithDecisionMetadata() {
         RoutingOutcomeRepository repository = mock(RoutingOutcomeRepository.class);
         TenantSchemaRoutingService schemaRoutingService =
                 mock(TenantSchemaRoutingService.class);
+        TenantAccessGuard accessGuard = new TenantAccessGuard();
         RoutingOutcomeServiceImpl service =
                 new RoutingOutcomeServiceImpl(
                         repository,
-                        schemaRoutingService);
+                        schemaRoutingService,
+                        accessGuard);
 
         UUID requestId = UUID.randomUUID();
         AIRequest request = AIRequest.builder()
@@ -50,9 +60,12 @@ class RoutingOutcomeServiceImplTest {
                                 java.util.List.of(),
                                 java.util.List.of()));
 
+        UUID tenantId = UUID.randomUUID();
+        TenantContext.set(tenantId);
+
         AuthenticationContext auth =
                 AuthenticationContext.builder()
-                        .tenantId(UUID.randomUUID())
+                        .tenantId(tenantId)
                         .schemaName("tenant_test")
                         .build();
 
@@ -64,7 +77,7 @@ class RoutingOutcomeServiceImplTest {
 
         var captor = org.mockito.ArgumentCaptor.forClass(RoutingOutcome.class);
         verify(schemaRoutingService)
-                .useTenantSchema(auth.getTenantId());
+                .useTenantSchema();
 
         verify(repository).save(captor.capture());
 

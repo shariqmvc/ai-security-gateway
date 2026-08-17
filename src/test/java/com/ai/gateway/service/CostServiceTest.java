@@ -13,8 +13,11 @@ import com.ai.gateway.cost.service.impl.CostServiceImpl;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.enums.Provider;
+import com.ai.gateway.tenant.TenantAccessDeniedException;
 import com.ai.gateway.tenant.TenantAccessGuard;
+import com.ai.gateway.tenant.TenantContext;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,9 +47,6 @@ class CostServiceTest {
     private TenantSchemaRoutingService tenantSchemaRoutingService;
 
     @Mock
-    private TenantAccessGuard tenantAccessGuard;
-
-    @Mock
     private AuthenticationContext authenticationContext;
 
     @Mock
@@ -69,15 +69,63 @@ class CostServiceTest {
                         requestCostRepository,
                         budgetService,
                         tenantSchemaRoutingService,
-                        tenantAccessGuard);
+                        new TenantAccessGuard());
 
         requestId = UUID.randomUUID();
         tenantId = UUID.randomUUID();
 
-        // Keep common test setup free of stubs that are only needed by the
-        // save() scenarios. Mockito strictness should catch genuinely
-        // unnecessary stubbing in authorization-only tests.
+        TenantContext.set(tenantId);
+    }
 
+    @AfterEach
+    void cleanup() {
+        TenantContext.clear();
+    }
+
+    @Test
+    void shouldRejectCostWriteWhenAuthenticationContextTargetsAnotherTenant() {
+
+        UUID differentTenant = UUID.randomUUID();
+
+        when(authenticationContext.getTenantId())
+                .thenReturn(differentTenant);
+
+        assertThrows(
+                TenantAccessDeniedException.class,
+                () -> costService.save(
+                        requestId,
+                        authenticationContext,
+                        aiRequest,
+                        response));
+
+        verifyNoInteractions(costCalculator);
+        verifyNoInteractions(requestCostRepository);
+        verifyNoInteractions(budgetService);
+        verify(tenantSchemaRoutingService, never())
+                .useTenantSchema();
+    }
+
+    @Test
+    void shouldRejectCostWriteWithoutAuthenticatedTenantContext() {
+
+        TenantContext.clear();
+
+        when(authenticationContext.getTenantId())
+                .thenReturn(tenantId);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> costService.save(
+                        requestId,
+                        authenticationContext,
+                        aiRequest,
+                        response));
+
+        verifyNoInteractions(costCalculator);
+        verifyNoInteractions(requestCostRepository);
+        verifyNoInteractions(budgetService);
+        verify(tenantSchemaRoutingService, never())
+                .useTenantSchema();
     }
 
     @Test
@@ -177,10 +225,9 @@ class CostServiceTest {
 
         costService.getTenantSummary(tenantId);
 
-        verify(tenantAccessGuard)
-                .requireAccess(tenantId);
         verify(tenantSchemaRoutingService)
                 .useTenantSchema();
+
         verify(requestCostRepository)
                 .getTenantSummary(tenantId);
     }
@@ -188,16 +235,15 @@ class CostServiceTest {
     @Test
     void shouldNotRouteOrQueryWhenTenantAuthorizationFails() {
 
-        doThrow(new RuntimeException("denied"))
-                .when(tenantAccessGuard)
-                .requireAccess(tenantId);
+        UUID differentTenant = UUID.randomUUID();
 
         assertThrows(
-                RuntimeException.class,
-                () -> costService.getTenantSummary(tenantId));
+                TenantAccessDeniedException.class,
+                () -> costService.getTenantSummary(differentTenant));
 
         verify(tenantSchemaRoutingService, never())
                 .useTenantSchema();
+
         verify(requestCostRepository, never())
                 .getTenantSummary(any(UUID.class));
     }
