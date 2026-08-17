@@ -77,11 +77,6 @@ class BudgetServiceTest {
                 new BigDecimal("100.00"));
 
         verify(repository)
-                .createIfAbsent(
-                        eq(tenantId),
-                        eq(YearMonth.now().atDay(1)));
-
-        verify(repository)
                 .consume(
                         eq(tenantId),
                         eq(YearMonth.now().atDay(1)),
@@ -121,9 +116,11 @@ class BudgetServiceTest {
                 exception.getMessage());
 
         verify(repository)
-                .createIfAbsent(
+                .consume(
                         eq(tenantId),
-                        eq(YearMonth.now().atDay(1)));
+                        eq(YearMonth.now().atDay(1)),
+                        eq(new BigDecimal("50.00")),
+                        eq(new BigDecimal("500.00")));
     }
 
     @Test

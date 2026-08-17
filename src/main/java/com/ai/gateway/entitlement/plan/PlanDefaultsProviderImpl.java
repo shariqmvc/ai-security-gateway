@@ -83,7 +83,7 @@ public class PlanDefaultsProviderImpl
                     .requestsPerDay(100_000)
                     .monthlyTokenQuota(100_000_000)
                     .monthlyBudget(
-                            new BigDecimal("5_000.00"))
+                            new BigDecimal("5000.00"))
                     .build();
         };
     }

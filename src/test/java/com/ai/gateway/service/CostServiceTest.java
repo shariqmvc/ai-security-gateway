@@ -69,7 +69,7 @@ class CostServiceTest {
                         requestCostRepository,
                         budgetService,
                         tenantSchemaRoutingService,
-                        new TenantAccessGuard());
+                        new TenantAccessGuard(new com.ai.gateway.security.AuthorizationService()));
 
         requestId = UUID.randomUUID();
         tenantId = UUID.randomUUID();

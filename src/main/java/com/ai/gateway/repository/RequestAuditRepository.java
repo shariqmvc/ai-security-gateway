@@ -12,4 +12,8 @@ public interface RequestAuditRepository extends JpaRepository<RequestAudit, Long
 
     Optional<RequestAudit> findByRequestUuid(UUID requestUuid);
 
+    long count();
+
+    long countByStatus(com.ai.gateway.enums.AuditStatus status);
+
 }

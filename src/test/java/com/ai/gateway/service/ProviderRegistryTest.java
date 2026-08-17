@@ -28,10 +28,7 @@ class ProviderRegistryTest {
 
     @BeforeEach
     void setUp() {
-
-        registry =
-                new ProviderRegistryImpl(
-                        providerFactory);
+        // Registry is startup-built; each test constructs it after stubbing provider metadata.
     }
 
     @Test
@@ -40,6 +37,8 @@ class ProviderRegistryTest {
         when(providerFactory.getProvider(
                 Provider.GEMINI))
                 .thenReturn(provider);
+
+        registry = new ProviderRegistryImpl(providerFactory);
 
         ProviderDefinition result =
                 registry.find(

@@ -70,6 +70,16 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     @Override
     @Transactional
     public ApiKeyProvisioningResult rotate(Tenant tenant, String clientName) {
+        return rotate(tenant, clientName, SecurityRole.TENANT_USER);
+    }
+
+    @Override
+    @Transactional
+    public ApiKeyProvisioningResult rotate(
+            Tenant tenant,
+            String clientName,
+            SecurityRole role) {
+
         if (tenant.getStatus() != TenantStatus.ACTIVE) {
             throw new IllegalStateException(
                     "API keys can only be rotated for ACTIVE tenants.");

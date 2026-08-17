@@ -1,4 +1,10 @@
 package com.ai.gateway.dashboard.dto;
 
-public class ProviderResponse {
+import com.ai.gateway.enums.Provider;
+
+public record ProviderResponse(
+        Provider provider,
+        long healthyModels,
+        long degradedModels,
+        long unhealthyModels) {
 }

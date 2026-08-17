@@ -28,10 +28,7 @@ class ModelRegistryTest {
 
     @BeforeEach
     void setUp() {
-
-        registry =
-                new ModelRegistryImpl(
-                        providerFactory);
+        // Registry is startup-built; each test constructs it after stubbing provider metadata.
     }
 
     @Test
@@ -43,6 +40,8 @@ class ModelRegistryTest {
 
         when(provider.defaultModel())
                 .thenReturn("gemini-test");
+
+        registry = new ModelRegistryImpl(providerFactory);
 
         ModelDefinition result =
                 registry.find(
@@ -71,6 +70,8 @@ class ModelRegistryTest {
 
         when(provider.defaultModel())
                 .thenReturn("gemini-test");
+
+        registry = new ModelRegistryImpl(providerFactory);
 
         assertTrue(
                 registry.find(

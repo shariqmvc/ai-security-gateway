@@ -14,5 +14,10 @@ public interface ApiKeyService {
 
     ApiKeyProvisioningResult rotate(Tenant tenant, String clientName);
 
+    ApiKeyProvisioningResult rotate(
+            Tenant tenant,
+            String clientName,
+            SecurityRole role);
+
     void revoke(Tenant tenant, UUID apiKeyId);
 }

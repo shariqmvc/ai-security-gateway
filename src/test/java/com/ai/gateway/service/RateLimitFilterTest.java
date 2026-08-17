@@ -168,4 +168,32 @@ class RateLimitFilterTest {
                         request,
                         response);
     }
+    @Test
+    void shouldBypassTenantRateLimitAndQuotaForPlatformPrincipal()
+            throws Exception {
+
+        when(context.isPlatformPrincipal())
+                .thenReturn(true);
+
+        filter.doFilter(
+                request,
+                response,
+                filterChain);
+
+        verify(rateLimiterService, never())
+                .check(context);
+
+        verify(quotaService, never())
+                .consumeRequest(any());
+
+        verify(filterChain)
+                .doFilter(
+                        request,
+                        response);
+
+        assertEquals(
+                200,
+                response.getStatus());
+    }
+
 }

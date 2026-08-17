@@ -14,12 +14,19 @@ public class EntitlementCache {
             new ConcurrentHashMap<>();
 
     public TenantEntitlementDto get(UUID tenantId) {
+        if (tenantId == null) {
+            return null;
+        }
         return cache.get(tenantId);
     }
 
     public void put(
             UUID tenantId,
             TenantEntitlementDto entitlement) {
+
+        if (tenantId == null || entitlement == null) {
+            return;
+        }
 
         cache.put(
                 tenantId,
@@ -28,9 +35,10 @@ public class EntitlementCache {
     }
 
     public void evict(UUID tenantId) {
-
+        if (tenantId == null) {
+            return;
+        }
         cache.remove(tenantId);
-
     }
 
     public void clear() {

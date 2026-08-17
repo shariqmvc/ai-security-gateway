@@ -1,4 +1,8 @@
 package com.ai.gateway.dashboard.dto;
 
-public class SecurityResponse {
+public record SecurityResponse(
+        String scope,
+        long auditEvents,
+        long successfulEvents,
+        long failedEvents) {
 }

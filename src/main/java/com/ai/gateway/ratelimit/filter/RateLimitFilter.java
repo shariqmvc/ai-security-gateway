@@ -37,8 +37,14 @@ public class RateLimitFilter
                         request.getAttribute(
                                 AuthenticationConstants.AUTH_CONTEXT);
 
-        if (context == null) {
+        if (context == null || context.isPlatformPrincipal()) {
 
+            /*
+             * Platform principals are control-plane identities and do not
+             * have a tenant entitlement, tenant quota, or tenant rate-limit
+             * scope. Applying tenant controls here would attempt to resolve
+             * a null tenant ID and can cause an invalid cache lookup.
+             */
             filterChain.doFilter(request, response);
 
             return;

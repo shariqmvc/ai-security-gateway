@@ -2,10 +2,12 @@ package com.ai.gateway.routing.health;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
 @RestController
+@PreAuthorize("hasAnyRole('PLATFORM_OWNER','PLATFORM_ADMIN','PLATFORM_OPERATIONS')")
 @RequestMapping("/api/routing/health")
 @RequiredArgsConstructor
 public class RoutingHealthController {

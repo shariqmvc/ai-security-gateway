@@ -25,6 +25,18 @@ public class InMemoryRateLimiterServiceImpl
     public RateLimitResult check(
             AuthenticationContext context) {
 
+        if (context == null || context.isPlatformPrincipal()) {
+            return RateLimitResult.builder()
+                    .allowed(true)
+                    .retryAfterSeconds(0)
+                    .build();
+        }
+
+        if (context.getTenantId() == null) {
+            throw new IllegalArgumentException(
+                    "Tenant ID is required for tenant rate limiting.");
+        }
+
         String key =
                 buildKey(context);
 

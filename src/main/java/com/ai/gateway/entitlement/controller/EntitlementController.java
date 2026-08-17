@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.ai.gateway.security.AuthorizationService;
+import com.ai.gateway.security.SecurityRole;
 
 import java.util.UUID;
 
@@ -27,6 +29,13 @@ public class EntitlementController {
     private final QuotaService quotaService;
 
     private final BudgetService budgetService;
+    private final AuthorizationService authorizationService;
+
+    private void requirePlatformAdmin() {
+        authorizationService.requirePlatformRole(
+                SecurityRole.PLATFORM_OWNER,
+                SecurityRole.PLATFORM_ADMIN);
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -35,6 +44,7 @@ public class EntitlementController {
             @RequestBody
             CreateTenantEntitlementRequest request) {
 
+        requirePlatformAdmin();
         return service.create(request);
 
     }
@@ -43,6 +53,7 @@ public class EntitlementController {
     public TenantEntitlementResponse get(
             @PathVariable UUID tenantId) {
 
+        requirePlatformAdmin();
         return service.get(tenantId);
 
     }
@@ -56,6 +67,7 @@ public class EntitlementController {
             @RequestBody
             UpdateTenantEntitlementRequest request) {
 
+        requirePlatformAdmin();
         return service.update(
                 tenantId,
                 request);
@@ -67,6 +79,7 @@ public class EntitlementController {
     public void disable(
             @PathVariable UUID tenantId) {
 
+        requirePlatformAdmin();
         service.disable(tenantId);
 
     }
@@ -75,6 +88,7 @@ public class EntitlementController {
     public ResponseEntity<TenantEntitlementResponse> provision(
             @PathVariable UUID tenantId) {
 
+        requirePlatformAdmin();
         return ResponseEntity.ok(
                 service.provision(tenantId));
     }
@@ -83,6 +97,7 @@ public class EntitlementController {
     public TenantQuotaUsageResponse getQuotaUsage(
             @PathVariable UUID tenantId) {
 
+        requirePlatformAdmin();
         return quotaService.getUsage(
                 tenantId);
     }
@@ -91,6 +106,7 @@ public class EntitlementController {
     public BudgetUsageResponse getBudgetUsage(
             @PathVariable UUID tenantId) {
 
+        requirePlatformAdmin();
         return budgetService.getUsage(
                 tenantId);
     }

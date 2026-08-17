@@ -2,6 +2,8 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
     url: jdbc:postgresql://localhost:5432/db_gateway
     username: postgres
@@ -50,6 +52,13 @@ ollama:
   base:
     url: http://localhost:11434
   model: llama3.1:8b
+
+aegis:
+  security:
+    platform:
+      # Bootstrap credential for the first platform owner. Leave blank and use
+      # a managed secret in production. It uses the same X-API-Key header.
+      bootstrap-api-key: ${AEGIS_PLATFORM_API_KEY:}
 
 security:
   encryption:

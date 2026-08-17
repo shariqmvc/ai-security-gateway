@@ -10,6 +10,7 @@ import com.ai.gateway.routing.health.entity.RoutingOutcome;
 import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
 import com.ai.gateway.tenant.TenantContext;
 import com.ai.gateway.tenant.TenantAccessGuard;
+import com.ai.gateway.security.AuthorizationService;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ class RoutingOutcomeServiceImplTest {
         RoutingOutcomeRepository repository = mock(RoutingOutcomeRepository.class);
         TenantSchemaRoutingService schemaRoutingService =
                 mock(TenantSchemaRoutingService.class);
-        TenantAccessGuard accessGuard = new TenantAccessGuard();
+        TenantAccessGuard accessGuard = new TenantAccessGuard(new AuthorizationService());
         RoutingOutcomeServiceImpl service =
                 new RoutingOutcomeServiceImpl(
                         repository,

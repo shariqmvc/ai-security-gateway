@@ -365,25 +365,20 @@ public class PolicyBasedRoutingStrategy
          *
          * Selection operates only on scored candidates and is deterministic.
          */
-        ScoredCandidate selectedScoredCandidate =
-                candidateSelectionEngine.select(
-                        scoredCandidates);
+        com.ai.gateway.routing.selection.CandidateSelectionResult selectionResult =
+                candidateSelectionEngine.selectWithRanking(scoredCandidates);
 
-        RoutingCandidate selected =
-                selectedScoredCandidate.candidate();
+        ScoredCandidate selectedScoredCandidate = selectionResult.selected();
+        RoutingCandidate selected = selectedScoredCandidate.candidate();
 
         /*
          * 6.5.7 Decision Metadata
          *
-         * Keep the public routing decision compatible while exposing the
-         * ranked decision context for observability and future analytics.
+         * Reuse the ranking produced by selection. This avoids a second
+         * O(C log C) sort on the same candidate set.
          */
         List<ScoredCandidate> rankedCandidates =
-                candidateSelectionEngine instanceof
-                        com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl
-                        impl
-                        ? impl.rank(scoredCandidates)
-                        : scoredCandidates;
+                selectionResult.rankedCandidates();
 
         int selectedRank = 1;
         for (int index = 0; index < rankedCandidates.size(); index++) {

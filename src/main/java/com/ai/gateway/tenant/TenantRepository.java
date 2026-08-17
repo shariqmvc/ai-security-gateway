@@ -9,10 +9,14 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ai.gateway.tenant.TenantStatus;
+
 public interface TenantRepository
         extends JpaRepository<Tenant, UUID> {
 
     Optional<Tenant> findByTenantCode(String tenantCode);
+
+    long countByStatus(TenantStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

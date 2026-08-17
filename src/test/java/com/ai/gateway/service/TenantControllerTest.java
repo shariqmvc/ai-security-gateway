@@ -4,6 +4,7 @@ import com.ai.gateway.authentication.AuthenticationService;
 import com.ai.gateway.entitlement.enums.Plan;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.ratelimit.service.RateLimiterService;
+import com.ai.gateway.security.AuthorizationService;
 import com.ai.gateway.tenant.Tenant;
 import com.ai.gateway.tenant.TenantController;
 import com.ai.gateway.tenant.TenantService;
@@ -48,6 +49,9 @@ class TenantControllerTest {
 
     @MockitoBean
     private RateLimiterService rateLimiterService;
+
+    @MockitoBean
+    private AuthorizationService authorizationService;
 
     @Test
     void shouldCreateTenant() throws Exception {

@@ -6,11 +6,14 @@ import java.util.List;
 
 /**
  * Selects exactly one candidate from an already scored candidate set.
- *
- * <p>Selection never evaluates hard constraints. Candidates reaching this
- * contract are assumed to have passed 6.5.4.</p>
+ * Implementations may expose the deterministic ranking together with the
+ * winner so callers do not need to sort the same candidates twice.
  */
 public interface CandidateSelectionEngine {
 
-    ScoredCandidate select(List<ScoredCandidate> candidates);
+    CandidateSelectionResult selectWithRanking(List<ScoredCandidate> candidates);
+
+    default ScoredCandidate select(List<ScoredCandidate> candidates) {
+        return selectWithRanking(candidates).selected();
+    }
 }
