@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.util.Collections;
 import java.util.Set;
+import java.math.BigDecimal;
 
 @Setter
 @Getter
@@ -30,5 +31,25 @@ public class ChatRequest {
 
    /** Optional routing priority: BALANCED, COST, LATENCY, RELIABILITY. */
    private String routingPriority;
+
+   /** Optional explicit multi-objective optimization profile. */
+   private String routingOptimizationProfile;
+
+   /** Terminal routing selection mode: SINGLE, TOP_N, PRIMARY_ESCALATION. */
+   @Builder.Default
+   private String routingSelectionMode = "SINGLE";
+
+   /** Number of candidates requested when routingSelectionMode is TOP_N. */
+   @Builder.Default
+   private int routingTopN = 1;
+
+   /** Optional profile used for the escalation candidate. */
+   private String routingEscalationProfile;
+
+   /** Optional hard maximum estimated provider cost for this request. */
+   private BigDecimal maximumRequestCost;
+
+   /** Optional remaining aggregate workflow budget supplied by orchestration. */
+   private BigDecimal remainingWorkflowBudget;
 
 }

@@ -15,6 +15,10 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import com.ai.gateway.routing.scoring.objective.RoutingObjective;
+import com.ai.gateway.routing.scoring.objective.RoutingObjectiveVector;
+import com.ai.gateway.routing.scoring.objective.RoutingUtilityCalculator;
+import com.ai.gateway.routing.scoring.objective.RoutingUtilityResult;
 
 /**
  * Deterministic scoring with O(S*C) normalization rather than O(S*C^2).
@@ -26,6 +30,7 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
 
     private final List<CandidateScoreStrategy> strategies;
     private final RoutingScoringProperties properties;
+    private final RoutingUtilityCalculator utilityCalculator = new RoutingUtilityCalculator();
 
     @Override
     public List<ScoredCandidate> score(List<RoutingCandidate> candidates, CandidateScoringContext context) {
@@ -86,10 +91,48 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
                 components.add(new CandidateScoreComponent(dimension, raw, normalized, weight, weighted));
             }
 
+            if (context.objectiveWeights() != null) {
+                RoutingObjectiveVector vector = objectiveVector(components);
+                RoutingUtilityResult utility = utilityCalculator.calculate(
+                        vector, context.objectiveWeights());
+                total = utility.utility();
+
+                List<CandidateScoreComponent> utilityComponents = new ArrayList<>(components.size());
+                for (CandidateScoreComponent component : components) {
+                    RoutingObjective objective = toObjective(component.dimension());
+                    double effectiveWeight = utility.effectiveWeightOf(objective);
+                    double weighted = component.normalizedScore() * effectiveWeight;
+                    utilityComponents.add(new CandidateScoreComponent(
+                            component.dimension(),
+                            component.rawValue(),
+                            component.normalizedScore(),
+                            effectiveWeight,
+                            weighted));
+                }
+                components = utilityComponents;
+            }
+
             result.add(new ScoredCandidate(candidate, components, total));
         }
 
         return List.copyOf(result);
+    }
+
+    private RoutingObjectiveVector objectiveVector(List<CandidateScoreComponent> components) {
+        EnumMap<RoutingObjective, Double> values = new EnumMap<>(RoutingObjective.class);
+        for (CandidateScoreComponent component : components) {
+            values.put(toObjective(component.dimension()), component.normalizedScore());
+        }
+        return new RoutingObjectiveVector(values);
+    }
+
+    private RoutingObjective toObjective(CandidateScoreDimension dimension) {
+        return switch (dimension) {
+            case COST -> RoutingObjective.COST;
+            case LATENCY -> RoutingObjective.LATENCY;
+            case AVAILABILITY -> RoutingObjective.AVAILABILITY;
+            case POLICY_PREFERENCE -> RoutingObjective.POLICY_PREFERENCE;
+        };
     }
 
     private Map<CandidateScoreDimension, Double> weights(CandidateScoringContext context) {

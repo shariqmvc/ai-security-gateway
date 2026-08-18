@@ -21,6 +21,15 @@ import com.ai.gateway.routing.intelligence.RoutingDecisionIntelligence;
 import com.ai.gateway.routing.intelligence.NoopRoutingDecisionIntelligence;
 import com.ai.gateway.routing.health.FailureAwareCandidateFilter;
 import com.ai.gateway.routing.selection.CandidateSelectionEngine;
+import com.ai.gateway.routing.selection.RoutingSelectionMode;
+import com.ai.gateway.routing.selection.RoutingSelectionRequest;
+import com.ai.gateway.routing.selection.CandidateSelectionResult;
+import com.ai.gateway.routing.selection.CandidateSelectionExplanation;
+import com.ai.gateway.cost.routing.CostAwareCandidate;
+import com.ai.gateway.cost.routing.CostAwareRoutingEvaluator;
+import com.ai.gateway.routing.scoring.objective.profile.RoutingOptimizationProfile;
+import com.ai.gateway.routing.scoring.objective.profile.RoutingOptimizationProfileRegistry;
+import com.ai.gateway.routing.scoring.objective.profile.RoutingOptimizationProfileResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -62,6 +71,10 @@ public class PolicyBasedRoutingStrategy
     private final FailureAwareCandidateFilter
             failureAwareCandidateFilter;
 
+    private final CostAwareRoutingEvaluator costAwareRoutingEvaluator;
+
+    private final RoutingOptimizationProfileResolver optimizationProfileResolver;
+
     /**
      * Spring production constructor. The complete routing pipeline is:
      * resolution -> eligibility -> hard constraints -> scoring -> selection.
@@ -77,7 +90,8 @@ public class PolicyBasedRoutingStrategy
             CandidateScoringEngine candidateScoringEngine,
             CandidateSelectionEngine candidateSelectionEngine,
             RoutingDecisionIntelligence routingDecisionIntelligence,
-            FailureAwareCandidateFilter failureAwareCandidateFilter) {
+            FailureAwareCandidateFilter failureAwareCandidateFilter,
+            CostAwareRoutingEvaluator costAwareRoutingEvaluator) {
 
         this.routingPolicyService = routingPolicyService;
         this.providerModelRegistryService = providerModelRegistryService;
@@ -89,6 +103,10 @@ public class PolicyBasedRoutingStrategy
         this.candidateSelectionEngine = candidateSelectionEngine;
         this.routingDecisionIntelligence = routingDecisionIntelligence;
         this.failureAwareCandidateFilter = failureAwareCandidateFilter;
+        this.costAwareRoutingEvaluator = costAwareRoutingEvaluator;
+        this.optimizationProfileResolver =
+                new RoutingOptimizationProfileResolver(
+                        new RoutingOptimizationProfileRegistry(), null);
     }
     public PolicyBasedRoutingStrategy(
             RoutingPolicyService routingPolicyService,
@@ -116,7 +134,12 @@ public class PolicyBasedRoutingStrategy
                     public void recordSuccess(com.ai.gateway.routing.engine.RoutingCandidate c, long l) {}
                     public void recordFailure(com.ai.gateway.routing.engine.RoutingCandidate c, String f) {}
                     public boolean isHealthyForRouting(com.ai.gateway.routing.engine.RoutingCandidate c) { return true; }
-                })
+                }),
+                new CostAwareRoutingEvaluator(
+                        new com.ai.gateway.cost.service.impl.PreRequestCostEstimatorImpl(
+                                new com.ai.gateway.cost.pricing.CachedPricingCatalog(
+                                        new com.ai.gateway.cost.config.PricingConfig())),
+                        new com.ai.gateway.cost.routing.DefaultCostGuardrail())
         );
     }
 
@@ -150,7 +173,12 @@ public class PolicyBasedRoutingStrategy
                     public void recordSuccess(com.ai.gateway.routing.engine.RoutingCandidate c, long l) {}
                     public void recordFailure(com.ai.gateway.routing.engine.RoutingCandidate c, String f) {}
                     public boolean isHealthyForRouting(com.ai.gateway.routing.engine.RoutingCandidate c) { return true; }
-                }));
+                }),
+                new CostAwareRoutingEvaluator(
+                        new com.ai.gateway.cost.service.impl.PreRequestCostEstimatorImpl(
+                                new com.ai.gateway.cost.pricing.CachedPricingCatalog(
+                                        new com.ai.gateway.cost.config.PricingConfig())),
+                        new com.ai.gateway.cost.routing.DefaultCostGuardrail()));
     }
 
     @Override
@@ -339,6 +367,39 @@ public class PolicyBasedRoutingStrategy
         }
 
         /*
+         * B.4/B.5 Cost Guardrail Integration.
+         * Workflow accounting remains outside routing; the routing context
+         * supplies only the current effective budget boundary.
+         */
+        com.ai.gateway.cost.routing.RoutingCostContext costContext =
+                context.effectiveCostContext();
+        java.math.BigDecimal effectiveMaximumCost =
+                costContext.effectiveMaximumCost();
+
+        List<RoutingCandidate> costEligibleCandidates =
+                healthEligibleCandidates;
+
+        if (effectiveMaximumCost != null) {
+            CandidateScoringContext costContextForEstimate =
+                    routingDecisionIntelligence.scoringContext(policy, decisionContext);
+            List<CostAwareCandidate> costEvaluations =
+                    costAwareRoutingEvaluator.evaluate(
+                            healthEligibleCandidates,
+                            costContextForEstimate.estimatedInputTokens(),
+                            costContextForEstimate.estimatedOutputTokens(),
+                            costContext);
+
+            if (costEvaluations.isEmpty()) {
+                throw new BusinessException(
+                        "No routing candidate satisfies the configured cost guardrail.");
+            }
+            costEligibleCandidates =
+                    costEvaluations.stream()
+                            .map(CostAwareCandidate::candidate)
+                            .toList();
+        }
+
+        /*
          * 6.5.5 Candidate Scoring
          *
          * Hard-constraint-eligible candidates are now scored as soft
@@ -348,9 +409,16 @@ public class PolicyBasedRoutingStrategy
         CandidateScoringContext scoringContext =
                 routingDecisionIntelligence.scoringContext(policy, decisionContext);
 
+        RoutingOptimizationProfile profile =
+                optimizationProfileResolver.resolve(
+                        context.request().getRoutingOptimizationProfile(),
+                        null);
+
+        scoringContext = scoringContext.withObjectiveWeights(profile.weights());
+
         List<ScoredCandidate> scoredCandidates =
                 candidateScoringEngine.score(
-                        healthEligibleCandidates,
+                        costEligibleCandidates,
                         scoringContext);
 
         if (scoredCandidates == null
@@ -365,8 +433,15 @@ public class PolicyBasedRoutingStrategy
          *
          * Selection operates only on scored candidates and is deterministic.
          */
-        com.ai.gateway.routing.selection.CandidateSelectionResult selectionResult =
-                candidateSelectionEngine.selectWithRanking(scoredCandidates);
+        RoutingSelectionRequest selectionRequest =
+                selectionRequest(context.request());
+
+        CandidateSelectionResult selectionResult =
+                selectCandidates(
+                        costEligibleCandidates,
+                        scoredCandidates,
+                        scoringContext,
+                        selectionRequest);
 
         ScoredCandidate selectedScoredCandidate = selectionResult.selected();
         RoutingCandidate selected = selectedScoredCandidate.candidate();
@@ -431,11 +506,98 @@ public class PolicyBasedRoutingStrategy
                 selected.provider(),
                 selected.model());
 
+        List<RoutingCandidate> selectedCandidates =
+                selectionResult.selectedCandidates().stream()
+                        .map(ScoredCandidate::candidate)
+                        .toList();
+
         return new RoutingDecision(
                 selected.provider(),
                 selected.model(),
                 RoutingStrategy.POLICY_BASED,
-                metadata);
+                metadata,
+                selectedCandidates);
+    }
+
+    private CandidateSelectionResult selectCandidates(
+            List<RoutingCandidate> candidates,
+            List<ScoredCandidate> primaryScoredCandidates,
+            CandidateScoringContext primaryScoringContext,
+            RoutingSelectionRequest request) {
+
+        if (request.mode() != RoutingSelectionMode.PRIMARY_ESCALATION
+                || request.escalationProfile() == null) {
+            return candidateSelectionEngine.select(primaryScoredCandidates, request);
+        }
+
+        RoutingOptimizationProfile escalationProfile =
+                optimizationProfileResolver.resolve(
+                        request.escalationProfile(), null);
+
+        CandidateScoringContext escalationContext =
+                primaryScoringContext.withObjectiveWeights(escalationProfile.weights());
+
+        List<ScoredCandidate> escalationScoredCandidates =
+                candidateScoringEngine.score(candidates, escalationContext);
+
+        CandidateSelectionResult escalationResult =
+                candidateSelectionEngine.select(
+                        escalationScoredCandidates,
+                        RoutingSelectionRequest.single());
+
+        CandidateSelectionResult primaryResult =
+                candidateSelectionEngine.select(
+                        primaryScoredCandidates,
+                        RoutingSelectionRequest.single());
+        ScoredCandidate primary = primaryResult.selected();
+
+        ScoredCandidate escalation = escalationResult.selected();
+        if (escalation.candidate().equals(primary.candidate())) {
+            escalation = escalationResult.rankedCandidates().stream()
+                    .filter(candidate -> !candidate.candidate().equals(primary.candidate()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        List<ScoredCandidate> selected = escalation == null
+                ? List.of(primary)
+                : List.of(primary, escalation);
+
+        List<ScoredCandidate> ranked = primaryResult.rankedCandidates();
+
+        return new CandidateSelectionResult(
+                primary,
+                ranked,
+                selected,
+                new CandidateSelectionExplanation(
+                        RoutingSelectionMode.PRIMARY_ESCALATION,
+                        escalation == null
+                                ? "PRIMARY_ONLY_NO_ESCALATION"
+                                : "PRIMARY_AND_ESCALATION",
+                        false,
+                        null));
+    }
+
+    private RoutingSelectionRequest selectionRequest(com.ai.gateway.dto.ChatRequest request) {
+        String mode = request.getRoutingSelectionMode();
+        if (mode == null || mode.isBlank()) {
+            return RoutingSelectionRequest.single();
+        }
+
+        RoutingSelectionMode selectionMode;
+        try {
+            selectionMode = RoutingSelectionMode.valueOf(mode.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException("Unsupported routing selection mode: " + mode);
+        }
+
+        return switch (selectionMode) {
+            case SINGLE -> RoutingSelectionRequest.single();
+            case TOP_N -> RoutingSelectionRequest.topN(request.getRoutingTopN());
+            case PRIMARY_ESCALATION -> RoutingSelectionRequest.primaryEscalation(
+                    request.getRoutingOptimizationProfile(),
+                    request.getRoutingEscalationProfile());
+        };
     }
 
     private List<RoutingCandidate> buildCandidates(
