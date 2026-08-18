@@ -44,6 +44,14 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private RoutingHealthService routingHealthService;
 
+    /**
+     * Local, low-latency circuit breaker. Optional injection preserves the
+     * lightweight unit-test construction path while production receives the
+     * Spring-managed breaker.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ProviderCircuitBreaker providerCircuitBreaker;
+
     @Override
     public AIResponse execute(AIRequest request) {
 
@@ -82,25 +90,60 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
          */
         attempted.add(primary);
 
-        try {
-            return invoke(request, 1);
+        /*
+         * Fast-fail a provider/model that is already known to be unhealthy.
+         * Subsequent requests should not pay the same provider timeout again.
+         */
+        if (!isCircuitOpen(request.getProvider(), request.getModel())) {
 
-        } catch (Exception ex) {
+            try {
+                AIResponse response = invoke(request, 1);
+                recordProviderSuccess(request);
+                return response;
 
-            primaryFailure = ex;
-            lastFailure = ex;
+            } catch (Exception ex) {
 
-            recordProviderFailure(request, ex);
+                primaryFailure = ex;
+                lastFailure = ex;
 
-            if (!isRetryableFailure(ex)) {
-                log.info(
-                        "FAILOVER_NOT_RETRYABLE requestId={} provider={} failureType={}",
-                        requestId(),
-                        primary,
-                        ex.getClass().getSimpleName());
-                throw propagate(primaryFailure, lastFailure);
+                recordProviderFailure(request, ex);
+
+                if (!isRetryableFailure(ex)) {
+                    log.info(
+                            "FAILOVER_NOT_RETRYABLE requestId={} provider={} failureType={}",
+                            requestId(),
+                            primary,
+                            ex.getClass().getSimpleName());
+                    throw propagate(primaryFailure, lastFailure);
+                }
             }
+
+        } else {
+
+            long retryAfterMs =
+                    circuitRetryAfterMs(
+                            request.getProvider(),
+                            request.getModel());
+
+            primaryFailure =
+                    new ProviderCircuitOpenException(
+                            request.getProvider(),
+                            request.getModel(),
+                            retryAfterMs);
+
+            lastFailure = primaryFailure;
+
+            metricsService.increment(
+                    MetricsConstants.ROUTING_FAILOVER_CIRCUIT_OPEN);
+
+            log.info(
+                    "FAILOVER_PRIMARY_CIRCUIT_OPEN requestId={} provider={} model={} retryAfterMs={}",
+                    requestId(),
+                    request.getProvider(),
+                    request.getModel(),
+                    retryAfterMs);
         }
+
         log.info(
                 "FAILOVER_DECISION requestId={} primary={} primaryFailure={} maxAttempts={} fallbackCount={}",
                 requestId(),
@@ -181,6 +224,25 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 continue;
             }
 
+            if (isCircuitOpen(
+                    fallbackRequest.getProvider(),
+                    fallbackRequest.getModel())) {
+
+                metricsService.increment(
+                        MetricsConstants.ROUTING_FAILOVER_CIRCUIT_OPEN);
+
+                log.info(
+                        "FAILOVER_CANDIDATE_CIRCUIT_OPEN requestId={} provider={} model={} retryAfterMs={}",
+                        requestId(),
+                        fallbackRequest.getProvider(),
+                        fallbackRequest.getModel(),
+                        circuitRetryAfterMs(
+                                fallbackRequest.getProvider(),
+                                fallbackRequest.getModel()));
+
+                continue;
+            }
+
             attempted.add(fallback);
             fallbackAttempts++;
 
@@ -202,6 +264,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
                 AIResponse response =
                         invoke(fallbackRequest, fallbackAttempts + 1);
+
+                recordProviderSuccess(fallbackRequest);
 
                 /*
                  * Failover succeeded.
@@ -314,6 +378,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                             request.getModel()),
                     ex.getClass().getSimpleName());
         }
+
+        recordProviderCircuitFailure(request, ex);
     }
     private AIRequest buildFallbackRequest(
             AIRequest primaryRequest,
@@ -360,31 +426,80 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
     /**
      * Only transient provider failures should trigger another provider call.
-     * HTTP 4xx errors such as invalid requests or authentication failures are
-     * not made better by failover. Network/timeout failures and 408/429/5xx
-     * responses are considered retryable. Unknown provider runtime failures
-     * remain retryable for backwards compatibility with provider adapters and
-     * controlled failure injection tests.
+     * The same normalized classification is also used by the local circuit
+     * breaker so retry and health behavior remain consistent.
      */
     private boolean isRetryableFailure(Throwable failure) {
-        Throwable current = failure;
+        return ProviderFailureClassifier.isRetryable(failure);
+    }
 
-        while (current != null) {
-            if (current instanceof ResourceAccessException) {
-                return true;
-            }
-
-            if (current instanceof RestClientResponseException responseException) {
-                int status = responseException.getStatusCode().value();
-                return status == 408
-                        || status == 429
-                        || status >= 500;
-            }
-
-            current = current.getCause();
+    private void recordProviderSuccess(AIRequest request) {
+        if (providerCircuitBreaker == null
+                || request == null
+                || request.getProvider() == null
+                || request.getModel() == null
+                || request.getModel().isBlank()) {
+            return;
         }
 
-        return true;
+        providerCircuitBreaker.recordSuccess(
+                request.getProvider(),
+                request.getModel());
+    }
+
+    private void recordProviderCircuitFailure(
+            AIRequest request,
+            Throwable failure) {
+
+        if (providerCircuitBreaker == null
+                || request == null
+                || request.getProvider() == null
+                || request.getModel() == null
+                || request.getModel().isBlank()) {
+            return;
+        }
+
+        ProviderFailureCategory category =
+                ProviderFailureClassifier.classify(failure);
+
+        if (ProviderFailureClassifier.isRetryable(failure)) {
+            long openDurationMs =
+                    ProviderFailureClassifier.retryAfter(failure)
+                            .map(java.time.Duration::toMillis)
+                            .orElseGet(
+                                    () -> {
+                                        /*
+                                         * Use the configured category duration
+                                         * when the provider did not supply a
+                                         * Retry-After header.
+                                         */
+                                        return 0L;
+                                    });
+
+            if (openDurationMs > 0L) {
+                providerCircuitBreaker.recordFailure(
+                        request.getProvider(),
+                        request.getModel(),
+                        category,
+                        openDurationMs);
+            } else {
+                providerCircuitBreaker.recordFailure(
+                        request.getProvider(),
+                        request.getModel(),
+                        category);
+            }
+        }
+    }
+
+    private boolean isCircuitOpen(Provider provider, String model) {
+        return providerCircuitBreaker != null
+                && !providerCircuitBreaker.allowRequest(provider, model);
+    }
+
+    private long circuitRetryAfterMs(Provider provider, String model) {
+        return providerCircuitBreaker == null
+                ? 0L
+                : providerCircuitBreaker.retryAfterMs(provider, model);
     }
 
     private RuntimeException propagate(

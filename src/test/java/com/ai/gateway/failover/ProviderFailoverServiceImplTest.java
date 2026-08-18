@@ -19,9 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.List;
@@ -29,8 +30,8 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+
 @ActiveProfiles("test")
 @ExtendWith(MockitoExtension.class)
 class ProviderFailoverServiceImplTest {
@@ -50,17 +51,20 @@ class ProviderFailoverServiceImplTest {
     @Mock
     private AIProvider openAiProvider;
 
-    private FailoverProperties properties;
-    private ProviderFailoverServiceImpl service;
-
-    private AIRequest primaryRequest;
-    private AIResponse response;
     @Mock
     private RoutingAnalyticsService routingAnalyticsService;
 
     @Mock
     private PerformanceLogger performanceLogger;
 
+    @Mock
+    private ProviderCircuitBreaker providerCircuitBreaker;
+
+    private FailoverProperties properties;
+    private ProviderFailoverServiceImpl service;
+
+    private AIRequest primaryRequest;
+    private AIResponse response;
 
     @BeforeEach
     void setUp() {
@@ -82,6 +86,11 @@ class ProviderFailoverServiceImplTest {
                 routingAnalyticsService,
                 performanceLogger);
 
+        ReflectionTestUtils.setField(
+                service,
+                "providerCircuitBreaker",
+                providerCircuitBreaker);
+
         primaryRequest = AIRequest.builder()
                 .provider(Provider.GEMINI)
                 .model("gemini-test")
@@ -93,8 +102,24 @@ class ProviderFailoverServiceImplTest {
                 .build();
     }
 
+    /**
+     * Enables the primary provider circuit for tests whose
+     * purpose is to exercise normal provider execution.
+     *
+     * We intentionally do this per test instead of globally in
+     * setUp() so Mockito strict stubbing remains enabled and
+     * tests such as shouldNotFailoverWhenDisabled() do not receive
+     * an unused stubbing.
+     */
+    private void allowPrimaryCircuit() {
+        when(providerCircuitBreaker.allowRequest(any(), any()))
+                .thenReturn(true);
+    }
+
     @Test
     void shouldReturnPrimaryResponseWithoutFailover() {
+
+        allowPrimaryCircuit();
 
         when(providerFactory.getProvider(Provider.GEMINI))
                 .thenReturn(geminiProvider);
@@ -107,17 +132,23 @@ class ProviderFailoverServiceImplTest {
         assertSame(response, result);
 
         verify(geminiProvider).chat(primaryRequest);
+
         verify(providerFactory, never())
                 .getProvider(Provider.OPENAI);
+
         verify(metricsService, never())
                 .increment(MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
+
         verify(metricsService, never())
                 .increment(MetricsConstants.ROUTING_FAILOVER_SUCCESS);
+
         verifyNoInteractions(routingAnalyticsService);
     }
 
     @Test
     void shouldFailoverWhenPrimaryProviderFails() {
+
+        allowPrimaryCircuit();
 
         when(providerFactory.getProvider(Provider.GEMINI))
                 .thenReturn(geminiProvider);
@@ -140,9 +171,10 @@ class ProviderFailoverServiceImplTest {
         when(registry.requireModel(
                 Provider.OPENAI,
                 "gpt-test"))
-                .thenReturn(enabledModel(
-                        Provider.OPENAI,
-                        "gpt-test"));
+                .thenReturn(
+                        enabledModel(
+                                Provider.OPENAI,
+                                "gpt-test"));
 
         when(openAiProvider.chat(any(AIRequest.class)))
                 .thenReturn(response);
@@ -151,10 +183,11 @@ class ProviderFailoverServiceImplTest {
 
         assertSame(response, result);
 
-        verify(geminiProvider).chat(primaryRequest);
+        verify(geminiProvider)
+                .chat(primaryRequest);
 
-        verify(openAiProvider).chat(
-                argThat(request ->
+        verify(openAiProvider)
+                .chat(argThat(request ->
                         request.getProvider() == Provider.OPENAI
                                 && request.getModel().equals("gpt-test")
                                 && request.getPrompt().equals("hello")));
@@ -200,6 +233,7 @@ class ProviderFailoverServiceImplTest {
 
         verify(providerFactory, never())
                 .getProvider(Provider.OPENAI);
+
         verifyNoInteractions(registry);
 
         verifyNoInteractions(routingAnalyticsService);
@@ -207,6 +241,8 @@ class ProviderFailoverServiceImplTest {
 
     @Test
     void shouldPropagatePrimaryFailureWhenNoFallbackConfigured() {
+
+        allowPrimaryCircuit();
 
         properties.getProviders().clear();
 
@@ -225,12 +261,16 @@ class ProviderFailoverServiceImplTest {
                         () -> service.execute(primaryRequest));
 
         assertSame(failure, thrown);
+
         verifyNoInteractions(registry);
+
         verifyNoInteractions(routingAnalyticsService);
     }
 
     @Test
     void shouldPreservePrimaryFailureWhenFallbackAlsoFails() {
+
+        allowPrimaryCircuit();
 
         when(providerFactory.getProvider(Provider.GEMINI))
                 .thenReturn(geminiProvider);
@@ -256,9 +296,10 @@ class ProviderFailoverServiceImplTest {
         when(registry.requireModel(
                 Provider.OPENAI,
                 "gpt-test"))
-                .thenReturn(enabledModel(
-                        Provider.OPENAI,
-                        "gpt-test"));
+                .thenReturn(
+                        enabledModel(
+                                Provider.OPENAI,
+                                "gpt-test"));
 
         when(openAiProvider.chat(any(AIRequest.class)))
                 .thenThrow(fallbackFailure);
@@ -269,6 +310,7 @@ class ProviderFailoverServiceImplTest {
                         () -> service.execute(primaryRequest));
 
         assertSame(primaryFailure, thrown);
+
         assertTrue(
                 List.of(thrown.getSuppressed())
                         .contains(fallbackFailure));
@@ -286,6 +328,8 @@ class ProviderFailoverServiceImplTest {
     @Test
     void shouldRespectMaximumAttempts() {
 
+        allowPrimaryCircuit();
+
         properties.setMaxAttempts(2);
 
         when(providerFactory.getProvider(Provider.GEMINI))
@@ -296,24 +340,28 @@ class ProviderFailoverServiceImplTest {
 
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(
-                        new RuntimeException("Gemini unavailable"));
+                        new RuntimeException(
+                                "Gemini unavailable"));
 
         when(openAiProvider.defaultModel())
                 .thenReturn("gpt-test");
 
         when(registry.requireProvider(Provider.OPENAI))
-                .thenReturn(enabledProvider(Provider.OPENAI));
+                .thenReturn(
+                        enabledProvider(Provider.OPENAI));
 
         when(registry.requireModel(
                 Provider.OPENAI,
                 "gpt-test"))
-                .thenReturn(enabledModel(
-                        Provider.OPENAI,
-                        "gpt-test"));
+                .thenReturn(
+                        enabledModel(
+                                Provider.OPENAI,
+                                "gpt-test"));
 
         when(openAiProvider.chat(any(AIRequest.class)))
                 .thenThrow(
-                        new RuntimeException("OpenAI unavailable"));
+                        new RuntimeException(
+                                "OpenAI unavailable"));
 
         assertThrows(
                 RuntimeException.class,
@@ -327,6 +375,7 @@ class ProviderFailoverServiceImplTest {
 
         verify(providerFactory, never())
                 .getProvider(Provider.CLAUDE);
+
         verify(routingAnalyticsService)
                 .recordFailoverAttempt();
 
@@ -335,11 +384,12 @@ class ProviderFailoverServiceImplTest {
 
         verify(routingAnalyticsService, never())
                 .recordFailoverSuccess();
-
     }
 
     @Test
     void shouldSkipDuplicateFallbackProviders() {
+
+        allowPrimaryCircuit();
 
         properties.setMaxAttempts(3);
 
@@ -357,24 +407,28 @@ class ProviderFailoverServiceImplTest {
 
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(
-                        new RuntimeException("Gemini unavailable"));
+                        new RuntimeException(
+                                "Gemini unavailable"));
 
         when(openAiProvider.defaultModel())
                 .thenReturn("gpt-test");
 
         when(registry.requireProvider(Provider.OPENAI))
-                .thenReturn(enabledProvider(Provider.OPENAI));
+                .thenReturn(
+                        enabledProvider(Provider.OPENAI));
 
         when(registry.requireModel(
                 Provider.OPENAI,
                 "gpt-test"))
-                .thenReturn(enabledModel(
-                        Provider.OPENAI,
-                        "gpt-test"));
+                .thenReturn(
+                        enabledModel(
+                                Provider.OPENAI,
+                                "gpt-test"));
 
         when(openAiProvider.chat(any(AIRequest.class)))
                 .thenThrow(
-                        new RuntimeException("OpenAI unavailable"));
+                        new RuntimeException(
+                                "OpenAI unavailable"));
 
         assertThrows(
                 RuntimeException.class,
@@ -393,27 +447,113 @@ class ProviderFailoverServiceImplTest {
                 .recordFailoverSuccess();
     }
 
-    private ProviderDefinition enabledProvider(Provider provider) {
-        return new ProviderDefinition(
-                provider,
-                provider.name(),
-                ProviderStatus.ENABLED,
-                Set.of("CHAT"));
+    @Test
+    void shouldSkipPrimaryWhenCircuitIsOpenAndFailOverImmediately() {
+
+        // Primary circuit is OPEN.
+        when(providerCircuitBreaker.allowRequest(
+                Provider.GEMINI,
+                "gemini-test"))
+                .thenReturn(false);
+
+        when(providerCircuitBreaker.retryAfterMs(
+                Provider.GEMINI,
+                "gemini-test"))
+                .thenReturn(60_000L);
+
+        // Fallback circuit is CLOSED/available.
+        when(providerCircuitBreaker.allowRequest(
+                Provider.OPENAI,
+                "gpt-test"))
+                .thenReturn(true);
+
+        when(providerFactory.getProvider(Provider.OPENAI))
+                .thenReturn(openAiProvider);
+
+        when(openAiProvider.defaultModel())
+                .thenReturn("gpt-test");
+
+        when(registry.requireProvider(Provider.OPENAI))
+                .thenReturn(
+                        enabledProvider(Provider.OPENAI));
+
+        when(registry.requireModel(
+                Provider.OPENAI,
+                "gpt-test"))
+                .thenReturn(
+                        enabledModel(
+                                Provider.OPENAI,
+                                "gpt-test"));
+
+        when(openAiProvider.chat(any(AIRequest.class)))
+                .thenReturn(response);
+
+        AIResponse result =
+                service.execute(primaryRequest);
+
+        assertSame(response, result);
+
+        // Primary must never be instantiated/executed.
+        verify(providerFactory, never())
+                .getProvider(Provider.GEMINI);
+
+        // Fallback must execute.
+        verify(openAiProvider)
+                .chat(any(AIRequest.class));
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_FAILOVER_SUCCESS);
     }
 
-    private ModelDefinition enabledModel(
-            Provider provider,
-            String model) {
+    @Test
+    void shouldNotOpenCircuitForNonRetryableClientError() {
 
-        return new ModelDefinition(
-                provider,
-                model,
-                model,
-                ModelStatus.ENABLED,
-                Set.of("CHAT"));
+        allowPrimaryCircuit();
+
+        HttpClientErrorException failure =
+                HttpClientErrorException.create(
+                        HttpStatus.BAD_REQUEST,
+                        "Bad Request",
+                        HttpHeaders.EMPTY,
+                        null,
+                        null);
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(failure);
+
+        HttpClientErrorException thrown =
+                assertThrows(
+                        HttpClientErrorException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertSame(failure, thrown);
+
+        verify(providerCircuitBreaker, never())
+                .recordFailure(
+                        any(),
+                        any(),
+                        any(ProviderFailureCategory.class));
+
+        verify(providerFactory, never())
+                .getProvider(Provider.OPENAI);
+
+        verifyNoInteractions(registry);
+
+        verifyNoInteractions(routingAnalyticsService);
     }
+
     @Test
     void shouldNotFailoverOnNonRetryableHttp400() {
+
+        allowPrimaryCircuit();
 
         when(providerFactory.getProvider(Provider.GEMINI))
                 .thenReturn(geminiProvider);
@@ -435,35 +575,83 @@ class ProviderFailoverServiceImplTest {
                         () -> service.execute(primaryRequest));
 
         assertSame(failure, thrown);
-        verify(providerFactory, never()).getProvider(Provider.OPENAI);
+
+        verify(providerFactory, never())
+                .getProvider(Provider.OPENAI);
+
         verifyNoInteractions(registry);
+
         verifyNoInteractions(routingAnalyticsService);
     }
 
     @Test
     void shouldAttachActualFallbackProviderAndModelToResponse() {
 
+        allowPrimaryCircuit();
+
         when(providerFactory.getProvider(Provider.GEMINI))
                 .thenReturn(geminiProvider);
+
         when(providerFactory.getProvider(Provider.OPENAI))
                 .thenReturn(openAiProvider);
 
         when(geminiProvider.chat(primaryRequest))
-                .thenThrow(new RuntimeException("Gemini unavailable"));
+                .thenThrow(
+                        new RuntimeException(
+                                "Gemini unavailable"));
 
         when(openAiProvider.defaultModel())
                 .thenReturn("gpt-test");
+
         when(registry.requireProvider(Provider.OPENAI))
-                .thenReturn(enabledProvider(Provider.OPENAI));
-        when(registry.requireModel(Provider.OPENAI, "gpt-test"))
-                .thenReturn(enabledModel(Provider.OPENAI, "gpt-test"));
+                .thenReturn(
+                        enabledProvider(Provider.OPENAI));
+
+        when(registry.requireModel(
+                Provider.OPENAI,
+                "gpt-test"))
+                .thenReturn(
+                        enabledModel(
+                                Provider.OPENAI,
+                                "gpt-test"));
+
         when(openAiProvider.chat(any(AIRequest.class)))
-                .thenReturn(AIResponse.builder().response("fallback").build());
+                .thenReturn(
+                        AIResponse.builder()
+                                .response("fallback")
+                                .build());
 
-        AIResponse result = service.execute(primaryRequest);
+        AIResponse result =
+                service.execute(primaryRequest);
 
-        assertEquals(Provider.OPENAI, result.getProvider());
-        assertEquals("gpt-test", result.getModel());
+        assertEquals(
+                Provider.OPENAI,
+                result.getProvider());
+
+        assertEquals(
+                "gpt-test",
+                result.getModel());
     }
 
+    private ProviderDefinition enabledProvider(
+            Provider provider) {
+
+        return new ProviderDefinition(
+                provider,
+                provider.name(),
+                ProviderStatus.ENABLED,
+                Set.of("CHAT"));
+    }
+
+    private ModelDefinition enabledModel(
+            Provider provider,
+            String model) {
+
+        return new ModelDefinition(
+                provider,
+                model,
+                model,
+                ModelStatus.ENABLED,
+                Set.of("CHAT"));
+    }
 }
