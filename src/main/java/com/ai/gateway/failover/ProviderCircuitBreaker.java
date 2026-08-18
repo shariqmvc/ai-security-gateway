@@ -188,6 +188,29 @@ public class ProviderCircuitBreaker {
         return state == null ? 0 : state.consecutiveFailures;
     }
 
+    /**
+     * Non-mutating routing-path check.
+     *
+     * <p>Unlike {@link #allowRequest(Provider, String)}, this method never
+     * consumes the half-open probe. Candidate filtering can therefore inspect
+     * health before scoring without reserving a probe that may never execute.</p>
+     */
+    public boolean isCurrentlyOpen(Provider provider, String model) {
+        if (!properties.isEnabled()
+                || provider == null
+                || model == null
+                || model.isBlank()) {
+            return false;
+        }
+
+        State state = states.get(new Key(provider, model));
+        if (state == null) {
+            return false;
+        }
+
+        return state.openUntilEpochMs > System.currentTimeMillis();
+    }
+
     public boolean isOpen(Provider provider, String model) {
         return !allowRequest(provider, model);
     }

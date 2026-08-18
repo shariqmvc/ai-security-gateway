@@ -118,4 +118,35 @@ class ProviderCircuitBreakerTest {
                         Provider.GEMINI,
                         "gemini-test"));
     }
+    @Test
+    void currentOpenCheckDoesNotConsumeHalfOpenProbe() throws Exception {
+        properties.setTimeoutOpenDuration(Duration.ofMillis(5));
+
+        breaker.recordFailure(
+                Provider.GEMINI,
+                "gemini-test",
+                ProviderFailureCategory.TIMEOUT);
+
+        assertTrue(
+                breaker.isCurrentlyOpen(
+                        Provider.GEMINI,
+                        "gemini-test"));
+
+        Thread.sleep(15);
+
+        /*
+         * The non-mutating check reports that the cooldown has expired,
+         * but does not reserve the half-open probe.
+         */
+        assertFalse(
+                breaker.isCurrentlyOpen(
+                        Provider.GEMINI,
+                        "gemini-test"));
+
+        assertTrue(
+                breaker.allowRequest(
+                        Provider.GEMINI,
+                        "gemini-test"));
+    }
+
 }
