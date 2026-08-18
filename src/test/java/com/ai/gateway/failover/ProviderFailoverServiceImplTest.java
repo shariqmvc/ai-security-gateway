@@ -210,6 +210,93 @@ class ProviderFailoverServiceImplTest {
                 .recordFailoverFailure();
     }
 
+
+    @Test
+    void shouldStopFailoverWhenPrimaryExhaustsGlobalRequestBudget() {
+
+        allowPrimaryCircuit();
+
+        properties.setRequestTimeBudget(
+                java.time.Duration.ofMillis(100));
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenAnswer(invocation -> {
+                    Thread.sleep(150L);
+                    return response;
+                });
+
+        RuntimeException thrown =
+                assertThrows(
+                        RuntimeException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertInstanceOf(
+                com.ai.gateway.config.ProviderRequestBudgetExceededException.class,
+                thrown);
+
+        verify(geminiProvider)
+                .chat(primaryRequest);
+
+        verify(providerFactory, never())
+                .getProvider(Provider.OPENAI);
+
+        verify(providerCircuitBreaker, never())
+                .recordFailure(
+                        any(),
+                        any(),
+                        any(ProviderFailureCategory.class));
+
+        verify(routingAnalyticsService, never())
+                .recordFailoverAttempt();
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_FAILOVER_BUDGET_EXHAUSTED);
+    }
+
+    @Test
+    void shouldRejectProviderResponseThatArrivesAfterGlobalDeadline() {
+
+        allowPrimaryCircuit();
+
+        properties.setRequestTimeBudget(
+                java.time.Duration.ofMillis(100));
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenAnswer(invocation -> {
+                    Thread.sleep(150L);
+                    return response;
+                });
+
+        RuntimeException thrown =
+                assertThrows(
+                        RuntimeException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertInstanceOf(
+                com.ai.gateway.config.ProviderRequestBudgetExceededException.class,
+                thrown);
+
+        verify(geminiProvider)
+                .chat(primaryRequest);
+
+        verify(metricsService)
+                .increment(
+                        MetricsConstants.ROUTING_FAILOVER_BUDGET_EXHAUSTED);
+
+        verify(providerCircuitBreaker, never())
+                .recordFailure(
+                        any(),
+                        any(),
+                        any(ProviderFailureCategory.class));
+    }
+
     @Test
     void shouldNotFailoverWhenDisabled() {
 

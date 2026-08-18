@@ -368,6 +368,11 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     }
 
     private AIResponse invoke(AIRequest request, int attempt) {
+        ensureRequestBudgetAvailable(
+                request.getProvider(),
+                request.getModel(),
+                attempt);
+
         if (properties.getFailureInjection() != null
                 && properties.getFailureInjection()
                 .matches(request.getProvider(), request.getModel())) {
@@ -383,6 +388,19 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         MDC.put("providerAttempt", String.valueOf(attempt));
         try {
             AIResponse response = provider.chat(request);
+
+            /*
+             * A provider may successfully return after the gateway deadline
+             * has already expired (for example, because the underlying HTTP
+             * client uses a read/inactivity timeout rather than a total
+             * request timeout). Never return such a response as a successful
+             * gateway response and never start another provider attempt.
+             */
+            ensureRequestBudgetAvailable(
+                    request.getProvider(),
+                    request.getModel(),
+                    attempt);
+
             if (response != null) {
                 response.setProvider(request.getProvider());
                 response.setModel(request.getModel());
@@ -394,6 +412,36 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             } else {
                 MDC.put("providerAttempt", previousAttempt);
             }
+        }
+    }
+
+    private void ensureRequestBudgetAvailable(
+            Provider provider,
+            String model,
+            int attempt) {
+
+        if (!ProviderRequestBudget.isActive()) {
+            return;
+        }
+
+        long remainingMs =
+                ProviderRequestBudget.remainingMillis();
+
+        if (remainingMs <= 0L) {
+            metricsService.increment(
+                    MetricsConstants.ROUTING_FAILOVER_BUDGET_EXHAUSTED);
+
+            log.info(
+                    "REQUEST_DEADLINE_EXCEEDED requestId={} provider={} model={} attempt={}",
+                    requestId(),
+                    provider,
+                    model,
+                    attempt);
+
+            throw new com.ai.gateway.config.ProviderRequestBudgetExceededException(
+                    "Provider request budget exhausted for "
+                            + provider + "/" + model
+                            + " before attempt " + attempt + ".");
         }
     }
 
