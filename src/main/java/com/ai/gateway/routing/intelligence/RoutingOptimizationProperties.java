@@ -16,4 +16,10 @@ public class RoutingOptimizationProperties {
     private double latencyPriorityBoost = 1.15;
     private double costPriorityBoost = 1.15;
     private double reliabilityPriorityBoost = 1.15;
+    /** Maximum number of candidates retained for final deterministic ranking. */
+    private int topK = 5;
+    /** Enable Pareto-dominance pruning before bounded Top-K selection. */
+    private boolean paretoEnabled = true;
+    /** Pareto pruning is bounded to avoid O(C^2) work for very large sets. */
+    private int paretoMaxCandidates = 64;
 }
