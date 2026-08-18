@@ -6,6 +6,7 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -23,6 +24,20 @@ public class FailoverProperties {
      * Maximum number of provider attempts, including the primary provider.
      */
     private int maxAttempts = 2;
+
+    /**
+     * End-to-end budget shared by the primary and all fallback attempts.
+     * Provider HTTP clients automatically reduce their effective timeout to
+     * the remaining portion of this budget.
+     */
+    private Duration requestTimeBudget = Duration.ofSeconds(45);
+
+    /**
+     * Do not start another provider attempt when less than this amount of
+     * request budget remains. This avoids spending routing/serialization work
+     * on an attempt that cannot meaningfully complete.
+     */
+    private Duration minimumFallbackBudget = Duration.ofSeconds(1);
 
     /**
      * Ordered fallback providers for each primary provider.

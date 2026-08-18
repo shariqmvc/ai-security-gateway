@@ -23,25 +23,43 @@ public class ProviderCircuitBreakerProperties {
 
     /**
      * Number of retryable failures required before opening the circuit.
-     * The default of one is intentional: a completed long timeout is strong
-     * evidence that immediately retrying the same provider is undesirable.
+     *
+     * <p>The default of one is intentional: a completed long timeout is strong
+     * evidence that immediately retrying the same provider is undesirable.</p>
      */
     private int failureThreshold = 1;
 
     private Duration defaultOpenDuration = Duration.ofSeconds(60);
+
     private Duration timeoutOpenDuration = Duration.ofSeconds(60);
+
     private Duration networkOpenDuration = Duration.ofSeconds(30);
+
     private Duration rateLimitOpenDuration = Duration.ofSeconds(15);
+
     private Duration serverErrorOpenDuration = Duration.ofSeconds(30);
 
     long openDurationMs(ProviderFailureCategory category) {
+
         Duration duration = switch (category) {
-            case TIMEOUT -> timeoutOpenDuration;
-            case NETWORK -> networkOpenDuration;
-            case RATE_LIMITED -> rateLimitOpenDuration;
-            case SERVER_ERROR -> serverErrorOpenDuration;
-            case CLIENT_ERROR -> Duration.ZERO;
-            case UNKNOWN -> defaultOpenDuration;
+
+            case TIMEOUT ->
+                    timeoutOpenDuration;
+
+            case NETWORK ->
+                    networkOpenDuration;
+
+            case RATE_LIMITED ->
+                    rateLimitOpenDuration;
+
+            case SERVER_ERROR ->
+                    serverErrorOpenDuration;
+
+            case CLIENT_ERROR, REQUEST_BUDGET_EXHAUSTED ->
+                    Duration.ZERO;
+
+            case UNKNOWN ->
+                    defaultOpenDuration;
         };
 
         return Math.max(0L, duration.toMillis());

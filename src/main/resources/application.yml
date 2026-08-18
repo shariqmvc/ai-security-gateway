@@ -36,8 +36,6 @@ openai:
   api-key: ${OPENAI_API_KEY}
   model: gpt-5
   url: https://api.openai.com/v1/responses
-  connect-timeout: 5s
-  read-timeout: 60s
 
 gemini:
   api:
@@ -68,12 +66,24 @@ gateway:
     http:
       connect-timeout: ${GATEWAY_PROVIDER_CONNECT_TIMEOUT:5s}
       read-timeout: ${GATEWAY_PROVIDER_READ_TIMEOUT:30s}
+      providers:
+        GEMINI:
+          connect-timeout: ${GATEWAY_GEMINI_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_GEMINI_READ_TIMEOUT:15s}
+        OPENAI:
+          connect-timeout: ${GATEWAY_OPENAI_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_OPENAI_READ_TIMEOUT:30s}
+        OLLAMA:
+          connect-timeout: ${GATEWAY_OLLAMA_CONNECT_TIMEOUT:2s}
+          read-timeout: ${GATEWAY_OLLAMA_READ_TIMEOUT:30s}
   rate-limit:
     requests-per-minute: 60
   routing:
     failover:
       enabled: ${GATEWAY_ROUTING_FAILOVER_ENABLED:true}
       max-attempts: ${GATEWAY_ROUTING_FAILOVER_MAX_ATTEMPTS:2}
+      request-time-budget: ${GATEWAY_ROUTING_FAILOVER_REQUEST_TIME_BUDGET:45s}
+      minimum-fallback-budget: ${GATEWAY_ROUTING_FAILOVER_MINIMUM_FALLBACK_BUDGET:1s}
       circuit-breaker:
         enabled: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_ENABLED:true}
         failure-threshold: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_FAILURE_THRESHOLD:1}

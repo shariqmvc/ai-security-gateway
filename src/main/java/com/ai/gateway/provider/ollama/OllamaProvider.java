@@ -14,7 +14,7 @@ import com.ai.gateway.provider.gemini.dto.GeminiResponse;
 import com.ai.gateway.provider.ollama.dto.OllamaMessage;
 import com.ai.gateway.provider.ollama.dto.OllamaRequest;
 import com.ai.gateway.provider.ollama.dto.OllamaResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -23,8 +23,16 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class OllamaProvider implements AIProvider {
+
+    public OllamaProvider(
+            @Qualifier("ollamaRestTemplate") RestTemplate restTemplate,
+            OllamaConfig ollamaConfig,
+            PerformanceLogger performanceLogger) {
+        this.restTemplate = restTemplate;
+        this.ollamaConfig = ollamaConfig;
+        this.performanceLogger = performanceLogger;
+    }
 
     private final RestTemplate restTemplate;
     private final OllamaConfig ollamaConfig;

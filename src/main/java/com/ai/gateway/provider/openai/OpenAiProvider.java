@@ -6,8 +6,8 @@ import com.ai.gateway.dto.Usage;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.observability.PerformanceLogger;
 import com.ai.gateway.provider.AIProvider;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import com.ai.gateway.config.OpenAIConfig;
 import com.ai.gateway.provider.openai.dto.OpenAIRequest;
@@ -18,8 +18,16 @@ import org.springframework.web.client.RestClient;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OpenAiProvider implements AIProvider {
+
+    public OpenAiProvider(
+            @Qualifier("openAiRestClient") RestClient restClient,
+            OpenAIConfig openAIConfig,
+            PerformanceLogger performanceLogger) {
+        this.restClient = restClient;
+        this.openAIConfig = openAIConfig;
+        this.performanceLogger = performanceLogger;
+    }
 
     private final RestClient restClient;
     private final OpenAIConfig openAIConfig;

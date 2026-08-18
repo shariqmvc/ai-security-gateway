@@ -1,5 +1,7 @@
 package com.ai.gateway.failover;
 
+import com.ai.gateway.config.ProviderRequestBudgetExceededException;
+
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -24,6 +26,10 @@ public final class ProviderFailureClassifier {
         Throwable current = failure;
 
         while (current != null) {
+            if (current instanceof ProviderRequestBudgetExceededException) {
+                return ProviderFailureCategory.REQUEST_BUDGET_EXHAUSTED;
+            }
+
             if (current instanceof ResourceAccessException) {
                 return isTimeout(current)
                         ? ProviderFailureCategory.TIMEOUT

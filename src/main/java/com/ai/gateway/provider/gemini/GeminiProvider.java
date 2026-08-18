@@ -11,7 +11,7 @@ import com.ai.gateway.provider.gemini.dto.GeminiContent;
 import com.ai.gateway.provider.gemini.dto.GeminiPart;
 import com.ai.gateway.provider.gemini.dto.GeminiRequest;
 import com.ai.gateway.provider.gemini.dto.GeminiResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -20,8 +20,16 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class GeminiProvider implements AIProvider {
+
+    public GeminiProvider(
+            @Qualifier("geminiRestTemplate") RestTemplate restTemplate,
+            GeminiConfig geminiConfig,
+            PerformanceLogger performanceLogger) {
+        this.restTemplate = restTemplate;
+        this.geminiConfig = geminiConfig;
+        this.performanceLogger = performanceLogger;
+    }
 
     private final RestTemplate restTemplate;
     private final GeminiConfig geminiConfig;

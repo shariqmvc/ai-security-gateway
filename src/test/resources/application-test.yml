@@ -61,12 +61,24 @@ gateway:
     http:
       connect-timeout: 2s
       read-timeout: 5s
+      providers:
+        GEMINI:
+          connect-timeout: 1s
+          read-timeout: 2s
+        OPENAI:
+          connect-timeout: 1s
+          read-timeout: 2s
+        OLLAMA:
+          connect-timeout: 1s
+          read-timeout: 2s
   rate-limit:
     requests-per-minute: 60
   routing:
     failover:
       enabled: true
       max-attempts: 2
+      request-time-budget: 10s
+      minimum-fallback-budget: 250ms
       providers:
         GEMINI:
           - OPENAI

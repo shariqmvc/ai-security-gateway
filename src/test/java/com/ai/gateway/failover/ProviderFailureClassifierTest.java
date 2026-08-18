@@ -1,5 +1,6 @@
 package com.ai.gateway.failover;
 
+import com.ai.gateway.config.ProviderRequestBudgetExceededException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -73,4 +74,16 @@ class ProviderFailureClassifierTest {
                 ProviderFailureClassifier.classify(failure));
         assertFalse(ProviderFailureClassifier.isRetryable(failure));
     }
+    @Test
+    void classifiesRequestBudgetExhaustionAsNonRetryable() {
+        ProviderRequestBudgetExceededException failure =
+                new ProviderRequestBudgetExceededException("budget exhausted");
+
+        assertEquals(
+                ProviderFailureCategory.REQUEST_BUDGET_EXHAUSTED,
+                ProviderFailureClassifier.classify(failure));
+
+        assertFalse(ProviderFailureClassifier.isRetryable(failure));
+    }
+
 }

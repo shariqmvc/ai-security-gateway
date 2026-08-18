@@ -1,23 +1,21 @@
 package com.ai.gateway.config;
 
+import com.ai.gateway.enums.Provider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration
 public class RestClientConfig {
 
-    @Bean
-    public RestClient restClient(ProviderHttpProperties properties) {
-        SimpleClientHttpRequestFactory factory =
-                new SimpleClientHttpRequestFactory();
-
-        factory.setConnectTimeout(properties.getConnectTimeout());
-        factory.setReadTimeout(properties.getReadTimeout());
-
+    @Bean("openAiRestClient")
+    public RestClient openAiRestClient(
+            ProviderHttpProperties properties) {
         return RestClient.builder()
-                .requestFactory(factory)
+                .requestFactory(
+                        new ProviderHttpRequestFactory(
+                                Provider.OPENAI,
+                                properties.forProvider(Provider.OPENAI)))
                 .build();
     }
 }

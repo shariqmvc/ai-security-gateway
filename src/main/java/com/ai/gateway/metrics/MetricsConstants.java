@@ -44,6 +44,9 @@ public final class MetricsConstants {
 
     public static final String ROUTING_FAILOVER_CIRCUIT_OPEN =
             "ROUTING_FAILOVER_CIRCUIT_OPEN";
+
+    public static final String ROUTING_FAILOVER_BUDGET_EXHAUSTED =
+            "ROUTING_FAILOVER_BUDGET_EXHAUSTED";
     public static final String ROUTING_POLICY_BASED =
             "ROUTING_POLICY_BASED";
 

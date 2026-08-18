@@ -9,5 +9,6 @@ public enum ProviderFailureCategory {
     RATE_LIMITED,
     CLIENT_ERROR,
     SERVER_ERROR,
-    UNKNOWN
+    UNKNOWN,
+    REQUEST_BUDGET_EXHAUSTED
 }

@@ -2,6 +2,7 @@ package com.ai.gateway.failover;
 
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.config.ProviderRequestBudget;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.metrics.MetricsConstants;
@@ -54,6 +55,15 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
     @Override
     public AIResponse execute(AIRequest request) {
+        ProviderRequestBudget.start(properties.getRequestTimeBudget());
+        try {
+            return executeWithinBudget(request);
+        } finally {
+            ProviderRequestBudget.clear();
+        }
+    }
+
+    private AIResponse executeWithinBudget(AIRequest request) {
 
         if (request == null || request.getProvider() == null) {
             throw new IllegalArgumentException(
@@ -174,6 +184,29 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         int fallbackAttempts = 0;
 
         for (Provider fallback : fallbacks) {
+
+            long remainingBudgetMs =
+                    ProviderRequestBudget.remainingMillis();
+
+            long minimumFallbackBudgetMs =
+                    properties.getMinimumFallbackBudget() == null
+                            ? 0L
+                            : Math.max(0L, properties.getMinimumFallbackBudget().toMillis());
+
+            if (ProviderRequestBudget.isActive()
+                    && remainingBudgetMs < minimumFallbackBudgetMs) {
+
+                metricsService.increment(
+                        MetricsConstants.ROUTING_FAILOVER_BUDGET_EXHAUSTED);
+
+                log.info(
+                        "FAILOVER_BUDGET_EXHAUSTED requestId={} remainingBudgetMs={} minimumFallbackBudgetMs={}",
+                        requestId(),
+                        remainingBudgetMs,
+                        minimumFallbackBudgetMs);
+
+                break;
+            }
 
             /*
              * The configured fallback list may contain:
