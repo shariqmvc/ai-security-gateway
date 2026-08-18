@@ -4,7 +4,10 @@ import com.ai.gateway.routing.scoring.CandidateScoreComponent;
 import com.ai.gateway.routing.scoring.CandidateScoreDimension;
 import com.ai.gateway.routing.scoring.ScoredCandidate;
 import com.ai.gateway.routing.selection.CandidateSelectionEngine;
+import com.ai.gateway.routing.selection.CandidateSelectionExplanation;
 import com.ai.gateway.routing.selection.CandidateSelectionResult;
+import com.ai.gateway.routing.selection.RoutingSelectionMode;
+import com.ai.gateway.routing.selection.RoutingSelectionRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -70,15 +73,89 @@ public class CandidateSelectionEngineImpl implements CandidateSelectionEngine {
                     "At least one non-null scored candidate is required.");
         }
 
+        return select(validCandidates, RoutingSelectionRequest.single());
+    }
+
+    @Override
+    public CandidateSelectionResult select(
+            List<ScoredCandidate> candidates,
+            RoutingSelectionRequest request) {
+
+        if (request == null) {
+            throw new IllegalArgumentException("Routing selection request is required.");
+        }
+        List<ScoredCandidate> validCandidates = nonNullCandidates(candidates);
+        if (validCandidates.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "At least one non-null scored candidate is required.");
+        }
+
         List<ScoredCandidate> optimized = optimizeCandidates(validCandidates);
         List<ScoredCandidate> ranked = rank(optimized);
-
         if (ranked.isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one non-null scored candidate is required.");
         }
 
-        return new CandidateSelectionResult(ranked.get(0), ranked);
+        return switch (request.mode()) {
+            case SINGLE -> singleResult(ranked);
+            case TOP_N -> topNResult(ranked, request.topN());
+            case PRIMARY_ESCALATION -> primaryEscalationResult(ranked);
+        };
+    }
+
+    private CandidateSelectionResult singleResult(List<ScoredCandidate> ranked) {
+        ScoredCandidate selected = ranked.get(0);
+        boolean tie = ranked.size() > 1
+                && Math.abs(selected.totalScore() - ranked.get(1).totalScore()) <= SCORE_EPSILON;
+        String criterion = tie ? tieBreakCriterion(selected, ranked.get(1)) : null;
+        return new CandidateSelectionResult(
+                selected,
+                ranked,
+                List.of(selected),
+                new CandidateSelectionExplanation(
+                        RoutingSelectionMode.SINGLE,
+                        tie ? "DETERMINISTIC_TIE_BREAK" : "HIGHEST_UTILITY",
+                        tie,
+                        criterion));
+    }
+
+    private CandidateSelectionResult topNResult(
+            List<ScoredCandidate> ranked,
+            int requestedTopN) {
+        int limit = Math.min(requestedTopN, ranked.size());
+        List<ScoredCandidate> selected = List.copyOf(ranked.subList(0, limit));
+        return new CandidateSelectionResult(
+                selected.get(0),
+                ranked,
+                selected,
+                new CandidateSelectionExplanation(
+                        RoutingSelectionMode.TOP_N,
+                        "TOP_N_UTILITY",
+                        false,
+                        null));
+    }
+
+    private CandidateSelectionResult primaryEscalationResult(List<ScoredCandidate> ranked) {
+        List<ScoredCandidate> selected = List.copyOf(ranked.subList(0, Math.min(2, ranked.size())));
+        return new CandidateSelectionResult(
+                selected.get(0),
+                ranked,
+                selected,
+                new CandidateSelectionExplanation(
+                        RoutingSelectionMode.PRIMARY_ESCALATION,
+                        selected.size() > 1 ? "PRIMARY_AND_ESCALATION" : "PRIMARY_ONLY_NO_ESCALATION",
+                        false,
+                        null));
+    }
+
+    private String tieBreakCriterion(ScoredCandidate winner, ScoredCandidate runnerUp) {
+        double winnerPolicy = normalized(winner, CandidateScoreDimension.POLICY_PREFERENCE);
+        double runnerPolicy = normalized(runnerUp, CandidateScoreDimension.POLICY_PREFERENCE);
+        if (Math.abs(winnerPolicy - runnerPolicy) > SCORE_EPSILON) {
+            return "POLICY_PREFERENCE";
+        }
+        return "ORIGINAL_ORDER";
     }
 
     /**
@@ -100,9 +177,18 @@ public class CandidateSelectionEngineImpl implements CandidateSelectionEngine {
             return List.of();
         }
 
-        List<ScoredCandidate> paretoReduced = valid;
-        if (paretoEnabled && valid.size() > 1 && valid.size() <= paretoMaxCandidates) {
-            paretoReduced = paretoFrontier(valid);
+        List<ScoredCandidate> paretoInput = valid;
+        if (paretoEnabled && valid.size() > paretoMaxCandidates) {
+            // Deterministic approximation: pre-reduce by the already computed
+            // aggregate score before the bounded quadratic Pareto stage. This
+            // preserves the hot-path bound but is not an exact global Pareto
+            // frontier for candidate sets larger than the configured bound.
+            paretoInput = topK(valid, paretoMaxCandidates);
+        }
+
+        List<ScoredCandidate> paretoReduced = paretoInput;
+        if (paretoEnabled && paretoInput.size() > 1) {
+            paretoReduced = paretoFrontier(paretoInput);
         }
 
         if (topK <= 0 || paretoReduced.size() <= topK) {
