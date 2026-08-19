@@ -111,4 +111,70 @@ public class PerformanceLogger {
                 gatewayOverheadMs,
                 outcome);
     }
+
+    public void providerConcurrencyWait(
+            UUID requestId,
+            String provider,
+            int maxConcurrent,
+            long waitBudgetMs,
+            int active) {
+
+        LOG.info(
+                "event=PROVIDER_CONCURRENCY_WAIT requestId={} provider={} maxConcurrent={} waitBudgetMs={} active={}",
+                requestId,
+                provider,
+                maxConcurrent,
+                waitBudgetMs,
+                active
+        );
+    }
+
+    public void providerConcurrencyAcquired(
+            UUID requestId,
+            String provider,
+            int maxConcurrent,
+            int active,
+            long waitMs) {
+
+        LOG.info(
+                "event=PROVIDER_CONCURRENCY_ACQUIRED requestId={} provider={} maxConcurrent={} active={} waitMs={}",
+                requestId,
+                provider,
+                maxConcurrent,
+                active,
+                waitMs
+        );
+    }
+
+    public void providerConcurrencyReleased(
+            UUID requestId,
+            String provider,
+            int maxConcurrent,
+            int active) {
+
+        LOG.info(
+                "event=PROVIDER_CONCURRENCY_RELEASED requestId={} provider={} maxConcurrent={} active={}",
+                requestId,
+                provider,
+                maxConcurrent,
+                active
+        );
+    }
+
+    public void providerConcurrencyRejected(
+            UUID requestId,
+            String provider,
+            int maxConcurrent,
+            long waitMs,
+            int active) {
+
+        LOG.warn(
+                "event=PROVIDER_CONCURRENCY_REJECTED requestId={} provider={} maxConcurrent={} waitMs={} active={}",
+                requestId,
+                provider,
+                maxConcurrent,
+                waitMs,
+                active
+        );
+    }
 }

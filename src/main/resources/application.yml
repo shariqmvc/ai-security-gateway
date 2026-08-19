@@ -63,26 +63,37 @@ security:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
   provider:
+
     http:
       connect-timeout: ${GATEWAY_PROVIDER_CONNECT_TIMEOUT:5s}
       read-timeout: ${GATEWAY_PROVIDER_READ_TIMEOUT:30s}
+
       providers:
         GEMINI:
           connect-timeout: ${GATEWAY_GEMINI_CONNECT_TIMEOUT:5s}
           read-timeout: ${GATEWAY_GEMINI_READ_TIMEOUT:15s}
+
         OPENAI:
           connect-timeout: ${GATEWAY_OPENAI_CONNECT_TIMEOUT:5s}
           read-timeout: ${GATEWAY_OPENAI_READ_TIMEOUT:30s}
+
         OLLAMA:
           connect-timeout: ${GATEWAY_OLLAMA_CONNECT_TIMEOUT:2s}
-          read-timeout: ${GATEWAY_OLLAMA_READ_TIMEOUT:30s}
+          read-timeout: ${GATEWAY_OLLAMA_READ_TIMEOUT:60s}
+
+    concurrency:
+      providers:
+        OLLAMA:
+          max-concurrent: ${GATEWAY_OLLAMA_MAX_CONCURRENT:0}
+          acquire-timeout: ${GATEWAY_OLLAMA_CONCURRENCY_ACQUIRE_TIMEOUT:0s}
+
   rate-limit:
     requests-per-minute: 60
   routing:
     failover:
-      enabled: ${GATEWAY_ROUTING_FAILOVER_ENABLED:true}
+      enabled: ${GATEWAY_ROUTING_FAILOVER_ENABLED:false}
       max-attempts: ${GATEWAY_ROUTING_FAILOVER_MAX_ATTEMPTS:2}
-      request-time-budget: ${GATEWAY_ROUTING_FAILOVER_REQUEST_TIME_BUDGET:45s}
+      request-time-budget: ${GATEWAY_ROUTING_FAILOVER_REQUEST_TIME_BUDGET:75s}
       minimum-fallback-budget: ${GATEWAY_ROUTING_FAILOVER_MINIMUM_FALLBACK_BUDGET:1s}
       circuit-breaker:
         enabled: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_ENABLED:true}

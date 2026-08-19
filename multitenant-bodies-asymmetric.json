@@ -1,0 +1,16 @@
+{
+  "tenantA": {
+    "prompt": "Return exactly: OK",
+    "provider": "OLLAMA",
+    "model": "llama3.1:8b",
+    "extensiveResearch": false,
+    "routingPriority": "BALANCED"
+  },
+  "tenantB": {
+    "prompt": "Write a detailed technical explanation of distributed systems covering consistency, replication, consensus, partition tolerance, failure handling, observability, and practical implementation considerations. Produce approximately 1500 words.",
+    "provider": "OLLAMA",
+    "model": "llama3.1:8b",
+    "extensiveResearch": false,
+    "routingPriority": "BALANCED"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "tenantA": {
+    "prompt": "checking if prompt works fine. return the same text",
+    "provider": "OLLAMA",
+    "model": "llama3.1:8b",
+    "extensiveResearch": false,
+    "routingPriority": "BALANCED"
+  },
+  "tenantB": {
+    "prompt": "checking if prompt works fine. return the same text",
+    "provider": "OLLAMA",
+    "model": "llama3.1:8b",
+    "extensiveResearch": false,
+    "routingPriority": "BALANCED"
+  }
+}
