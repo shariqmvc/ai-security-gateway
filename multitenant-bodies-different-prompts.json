@@ -1,0 +1,16 @@
+{
+  "tenantA": {
+    "prompt": "Explain what a database transaction is in 3 concise sentences.",
+    "provider": "OLLAMA",
+    "model": "llama3.1:8b",
+    "extensiveResearch": false,
+    "routingPriority": "BALANCED"
+  },
+  "tenantB": {
+    "prompt": "Write a short Python function that checks whether a number is prime.",
+    "provider": "OLLAMA",
+    "model": "llama3.1:8b",
+    "extensiveResearch": false,
+    "routingPriority": "BALANCED"
+  }
+}

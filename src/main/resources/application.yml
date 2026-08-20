@@ -62,6 +62,9 @@ security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
+  tenant-schema:
+    migration:
+      reconcile-on-startup: ${GATEWAY_TENANT_SCHEMA_RECONCILE_ON_STARTUP:true}
   provider:
 
     http:
@@ -149,3 +152,11 @@ gateway:
 
     unity:
       enabled: false
+
+rag:
+  enabled: ${RAG_ENABLED:true}
+  defaults:
+    vector-store: ${RAG_VECTOR_STORE:POSTGRES}
+    chunking-strategy: ${RAG_CHUNKING_STRATEGY:TOKEN_AWARE}
+    retrieval-strategy: ${RAG_RETRIEVAL_STRATEGY:HYBRID}
+    top-k: ${RAG_TOP_K:5}

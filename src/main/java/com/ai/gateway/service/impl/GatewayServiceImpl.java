@@ -432,6 +432,20 @@ public class GatewayServiceImpl implements GatewayService {
                     routingDecision.model()
             );
 
+            var metadata = routingDecision.metadata();
+            performanceLogger.routingDecision(
+                    requestId,
+                    routingDecision.strategy() == null ? null : routingDecision.strategy().name(),
+                    routingDecision.provider() == null ? null : routingDecision.provider().name(),
+                    routingDecision.model(),
+                    metadata == null ? null : metadata.selectedScore(),
+                    metadata == null ? null : metadata.selectedRank(),
+                    metadata == null ? null : metadata.candidateCount(),
+                    metadata == null ? null : metadata.selectionReason(),
+                    metadata == null || metadata.explanation() == null
+                            ? null
+                            : String.join(",", metadata.explanation().appliedSignals()));
+
             metricsService.incrementProviderRequest(
                     selectedProvider);
 

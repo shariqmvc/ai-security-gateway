@@ -84,16 +84,23 @@ public class RoutingDecisionIntelligenceService implements RoutingDecisionIntell
     public RoutingDecisionExplanation explain(RoutingDecisionContext context, int candidateCount, String reason) {
         List<String> signals = new ArrayList<>(List.of(
                 "cost", "latency", "availability", "policy-preference",
-                "runtime-health", "failure-aware-routing", "optimization"));
+                "runtime-health", "failure-aware-routing", "optimization",
+                "deterministic-scoring", "candidate-ranking"));
         if (context != null && context.routingPriority() != RoutingPriority.BALANCED) {
             signals.add("routing-priority:" + context.routingPriority());
         }
         if (context != null && context.extensiveResearchEnabled()) {
             signals.add("unity:extensive-research");
         }
+        String summary = reason == null || reason.isBlank()
+                ? "DETERMINISTIC_ROUTING"
+                : reason;
+        if (candidateCount > 0) {
+            summary = summary + " candidates=" + candidateCount;
+        }
         return new RoutingDecisionExplanation(
-                reason, signals, List.of(),
-                context == null ? List.of() : context.requiredCapabilities().stream().toList());
+                summary, signals, List.of(),
+                context == null ? List.of() : context.requiredCapabilities().stream().sorted().toList());
     }
 
     private RoutingPriority parsePriority(String value) {

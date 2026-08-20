@@ -47,11 +47,20 @@ public class TenantSchemaRoutingService {
      * a tenant id and is safe for admin/concurrency flows where the request
      * ThreadLocal context is not present.
      */
-    @Transactional(readOnly = true)
     public void useTenantSchema(UUID tenantId) {
         if (tenantId == null) {
             throw new IllegalArgumentException(
                     "Tenant ID cannot be null.");
+        }
+
+        /*
+         * SET LOCAL is transaction-scoped. This method must participate in
+         * the caller's transaction; starting a separate transaction here
+         * would make the search_path disappear before the repository query.
+         */
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException(
+                    "Tenant schema routing requires an active transaction.");
         }
 
         /*

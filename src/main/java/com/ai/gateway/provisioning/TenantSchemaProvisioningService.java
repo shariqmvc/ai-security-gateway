@@ -32,7 +32,17 @@ public class TenantSchemaProvisioningService {
         return schemaName;
     }
 
-    private void migrateSchema(String schemaName) {
+    public void migrateSchema(String schemaName) {
+
+        if (schemaName == null || schemaName.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Tenant schema name must not be null or blank.");
+        }
+
+        if (!schemaName.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+            throw new IllegalArgumentException(
+                    "Invalid tenant schema name: " + schemaName);
+        }
 
         Flyway flyway = Flyway.configure()
                 .dataSource(dataSource)

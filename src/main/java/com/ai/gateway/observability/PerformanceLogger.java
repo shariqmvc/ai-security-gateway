@@ -77,6 +77,29 @@ public class PerformanceLogger {
                 attempt);
     }
 
+    public void routingDecision(
+            UUID requestId,
+            String strategy,
+            String provider,
+            String model,
+            Double selectedScore,
+            Integer selectedRank,
+            Integer candidateCount,
+            String selectionReason,
+            String routingSignals) {
+        LOG.info(
+                "event=ROUTING_DECISION requestId={} strategy={} provider={} model={} selectedScore={} selectedRank={} candidateCount={} selectionReason={} signals={}",
+                requestId,
+                strategy,
+                provider,
+                model,
+                selectedScore,
+                selectedRank,
+                candidateCount,
+                selectionReason,
+                routingSignals);
+    }
+
     public void requestCompleted(
             UUID requestId,
             long totalLatencyMs,

@@ -6,6 +6,7 @@ import lombok.*;
 import java.util.Collections;
 import java.util.Set;
 import java.math.BigDecimal;
+import com.ai.gateway.rag.api.RagRequest;
 
 @Setter
 @Getter
@@ -51,5 +52,9 @@ public class ChatRequest {
 
    /** Optional remaining aggregate workflow budget supplied by orchestration. */
    private BigDecimal remainingWorkflowBudget;
+
+   /** Optional first-class RAG request configuration. */
+   @Builder.Default
+   private RagRequest rag = RagRequest.builder().build();
 
 }

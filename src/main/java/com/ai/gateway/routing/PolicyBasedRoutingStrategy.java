@@ -471,11 +471,12 @@ public class PolicyBasedRoutingStrategy
                     rankedCandidates.get(index);
 
             rankedMetadata.add(
-                    new RoutingDecisionMetadata.RoutingCandidateMetadata(
+                    RoutingDecisionMetadata.RoutingCandidateMetadata.from(
                             candidate.candidate().provider().name(),
                             candidate.candidate().model(),
                             candidate.totalScore(),
-                            index + 1));
+                            index + 1,
+                            candidate.components()));
         }
 
         RoutingDecisionExplanation explanation =

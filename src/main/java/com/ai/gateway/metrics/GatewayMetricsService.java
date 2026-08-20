@@ -84,12 +84,23 @@ public class GatewayMetricsService {
         /*
          * Provider failover observability
          */
+        /*
+         * Provider failover observability
+         */
         counters.put(
                 MetricsConstants.ROUTING_FAILOVER_ATTEMPTS,
                 new AtomicLong());
 
         counters.put(
                 MetricsConstants.ROUTING_FAILOVER_SUCCESS,
+                new AtomicLong());
+
+        counters.put(
+                MetricsConstants.ROUTING_FAILOVER_CIRCUIT_OPEN,
+                new AtomicLong());
+
+        counters.put(
+                MetricsConstants.ROUTING_FAILOVER_BUDGET_EXHAUSTED,
                 new AtomicLong());
     }
 
@@ -181,6 +192,25 @@ public class GatewayMetricsService {
                 .totalLatencyMs(latency)
 
                 .averageLatencyMs(avg)
+                .routingFailoverAttempts(
+                        counters.get(
+                                        MetricsConstants.ROUTING_FAILOVER_ATTEMPTS)
+                                .get())
+
+                .routingFailoverSuccess(
+                        counters.get(
+                                        MetricsConstants.ROUTING_FAILOVER_SUCCESS)
+                                .get())
+
+                .routingFailoverCircuitOpen(
+                        counters.get(
+                                        MetricsConstants.ROUTING_FAILOVER_CIRCUIT_OPEN)
+                                .get())
+
+                .routingFailoverBudgetExhausted(
+                        counters.get(
+                                        MetricsConstants.ROUTING_FAILOVER_BUDGET_EXHAUSTED)
+                                .get())
 
                 .build();
     }

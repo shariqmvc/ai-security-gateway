@@ -57,6 +57,9 @@ security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
+  tenant-schema:
+    migration:
+      reconcile-on-startup: ${GATEWAY_TENANT_SCHEMA_RECONCILE_ON_STARTUP:true}
   provider:
     http:
       connect-timeout: 2s

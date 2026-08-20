@@ -30,4 +30,10 @@ public class GatewayMetrics {
 
     private long ollamaRequests;
 
+    private long routingFailoverAttempts;
+    private long routingFailoverSuccess;
+    private long routingFailoverCircuitOpen;
+    private long routingFailoverBudgetExhausted;
+
+
 }
