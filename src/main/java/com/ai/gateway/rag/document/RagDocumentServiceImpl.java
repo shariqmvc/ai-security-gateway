@@ -5,9 +5,9 @@ import com.ai.gateway.rag.document.dto.DocumentResponse;
 import com.ai.gateway.rag.knowledge.KnowledgeBase;
 import com.ai.gateway.rag.knowledge.KnowledgeBaseRepository;
 import com.ai.gateway.rag.knowledge.KnowledgeBaseStatus;
+import com.ai.gateway.rag.knowledge.KnowledgeBaseNotFoundException;
 import com.ai.gateway.tenant.TenantAccessGuard;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +36,7 @@ public class RagDocumentServiceImpl implements RagDocumentService {
 
         tenantSchemaRoutingService.useTenantSchema(tenantId);
         KnowledgeBase knowledgeBase = knowledgeBaseRepository.findById(knowledgeBaseId)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Knowledge base not found: " + knowledgeBaseId));
+                .orElseThrow(() -> new KnowledgeBaseNotFoundException(knowledgeBaseId));
 
         if (knowledgeBase.getStatus() != KnowledgeBaseStatus.ACTIVE) {
             throw new IllegalStateException(
@@ -67,10 +66,7 @@ public class RagDocumentServiceImpl implements RagDocumentService {
     public List<DocumentResponse> list(UUID tenantId, UUID knowledgeBaseId) {
         requireTenant(tenantId);
         tenantSchemaRoutingService.useTenantSchema(tenantId);
-        if (!knowledgeBaseRepository.existsById(knowledgeBaseId)) {
-            throw new EntityNotFoundException(
-                    "Knowledge base not found: " + knowledgeBaseId);
-        }
+        ensureKnowledgeBase(knowledgeBaseId);
         return repository.findByKnowledgeBase_IdOrderByCreatedAtDesc(knowledgeBaseId)
                 .stream()
                 .map(this::toResponse)
@@ -79,12 +75,24 @@ public class RagDocumentServiceImpl implements RagDocumentService {
 
     @Override
     @Transactional(readOnly = true)
-    public DocumentResponse get(UUID tenantId, UUID documentId) {
+    public DocumentResponse get(UUID tenantId, UUID knowledgeBaseId, UUID documentId) {
         requireTenant(tenantId);
         tenantSchemaRoutingService.useTenantSchema(tenantId);
-        return toResponse(repository.findById(documentId)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Document not found: " + documentId)));
+        ensureKnowledgeBase(knowledgeBaseId);
+
+        RagDocument document = repository.findById(documentId)
+                .orElseThrow(() -> new DocumentNotFoundException(documentId));
+
+        if (!knowledgeBaseId.equals(document.getKnowledgeBase().getId())) {
+            throw new DocumentNotFoundException(documentId);
+        }
+
+        return toResponse(document);
+    }
+
+    private KnowledgeBase ensureKnowledgeBase(UUID knowledgeBaseId) {
+        return knowledgeBaseRepository.findById(knowledgeBaseId)
+                .orElseThrow(() -> new KnowledgeBaseNotFoundException(knowledgeBaseId));
     }
 
     private void requireTenant(UUID tenantId) {

@@ -10,5 +10,5 @@ public interface RagDocumentService {
     DocumentResponse register(UUID tenantId, UUID knowledgeBaseId,
                               DocumentRegistrationRequest request);
     List<DocumentResponse> list(UUID tenantId, UUID knowledgeBaseId);
-    DocumentResponse get(UUID tenantId, UUID documentId);
+    DocumentResponse get(UUID tenantId, UUID knowledgeBaseId, UUID documentId);
 }

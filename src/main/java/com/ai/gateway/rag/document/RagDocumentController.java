@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class RagDocumentController {
 
     private final RagDocumentService service;
+    private final RagDocumentUploadService uploadService;
     private final TenantAccessGuard tenantAccessGuard;
 
     @PostMapping
@@ -30,11 +32,32 @@ public class RagDocumentController {
                 request);
     }
 
+    @PostMapping(value = "/upload", consumes = "multipart/form-data")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public DocumentResponse upload(
+            @PathVariable UUID knowledgeBaseId,
+            @RequestPart("file") MultipartFile file) {
+        return uploadService.upload(
+                tenantAccessGuard.requireAuthenticatedTenant(),
+                knowledgeBaseId,
+                file);
+    }
+
     @GetMapping
     public List<DocumentResponse> list(
             @PathVariable UUID knowledgeBaseId) {
         return service.list(
                 tenantAccessGuard.requireAuthenticatedTenant(),
                 knowledgeBaseId);
+    }
+
+    @GetMapping("/{documentId}")
+    public DocumentResponse get(
+            @PathVariable UUID knowledgeBaseId,
+            @PathVariable UUID documentId) {
+        return service.get(
+                tenantAccessGuard.requireAuthenticatedTenant(),
+                knowledgeBaseId,
+                documentId);
     }
 }

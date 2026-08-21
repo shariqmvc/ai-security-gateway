@@ -8,6 +8,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/db_gateway
     username: postgres
     password: shariq
+  servlet:
+    multipart:
+      max-file-size: ${RAG_INGESTION_MAX_FILE_SIZE:20MB}
+      max-request-size: ${RAG_INGESTION_MAX_FILE_SIZE:20MB}
   config:
     import: classpath:firewall-patterns.yml
 
@@ -160,3 +164,20 @@ rag:
     chunking-strategy: ${RAG_CHUNKING_STRATEGY:TOKEN_AWARE}
     retrieval-strategy: ${RAG_RETRIEVAL_STRATEGY:HYBRID}
     top-k: ${RAG_TOP_K:5}
+  ingestion:
+    max-file-size-bytes: ${RAG_INGESTION_MAX_FILE_SIZE_BYTES:20971520}
+    max-extracted-characters: ${RAG_INGESTION_MAX_EXTRACTED_CHARACTERS:2000000}
+    chunk-size-tokens: ${RAG_INGESTION_CHUNK_SIZE_TOKENS:512}
+    chunk-overlap-tokens: ${RAG_INGESTION_CHUNK_OVERLAP_TOKENS:64}
+    max-chunks: ${RAG_INGESTION_MAX_CHUNKS:10000}
+    temp-directory: ${RAG_INGESTION_TEMP_DIRECTORY:${java.io.tmpdir}/aegisai-rag}
+    allowed-extensions:
+      - pdf
+      - docx
+      - md
+      - markdown
+      - txt
+      - html
+      - htm
+      - json
+      - csv
