@@ -49,6 +49,7 @@ class TenantOperationalContextSafetyTest {
         when(entityManager.createNativeQuery(anyString())).thenReturn(query);
 
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
             service.useTenantSchema(tenantId);
             verify(entityManager, times(1)).createNativeQuery(anyString());
@@ -59,10 +60,12 @@ class TenantOperationalContextSafetyTest {
                         TransactionSynchronization.STATUS_COMMITTED);
             }
         } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
             TransactionSynchronizationManager.clearSynchronization();
         }
 
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
             service.useTenantSchema(tenantId);
             verify(entityManager, times(2)).createNativeQuery(anyString());
@@ -72,6 +75,7 @@ class TenantOperationalContextSafetyTest {
                 synchronization.afterCompletion(
                         TransactionSynchronization.STATUS_COMMITTED);
             }
+            TransactionSynchronizationManager.setActualTransactionActive(false);
             TransactionSynchronizationManager.clearSynchronization();
         }
     }

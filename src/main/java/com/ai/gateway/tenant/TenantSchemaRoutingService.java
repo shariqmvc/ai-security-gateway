@@ -4,7 +4,6 @@ import com.ai.gateway.provisioning.TenantSchemaNameResolver;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -54,6 +53,26 @@ public class TenantSchemaRoutingService {
         }
 
         /*
+         * Validate authenticated-tenant authorization before checking the
+         * transaction boundary. A cross-tenant request must be rejected as an
+         * authorization failure even when the caller is outside a transaction.
+         */
+        UUID authenticatedTenantId = TenantContext.get();
+        String authenticatedSchema = TenantSchemaContext.get();
+
+        if (authenticatedTenantId == null && authenticatedSchema != null) {
+            throw new IllegalStateException(
+                    "Tenant schema context exists without an authenticated tenant.");
+        }
+
+        if (authenticatedTenantId != null
+                && !authenticatedTenantId.equals(tenantId)) {
+            throw new TenantAccessDeniedException(
+                    authenticatedTenantId,
+                    tenantId);
+        }
+
+        /*
          * SET LOCAL is transaction-scoped. This method must participate in
          * the caller's transaction; starting a separate transaction here
          * would make the search_path disappear before the repository query.
@@ -69,21 +88,7 @@ public class TenantSchemaRoutingService {
          * deterministic schema mapping before reusing it, but do not perform
          * another control-plane tenant SELECT on every quota/budget operation.
          */
-        UUID authenticatedTenantId = TenantContext.get();
-        String authenticatedSchema = TenantSchemaContext.get();
-
-        if (authenticatedTenantId == null && authenticatedSchema != null) {
-            throw new IllegalStateException(
-                    "Tenant schema context exists without an authenticated tenant.");
-        }
-
         if (authenticatedTenantId != null) {
-            if (!authenticatedTenantId.equals(tenantId)) {
-                throw new TenantAccessDeniedException(
-                        authenticatedTenantId,
-                        tenantId);
-            }
-
             if (authenticatedSchema == null || authenticatedSchema.isBlank()) {
                 throw new IllegalStateException(
                         "Authenticated tenant schema context is missing.");

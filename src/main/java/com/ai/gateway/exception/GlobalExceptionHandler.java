@@ -3,6 +3,7 @@ package com.ai.gateway.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import com.ai.gateway.tenant.TenantAccessDeniedException;
+import com.ai.gateway.rag.knowledge.KnowledgeBaseNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -30,6 +31,25 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.badRequest().body(response);
+    }
+
+
+    @ExceptionHandler(KnowledgeBaseNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleKnowledgeBaseNotFound(
+            KnowledgeBaseNotFoundException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

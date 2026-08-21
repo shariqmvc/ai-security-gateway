@@ -4,7 +4,6 @@ import com.ai.gateway.rag.knowledge.dto.KnowledgeBaseCreateRequest;
 import com.ai.gateway.rag.knowledge.dto.KnowledgeBaseResponse;
 import com.ai.gateway.tenant.TenantAccessGuard;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,8 +88,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private KnowledgeBase find(UUID id) {
         return repository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Knowledge base not found: " + id));
+                .orElseThrow(() -> new KnowledgeBaseNotFoundException(id));
     }
 
     private void requireTenant(UUID tenantId) {
