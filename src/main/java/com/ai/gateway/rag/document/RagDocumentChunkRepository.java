@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface RagDocumentChunkRepository extends JpaRepository<RagDocumentChunk, UUID> {
     List<RagDocumentChunk> findByDocumentIdOrderByChunkIndexAsc(UUID documentId);
+    long countByDocumentId(UUID documentId);
+    void deleteByDocumentId(UUID documentId);
 }

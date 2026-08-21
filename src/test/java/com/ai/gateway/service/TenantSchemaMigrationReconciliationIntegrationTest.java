@@ -109,12 +109,13 @@ class TenantSchemaMigrationReconciliationIntegrationTest {
         assertTrue(result.migratedTenants() >= 1);
 
         assertEquals(
-                2,
+                3,
                 flywayVersion(schemaName));
 
         assertTenantTableExists(schemaName, "knowledge_base");
         assertTenantTableExists(schemaName, "rag_document");
         assertTenantTableExists(schemaName, "rag_document_chunk");
+        assertTenantIndexExists(schemaName, "uk_rag_document_kb_checksum");
     }
 
     private int flywayVersion(String schema) {
@@ -148,6 +149,23 @@ class TenantSchemaMigrationReconciliationIntegrationTest {
                 1,
                 count,
                 "Expected table " + schema + "." + table);
+    }
+
+    private void assertTenantIndexExists(String schema, String indexName) {
+
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM pg_indexes
+                WHERE schemaname = ?
+                  AND indexname = ?
+                """,
+                Integer.class,
+                schema,
+                indexName);
+
+        assertEquals(1, count,
+                "Expected index " + schema + "." + indexName);
     }
 
     private void assertFalseTableExists(
