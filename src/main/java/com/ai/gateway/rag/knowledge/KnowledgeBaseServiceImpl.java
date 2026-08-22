@@ -45,7 +45,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .status(KnowledgeBaseStatus.ACTIVE)
                 .embeddingProvider(normalize(request.getEmbeddingProvider()))
                 .embeddingModel(normalize(request.getEmbeddingModel()))
-                .vectorStore(defaultIfBlank(request.getVectorStore(), "POSTGRES"))
+                .vectorStore(defaultIfBlank(request.getVectorStore(), "PGVECTOR"))
                 .chunkingStrategy(request.getChunkingStrategy() == null
                         ? ChunkingStrategy.TOKEN_AWARE
                         : request.getChunkingStrategy())

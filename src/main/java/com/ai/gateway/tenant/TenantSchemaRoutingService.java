@@ -139,29 +139,36 @@ public class TenantSchemaRoutingService {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             Object applied = TransactionSynchronizationManager.getResource(
                     APPLIED_SCHEMA_RESOURCE);
+
             if (schemaName.equals(applied)) {
                 return;
             }
 
-            // A resource with a different schema belongs to the current
-            // transaction only if it was explicitly registered by this
-            // service. Replace it before applying the requested schema.
-            // The resource is transaction-scoped and is removed again in
-            // afterCompletion below, so it cannot leak between pooled threads.
             if (applied != null) {
                 TransactionSynchronizationManager.unbindResource(
                         APPLIED_SCHEMA_RESOURCE);
             }
         } else if (TransactionSynchronizationManager.hasResource(
                 APPLIED_SCHEMA_RESOURCE)) {
-            // Defensive cleanup for threads that may have executed older
-            // versions of this service, which could leave the marker bound.
+
             TransactionSynchronizationManager.unbindResource(
                     APPLIED_SCHEMA_RESOURCE);
         }
 
+        /*
+         * Tenant schema comes first so tenant tables are resolved first.
+         *
+         * public is also required because PostgreSQL extensions such as
+         * pgvector install their types/operators in the public schema.
+         *
+         * This allows:
+         *   tenant_schema.rag_document
+         *   tenant_schema.rag_document_chunk
+         *   public.vector
+         *   public.<=>
+         */
         entityManager.createNativeQuery(
-                "SET LOCAL search_path TO \"" + schemaName + "\""
+                "SET LOCAL search_path TO \"" + schemaName + "\", public"
         ).executeUpdate();
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -175,6 +182,7 @@ public class TenantSchemaRoutingService {
                         public void afterCompletion(int status) {
                             if (TransactionSynchronizationManager.hasResource(
                                     APPLIED_SCHEMA_RESOURCE)) {
+
                                 TransactionSynchronizationManager.unbindResource(
                                         APPLIED_SCHEMA_RESOURCE);
                             }
