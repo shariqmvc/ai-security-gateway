@@ -3,6 +3,7 @@ package com.ai.gateway.rag.search;
 import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.rag.embedding.EmbeddingProvider;
 import com.ai.gateway.rag.embedding.EmbeddingProviderFactory;
+import com.ai.gateway.rag.embedding.RagEmbeddingProperties;
 import com.ai.gateway.rag.embedding.EmbeddingVector;
 import com.ai.gateway.rag.embedding.EmbeddingVectorFormatter;
 import com.ai.gateway.rag.knowledge.KnowledgeBase;
@@ -29,6 +30,7 @@ public class RagSearchServiceImpl implements RagSearchService {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final RagVectorSearchRepository vectorSearchRepository;
     private final EmbeddingProviderFactory providerFactory;
+    private final RagEmbeddingProperties embeddingProperties;
     private final TenantAccessGuard tenantAccessGuard;
     private final TenantSchemaRoutingService tenantSchemaRoutingService;
 
@@ -108,6 +110,9 @@ public class RagSearchServiceImpl implements RagSearchService {
         if (request.getTopK() < 1 || request.getTopK() > 100) {
             throw new BusinessException("topK must be between 1 and 100.");
         }
+        if (!Double.isFinite(request.getMinScore())) {
+            throw new BusinessException("minScore must be a finite number.");
+        }
         if (request.getMinScore() < -1.0d || request.getMinScore() > 1.0d) {
             throw new BusinessException("minScore must be between -1.0 and 1.0.");
         }
@@ -116,7 +121,7 @@ public class RagSearchServiceImpl implements RagSearchService {
     private String normalizeProvider(String provider) {
         String normalized = trimToNull(provider);
         return normalized == null
-                ? "OLLAMA"
+                ? embeddingProperties.getDefaultProvider().trim().toUpperCase(Locale.ROOT)
                 : normalized.toUpperCase(Locale.ROOT);
     }
 

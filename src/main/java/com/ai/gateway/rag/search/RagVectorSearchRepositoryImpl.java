@@ -44,7 +44,7 @@ public class RagVectorSearchRepositoryImpl implements RagVectorSearchRepository 
                 similarity
             FROM ranked_chunks
             WHERE similarity >= ?
-            ORDER BY similarity DESC
+            ORDER BY similarity DESC, document_id ASC, chunk_index ASC, id ASC
             LIMIT ?
             """;
 
