@@ -26,7 +26,7 @@ public class KnowledgeBaseCreateRequest {
     private String embeddingModel;
 
     @Builder.Default
-    private String vectorStore = "POSTGRES";
+    private String vectorStore = "PGVECTOR";
 
     @Builder.Default
     private ChunkingStrategy chunkingStrategy = ChunkingStrategy.TOKEN_AWARE;

@@ -5,6 +5,7 @@ import com.ai.gateway.rag.ingestion.DocumentChunker;
 import com.ai.gateway.rag.ingestion.DocumentParser;
 import com.ai.gateway.rag.ingestion.ParsedDocument;
 import com.ai.gateway.rag.ingestion.TextNormalizer;
+import com.ai.gateway.rag.embedding.RagDocumentEmbeddingProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -24,6 +25,7 @@ public class RagDocumentIngestionProcessor {
     private final DocumentParser documentParser;
     private final TextNormalizer textNormalizer;
     private final DocumentChunker documentChunker;
+    private final RagDocumentEmbeddingProcessor embeddingProcessor;
 
     @Async("gatewayAsyncExecutor")
     public void processAsync(UUID tenantId,
@@ -47,6 +49,8 @@ public class RagDocumentIngestionProcessor {
                     normalizedText,
                     parsed.detectedContentType(),
                     chunks);
+
+            embeddingProcessor.processAsync(tenantId, documentId);
 
             log.info(
                     "RAG document ingestion completed: tenantId={} documentId={} chunks={}",

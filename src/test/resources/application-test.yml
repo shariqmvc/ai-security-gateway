@@ -5,9 +5,11 @@ spring:
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
-    url: jdbc:postgresql://localhost:5432/db_gateway
-    username: postgres
-    password: shariq
+    # Integration tests use the same Docker PostgreSQL instance by default.
+    # Override DB_TEST_URL/DB_TEST_USERNAME/DB_TEST_PASSWORD for an isolated test database.
+    url: ${DB_TEST_URL:jdbc:postgresql://localhost:5433/aegisai}
+    username: ${DB_TEST_USERNAME:postgres}
+    password: ${DB_TEST_PASSWORD:postgres}
   config:
     import: classpath:firewall-patterns.yml
 

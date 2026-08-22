@@ -109,13 +109,18 @@ class TenantSchemaMigrationReconciliationIntegrationTest {
         assertTrue(result.migratedTenants() >= 1);
 
         assertEquals(
-                3,
+                5,
                 flywayVersion(schemaName));
 
         assertTenantTableExists(schemaName, "knowledge_base");
         assertTenantTableExists(schemaName, "rag_document");
         assertTenantTableExists(schemaName, "rag_document_chunk");
         assertTenantIndexExists(schemaName, "uk_rag_document_kb_checksum");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "embedding");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "embedding_provider");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "embedding_model");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "embedding_dimension");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "embedded_at");
     }
 
     private int flywayVersion(String schema) {
@@ -149,6 +154,30 @@ class TenantSchemaMigrationReconciliationIntegrationTest {
                 1,
                 count,
                 "Expected table " + schema + "." + table);
+    }
+
+    private void assertTenantColumnExists(
+            String schema,
+            String table,
+            String column) {
+
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = ?
+                  AND table_name = ?
+                  AND column_name = ?
+                """,
+                Integer.class,
+                schema,
+                table,
+                column);
+
+        assertEquals(
+                1,
+                count,
+                "Expected column " + schema + "." + table + "." + column);
     }
 
     private void assertTenantIndexExists(String schema, String indexName) {

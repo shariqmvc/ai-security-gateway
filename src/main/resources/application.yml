@@ -5,9 +5,11 @@ spring:
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
-    url: jdbc:postgresql://localhost:5432/db_gateway
-    username: postgres
-    password: shariq
+    # Local Java process -> Docker PostgreSQL published on localhost:5433.
+    # Override DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD when needed.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:aegisai}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
   servlet:
     multipart:
       max-file-size: ${RAG_INGESTION_MAX_FILE_SIZE:20MB}
@@ -160,10 +162,17 @@ gateway:
 rag:
   enabled: ${RAG_ENABLED:true}
   defaults:
-    vector-store: ${RAG_VECTOR_STORE:POSTGRES}
+    vector-store: ${RAG_VECTOR_STORE:PGVECTOR}
     chunking-strategy: ${RAG_CHUNKING_STRATEGY:TOKEN_AWARE}
     retrieval-strategy: ${RAG_RETRIEVAL_STRATEGY:HYBRID}
     top-k: ${RAG_TOP_K:5}
+  embedding:
+    enabled: ${RAG_EMBEDDING_ENABLED:true}
+    batch-size: ${RAG_EMBEDDING_BATCH_SIZE:8}
+    default-provider: ${RAG_EMBEDDING_DEFAULT_PROVIDER:OLLAMA}
+    ollama-model: ${RAG_OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    openai-model: ${RAG_OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    gemini-model: ${RAG_GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
   ingestion:
     max-file-size-bytes: ${RAG_INGESTION_MAX_FILE_SIZE_BYTES:20971520}
     max-extracted-characters: ${RAG_INGESTION_MAX_EXTRACTED_CHARACTERS:2000000}

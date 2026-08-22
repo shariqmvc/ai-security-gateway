@@ -2,6 +2,7 @@ package com.ai.gateway.rag.document;
 
 import com.ai.gateway.rag.document.dto.DocumentRegistrationRequest;
 import com.ai.gateway.rag.document.dto.DocumentResponse;
+import com.ai.gateway.rag.embedding.RagDocumentEmbeddingProcessor;
 import com.ai.gateway.tenant.TenantAccessGuard;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class RagDocumentController {
     private final RagDocumentService service;
     private final RagDocumentUploadService uploadService;
     private final TenantAccessGuard tenantAccessGuard;
+    private final RagDocumentEmbeddingProcessor embeddingProcessor;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -41,6 +43,17 @@ public class RagDocumentController {
                 tenantAccessGuard.requireAuthenticatedTenant(),
                 knowledgeBaseId,
                 file);
+    }
+
+    @PostMapping("/{documentId}/embed")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public DocumentResponse embed(
+            @PathVariable UUID knowledgeBaseId,
+            @PathVariable UUID documentId) {
+        UUID tenantId = tenantAccessGuard.requireAuthenticatedTenant();
+        DocumentResponse response = service.get(tenantId, knowledgeBaseId, documentId);
+        embeddingProcessor.processAsync(tenantId, documentId);
+        return response;
     }
 
     @GetMapping
