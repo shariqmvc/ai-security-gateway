@@ -1,4 +1,4 @@
-package com.ai.gateway.rag.search.dto;
+package com.ai.gateway.rag.augmentation;
 
 import lombok.Builder;
 import lombok.Value;
@@ -7,9 +7,10 @@ import java.util.UUID;
 
 @Value
 @Builder
-public class RagSearchResult {
+public class RagContextChunk {
     UUID id;
     UUID documentId;
+    UUID knowledgeBaseId;
     String fileName;
     int chunkIndex;
     String recordId;

@@ -21,6 +21,9 @@ import com.ai.gateway.metrics.GatewayMetricsService;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.quota.exception.QuotaExceededException;
+import com.ai.gateway.rag.api.RagRequest;
+import com.ai.gateway.rag.augmentation.RagAugmentationResult;
+import com.ai.gateway.rag.augmentation.RagAugmentationService;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
@@ -36,12 +39,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -93,6 +98,9 @@ class GatewayServiceImplTest {
     @Mock
     private GovernanceGuardrailService governanceGuardrailService;
 
+    @Mock
+    private RagAugmentationService ragAugmentationService;
+
     @InjectMocks
     private GatewayServiceImpl gatewayService;
 
@@ -136,6 +144,18 @@ class GatewayServiceImplTest {
         when(httpServletRequest.getAttribute(
                 AuthenticationConstants.AUTH_CONTEXT))
                 .thenReturn(authenticationContext);
+
+        lenient().when(ragAugmentationService.augment(
+                        any(UUID.class),
+                        anyString(),
+                        any(RagRequest.class)))
+                .thenAnswer(invocation -> RagAugmentationResult.builder()
+                        .augmentedPrompt(invocation.getArgument(1, String.class))
+                        .chunks(Collections.emptyList())
+                        .knowledgeBaseCount(0)
+                        .retrievedCount(0)
+                        .selectedCount(0)
+                        .build());
 
         RequestContextHolder.setRequestAttributes(
                 servletRequestAttributes);
@@ -206,6 +226,92 @@ class GatewayServiceImplTest {
                         anyLong(),
                         eq("hello"),
                         anyLong());
+    }
+
+
+    // ============================================================
+    // PHASE 4 - RAG AUGMENTATION
+    // ============================================================
+
+    @Test
+    void shouldPassRagAugmentedPromptToProvider() {
+
+        mockSuccessfulPreProviderFlow();
+        mockGeminiRouting();
+
+        RagRequest ragRequest = RagRequest.builder()
+                .enabled(true)
+                .knowledgeBaseIds(List.of(UUID.randomUUID().toString()))
+                .topK(3)
+                .minScore(0.70d)
+                .retrievalStrategy("VECTOR")
+                .build();
+
+        RagAugmentationResult augmentation =
+                RagAugmentationResult.builder()
+                        .augmentedPrompt("hello\n\nRETRIEVED KNOWLEDGE:\n<source file=\"policy.md\">\nCost guardrails apply.\n</source>")
+                        .chunks(Collections.emptyList())
+                        .knowledgeBaseCount(1)
+                        .retrievedCount(2)
+                        .selectedCount(1)
+                        .build();
+
+        when(ragAugmentationService.augment(
+                eq(tenantId),
+                eq("hello"),
+                eq(ragRequest)))
+                .thenReturn(augmentation);
+
+        AIResponse response = createSuccessfulAIResponse();
+        when(providerFailoverService.execute(any(AIRequest.class)))
+                .thenReturn(response);
+        when(restoreService.restore(eq("Hello from AI"), any(UUID.class)))
+                .thenReturn("Hello from AI");
+
+        ChatRequest request = ChatRequest.builder()
+                .prompt("hello")
+                .provider(Provider.GEMINI)
+                .model("gemini-test")
+                .rag(ragRequest)
+                .build();
+
+        gatewayService.process(request);
+
+        ArgumentCaptor<AIRequest> aiRequestCaptor =
+                ArgumentCaptor.forClass(AIRequest.class);
+
+        verify(providerFailoverService).execute(aiRequestCaptor.capture());
+
+        assertEquals(
+                augmentation.getAugmentedPrompt(),
+                aiRequestCaptor.getValue().getPrompt());
+
+        verify(ragAugmentationService).augment(
+                tenantId, "hello", ragRequest);
+    }
+
+    @Test
+    void shouldKeepMaskedPromptWhenRagIsDisabled() {
+
+        mockSuccessfulPreProviderFlow();
+        mockGeminiRouting();
+
+        AIResponse response = createSuccessfulAIResponse();
+        when(providerFailoverService.execute(any(AIRequest.class)))
+                .thenReturn(response);
+        when(restoreService.restore(eq("Hello from AI"), any(UUID.class)))
+                .thenReturn("Hello from AI");
+
+        ChatRequest request = createGeminiRequest();
+        gatewayService.process(request);
+
+        ArgumentCaptor<AIRequest> aiRequestCaptor =
+                ArgumentCaptor.forClass(AIRequest.class);
+        verify(providerFailoverService).execute(aiRequestCaptor.capture());
+
+        assertEquals("hello", aiRequestCaptor.getValue().getPrompt());
+        verify(ragAugmentationService).augment(
+                tenantId, "hello", request.getRag());
     }
 
 

@@ -2,6 +2,8 @@ package com.ai.gateway.rag.document;
 
 import com.ai.gateway.rag.ingestion.DocumentChunk;
 import com.ai.gateway.rag.ingestion.DocumentChunker;
+import com.ai.gateway.rag.ingestion.DocumentChunkerFactory;
+import com.ai.gateway.rag.knowledge.ChunkingStrategy;
 import com.ai.gateway.rag.ingestion.DocumentParser;
 import com.ai.gateway.rag.ingestion.ParsedDocument;
 import com.ai.gateway.rag.ingestion.TextNormalizer;
@@ -24,7 +26,7 @@ public class RagDocumentIngestionProcessor {
     private final RagDocumentIngestionPersistenceService persistenceService;
     private final DocumentParser documentParser;
     private final TextNormalizer textNormalizer;
-    private final DocumentChunker documentChunker;
+    private final DocumentChunkerFactory documentChunkerFactory;
     private final RagDocumentEmbeddingProcessor embeddingProcessor;
 
     @Async("gatewayAsyncExecutor")
@@ -41,6 +43,12 @@ public class RagDocumentIngestionProcessor {
                     fileName,
                     contentType);
             String normalizedText = textNormalizer.normalize(parsed.text());
+
+            ChunkingStrategy chunkingStrategy =
+                    persistenceService.loadChunkingStrategy(tenantId, documentId);
+            DocumentChunker documentChunker =
+                    documentChunkerFactory.resolve(chunkingStrategy);
+
             List<DocumentChunk> chunks = documentChunker.chunk(normalizedText);
 
             persistenceService.complete(

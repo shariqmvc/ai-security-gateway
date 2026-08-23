@@ -2,6 +2,7 @@ package com.ai.gateway.rag.knowledge;
 
 public enum ChunkingStrategy {
     TOKEN_AWARE,
+    RECORD_AWARE,
     FIXED,
     SEMANTIC,
     MARKDOWN_STRUCTURE,

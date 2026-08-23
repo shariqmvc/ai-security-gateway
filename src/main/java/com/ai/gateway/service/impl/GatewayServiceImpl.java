@@ -20,6 +20,8 @@ import com.ai.gateway.observability.RequestCorrelationFilter;
 import org.slf4j.MDC;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
+import com.ai.gateway.rag.augmentation.RagAugmentationResult;
+import com.ai.gateway.rag.augmentation.RagAugmentationService;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
@@ -65,6 +67,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final GatewayPostProviderPersistenceService postProviderPersistenceService;
 
     private final GovernanceGuardrailService governanceGuardrailService;
+
+    private final RagAugmentationService ragAugmentationService;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -121,12 +125,27 @@ public class GatewayServiceImpl implements GatewayService {
             performanceLogger.stage("PII_MASKING_AND_TOKEN_VAULT", requestId, elapsedMs(stageStart), "SUCCESS");
 
             stageStart = System.nanoTime();
+            RagAugmentationResult ragResult =
+                    ragAugmentationService.augment(
+                            auth.getTenantId(),
+                            maskedPrompt,
+                            request.getRag());
+            String providerPrompt = ragResult.getAugmentedPrompt();
+            performanceLogger.stage(
+                    "RAG_AUGMENTATION",
+                    requestId,
+                    elapsedMs(stageStart),
+                    request.getRag() != null && request.getRag().isEnabled()
+                            ? "ENABLED"
+                            : "DISABLED");
+
+            stageStart = System.nanoTime();
             aiRequest =
                     buildAIRequest(
                             requestId,
                             request,
                             auth,
-                            maskedPrompt);
+                            providerPrompt);
 
             performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
 

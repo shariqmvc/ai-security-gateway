@@ -4,6 +4,7 @@ import com.ai.gateway.common.APIResponse;
 import com.ai.gateway.dto.ChatRequest;
 import com.ai.gateway.dto.ChatResponse;
 import com.ai.gateway.service.GatewayService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +22,7 @@ public class ChatController {
 
     @PostMapping
     public ResponseEntity<APIResponse<ChatResponse>> chat(
-             @RequestBody ChatRequest request) {
+             @Valid @RequestBody ChatRequest request) {
 
         ChatResponse response = gatewayService.process(request);
 

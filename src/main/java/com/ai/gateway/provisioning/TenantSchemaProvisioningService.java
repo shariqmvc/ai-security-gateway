@@ -44,6 +44,12 @@ public class TenantSchemaProvisioningService {
                     "Invalid tenant schema name: " + schemaName);
         }
 
+        // Existing-tenant startup reconciliation calls migrateSchema() directly,
+        // so schema creation must be part of this operation as well. Flyway is
+        // configured with createSchemas=false because schema lifecycle is owned
+        // explicitly by TenantSchemaCreationService.
+        schemaCreationService.createSchema(schemaName);
+
         Flyway flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .schemas(schemaName)

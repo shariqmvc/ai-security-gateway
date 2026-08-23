@@ -1,6 +1,7 @@
 package com.ai.gateway.rag.document;
 
 import com.ai.gateway.rag.ingestion.DocumentChunk;
+import com.ai.gateway.rag.knowledge.ChunkingStrategy;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,14 @@ public class RagDocumentIngestionPersistenceService {
         document.setUpdatedAt(LocalDateTime.now());
     }
 
+
+    @Transactional(readOnly = true)
+    public ChunkingStrategy loadChunkingStrategy(UUID tenantId, UUID documentId) {
+        tenantSchemaRoutingService.useTenantSchema(tenantId);
+        RagDocument document = find(documentId);
+        return document.getKnowledgeBase().getChunkingStrategy();
+    }
+
     @Transactional
     public void complete(UUID tenantId,
                          UUID documentId,
@@ -48,6 +57,9 @@ public class RagDocumentIngestionPersistenceService {
                         .id(UUID.randomUUID())
                         .documentId(documentId)
                         .chunkIndex(chunk.index())
+                        .recordId(chunk.recordId())
+                        .sectionId(chunk.sectionId())
+                        .chunkId(chunk.chunkId())
                         .content(chunk.content())
                         .tokenCount(chunk.tokenCount())
                         .metadataJson(chunk.metadataJson())
