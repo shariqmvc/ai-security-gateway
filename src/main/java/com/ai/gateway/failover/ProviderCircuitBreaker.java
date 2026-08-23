@@ -1,8 +1,10 @@
 package com.ai.gateway.failover;
 
 import com.ai.gateway.enums.Provider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -19,9 +21,18 @@ public class ProviderCircuitBreaker {
     private final ConcurrentMap<Key, State> states = new ConcurrentHashMap<>();
 
     private final ProviderCircuitBreakerProperties properties;
+    private final Clock clock;
 
+    @Autowired
     public ProviderCircuitBreaker(ProviderCircuitBreakerProperties properties) {
+        this(properties, Clock.systemUTC());
+    }
+
+    ProviderCircuitBreaker(
+            ProviderCircuitBreakerProperties properties,
+            Clock clock) {
         this.properties = properties;
+        this.clock = clock;
     }
 
     /**
@@ -42,7 +53,7 @@ public class ProviderCircuitBreaker {
         }
 
         long remaining =
-                state.openUntilEpochMs - System.currentTimeMillis();
+                state.openUntilEpochMs - clock.millis();
 
         if (state.openUntilEpochMs <= 0L) {
             return true;
@@ -62,7 +73,7 @@ public class ProviderCircuitBreaker {
         states.computeIfPresent(
                 key,
                 (ignored, current) -> {
-                    if (current.openUntilEpochMs <= System.currentTimeMillis()
+                    if (current.openUntilEpochMs <= clock.millis()
                             && !current.halfOpenProbe) {
 
                         admitted[0] = true;
@@ -88,7 +99,7 @@ public class ProviderCircuitBreaker {
 
         return Math.max(
                 0L,
-                state.openUntilEpochMs - System.currentTimeMillis());
+                state.openUntilEpochMs - clock.millis());
     }
 
     public void recordSuccess(Provider provider, String model) {
@@ -135,7 +146,7 @@ public class ProviderCircuitBreaker {
 
             return new State(
                     consecutiveFailures,
-                    System.currentTimeMillis() + openDurationMs,
+                    clock.millis() + openDurationMs,
                     false,
                     category);
         });
@@ -176,7 +187,7 @@ public class ProviderCircuitBreaker {
 
             return new State(
                     consecutiveFailures,
-                    System.currentTimeMillis()
+                    clock.millis()
                             + Math.max(0L, openDurationMs),
                     false,
                     category);
@@ -208,7 +219,7 @@ public class ProviderCircuitBreaker {
             return false;
         }
 
-        return state.openUntilEpochMs > System.currentTimeMillis();
+        return state.openUntilEpochMs > clock.millis();
     }
 
     public boolean isOpen(Provider provider, String model) {

@@ -24,6 +24,15 @@ public class RagDocumentChunk {
     @Column(name = "chunk_index", nullable = false)
     private int chunkIndex;
 
+    @Column(name = "record_id", length = 255)
+    private String recordId;
+
+    @Column(name = "section_id", length = 255)
+    private String sectionId;
+
+    @Column(name = "chunk_id", length = 255)
+    private String chunkId;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 

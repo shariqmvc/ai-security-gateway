@@ -19,6 +19,9 @@ public class RagVectorSearchRepositoryImpl implements RagVectorSearchRepository 
                     c.document_id,
                     d.file_name,
                     c.chunk_index,
+                    c.record_id,
+                    c.section_id,
+                    c.chunk_id,
                     c.content,
                     c.metadata_json,
                     1 - (
@@ -39,6 +42,9 @@ public class RagVectorSearchRepositoryImpl implements RagVectorSearchRepository 
                 document_id,
                 file_name,
                 chunk_index,
+                record_id,
+                section_id,
+                chunk_id,
                 content,
                 metadata_json,
                 similarity
@@ -67,6 +73,9 @@ public class RagVectorSearchRepositoryImpl implements RagVectorSearchRepository 
                         .documentId(rs.getObject("document_id", UUID.class))
                         .fileName(rs.getString("file_name"))
                         .chunkIndex(rs.getInt("chunk_index"))
+                        .recordId(rs.getString("record_id"))
+                        .sectionId(rs.getString("section_id"))
+                        .chunkId(rs.getString("chunk_id"))
                         .content(rs.getString("content"))
                         .metadataJson(rs.getString("metadata_json"))
                         .similarity(rs.getDouble("similarity"))

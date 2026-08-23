@@ -109,7 +109,7 @@ class TenantSchemaMigrationReconciliationIntegrationTest {
         assertTrue(result.migratedTenants() >= 1);
 
         assertEquals(
-                5,
+                6,
                 flywayVersion(schemaName));
 
         assertTenantTableExists(schemaName, "knowledge_base");
@@ -121,6 +121,11 @@ class TenantSchemaMigrationReconciliationIntegrationTest {
         assertTenantColumnExists(schemaName, "rag_document_chunk", "embedding_model");
         assertTenantColumnExists(schemaName, "rag_document_chunk", "embedding_dimension");
         assertTenantColumnExists(schemaName, "rag_document_chunk", "embedded_at");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "record_id");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "section_id");
+        assertTenantColumnExists(schemaName, "rag_document_chunk", "chunk_id");
+        assertTenantIndexExists(schemaName, "idx_rag_chunk_record");
+        assertTenantIndexExists(schemaName, "idx_rag_chunk_record_section");
     }
 
     private int flywayVersion(String schema) {

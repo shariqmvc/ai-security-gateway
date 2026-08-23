@@ -1,7 +1,10 @@
 package com.ai.gateway.rag.api;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.util.Collections;
@@ -17,6 +20,7 @@ public class RagRequest {
     @Builder.Default
     private boolean enabled = false;
 
+    @Size(max = 10, message = "A maximum of 10 knowledge bases may be used per request.")
     @Builder.Default
     private List<String> knowledgeBaseIds = Collections.emptyList();
 
@@ -25,6 +29,16 @@ public class RagRequest {
     @Builder.Default
     private int topK = 5;
 
+    /**
+     * Phase 4 currently supports deterministic vector retrieval only.
+     * HYBRID will be introduced when lexical/BM25 retrieval is implemented.
+     */
     @Builder.Default
-    private String retrievalStrategy = "HYBRID";
+    private String retrievalStrategy = "VECTOR";
+
+    /** Minimum cosine similarity required for retrieved context. */
+    @DecimalMin(value = "-1.0", message = "RAG minScore must be at least -1.0.")
+    @DecimalMax(value = "1.0", message = "RAG minScore must not exceed 1.0.")
+    @Builder.Default
+    private double minScore = 0.70d;
 }

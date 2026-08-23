@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.math.BigDecimal;
 import com.ai.gateway.rag.api.RagRequest;
+import jakarta.validation.Valid;
 
 @Setter
 @Getter
@@ -55,6 +56,7 @@ public class ChatRequest {
 
    /** Optional first-class RAG request configuration. */
    @Builder.Default
+   @Valid
    private RagRequest rag = RagRequest.builder().build();
 
 }
