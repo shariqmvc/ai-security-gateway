@@ -6,19 +6,36 @@ import com.ai.gateway.rag.search.RagSearchService;
 import com.ai.gateway.rag.search.dto.RagSearchRequest;
 import com.ai.gateway.rag.search.dto.RagSearchResponse;
 import com.ai.gateway.rag.search.dto.RagSearchResult;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 public class RagAugmentationServiceImpl implements RagAugmentationService {
 
     private static final int MAX_KNOWLEDGE_BASES = 10;
 
     private final RagSearchService ragSearchService;
     private final RagContextAssembler contextAssembler;
+    private final RagContextOptimizer contextOptimizer;
+
+    @Autowired
+    public RagAugmentationServiceImpl(
+            RagSearchService ragSearchService,
+            RagContextAssembler contextAssembler,
+            RagContextOptimizer contextOptimizer) {
+        this.ragSearchService = ragSearchService;
+        this.contextAssembler = contextAssembler;
+        this.contextOptimizer = contextOptimizer;
+    }
+
+    /** Backward-compatible constructor for existing Phase 4 tests. */
+    public RagAugmentationServiceImpl(
+            RagSearchService ragSearchService,
+            RagContextAssembler contextAssembler) {
+        this(ragSearchService, contextAssembler, new RagContextOptimizer());
+    }
 
     @Override
     public RagAugmentationResult augment(
@@ -53,6 +70,9 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                             .query(query.trim())
                             .topK(request.getTopK())
                             .minScore(request.getMinScore())
+                            .retrievalStrategy(request.getRetrievalStrategy())
+                            .queryTransformation(request.isQueryTransformation())
+                            .candidateLimit(request.getCandidateLimit())
                             .build());
 
             for (RagSearchResult result : response.getResults()) {
@@ -83,9 +103,10 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                 .thenComparing(RagContextChunk::getId,
                         Comparator.nullsLast(Comparator.naturalOrder())));
 
-        List<RagContextChunk> selected = candidates.stream()
-                .limit(request.getTopK())
-                .toList();
+        List<RagContextChunk> selected = contextOptimizer.optimize(
+                candidates,
+                request.getContextTokenBudget(),
+                request.getTopK());
 
         return RagAugmentationResult.builder()
                 .augmentedPrompt(contextAssembler.augment(query.trim(), selected))

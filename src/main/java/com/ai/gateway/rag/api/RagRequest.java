@@ -30,8 +30,8 @@ public class RagRequest {
     private int topK = 5;
 
     /**
-     * Phase 4 currently supports deterministic vector retrieval only.
-     * HYBRID will be introduced when lexical/BM25 retrieval is implemented.
+     * Retrieval strategy for Phase 4.2:
+     * VECTOR, KEYWORD, HYBRID, or HYBRID_RERANKED.
      */
     @Builder.Default
     private String retrievalStrategy = "VECTOR";
@@ -41,4 +41,17 @@ public class RagRequest {
     @DecimalMax(value = "1.0", message = "RAG minScore must not exceed 1.0.")
     @Builder.Default
     private double minScore = 0.70d;
+
+    @Builder.Default
+    private boolean queryTransformation = false;
+
+    @Min(1)
+    @Max(200)
+    @Builder.Default
+    private int candidateLimit = 50;
+
+    @Min(256)
+    @Max(32768)
+    @Builder.Default
+    private int contextTokenBudget = 4000;
 }
