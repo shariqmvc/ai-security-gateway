@@ -28,6 +28,7 @@ class RagSearchServiceImplTest {
 
     private final KnowledgeBaseRepository knowledgeBaseRepository = mock(KnowledgeBaseRepository.class);
     private final RagVectorSearchRepository vectorSearchRepository = mock(RagVectorSearchRepository.class);
+    private final RagKeywordSearchRepository keywordSearchRepository = mock(RagKeywordSearchRepository.class);
     private final EmbeddingProviderFactory providerFactory = mock(EmbeddingProviderFactory.class);
     private final RagEmbeddingProperties embeddingProperties = new RagEmbeddingProperties();
     private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
@@ -36,6 +37,10 @@ class RagSearchServiceImplTest {
     private final RagSearchServiceImpl service = new RagSearchServiceImpl(
             knowledgeBaseRepository,
             vectorSearchRepository,
+            keywordSearchRepository,
+            new RagResultFusionService(),
+            new TokenOverlapRagReranker(),
+            new DefaultRagQueryTransformer(),
             providerFactory,
             embeddingProperties,
             tenantAccessGuard,
@@ -68,6 +73,7 @@ class RagSearchServiceImplTest {
                 RagSearchRequest.builder()
                         .query("pgvector semantic search")
                         .topK(5)
+                        .candidateLimit(5)
                         .build());
 
         assertEquals(knowledgeBaseId, response.getKnowledgeBaseId());
@@ -109,6 +115,7 @@ class RagSearchServiceImplTest {
                 RagSearchRequest.builder()
                         .query("test query")
                         .topK(10)
+                        .candidateLimit(10)
                         .minScore(0.75d)
                         .build());
 
@@ -257,7 +264,7 @@ class RagSearchServiceImplTest {
                         knowledgeBaseId,
                         RagSearchRequest.builder().query("test").build()));
 
-        assertTrue(ex.getMessage().contains("RAG vector search requires vectorStore=PGVECTOR"));
+        assertTrue(ex.getMessage().contains("RAG retrieval requires vectorStore=PGVECTOR"));
         verifyNoInteractions(providerFactory, vectorSearchRepository);
     }
 
@@ -377,6 +384,7 @@ class RagSearchServiceImplTest {
                 RagSearchRequest.builder()
                         .query("How does Tenant B protect retrieval access?")
                         .topK(3)
+                        .candidateLimit(3)
                         .build());
 
         assertEquals(2, response.getResults().size());
@@ -406,7 +414,10 @@ class RagSearchServiceImplTest {
         RagSearchResponse response = service.search(
                 tenantId,
                 knowledgeBaseId,
-                RagSearchRequest.builder().query("test").build());
+                RagSearchRequest.builder()
+                        .query("test")
+                        .candidateLimit(5)
+                        .build());
 
         assertEquals("OLLAMA", response.getEmbeddingProvider());
         verify(providerFactory).get("OLLAMA");
@@ -436,6 +447,82 @@ class RagSearchServiceImplTest {
 
         assertEquals("OLLAMA", response.getEmbeddingProvider());
         verify(providerFactory).get("OLLAMA");
+    }
+
+
+    @Test
+    void shouldApplyMinScoreAfterHybridFusionAndReranking() {
+        UUID tenantId = UUID.randomUUID();
+        UUID knowledgeBaseId = UUID.randomUUID();
+        KnowledgeBase knowledgeBase = activePgVectorKnowledgeBase(
+                knowledgeBaseId, "OLLAMA", "nomic-embed-text");
+        EmbeddingProvider provider = mock(EmbeddingProvider.class);
+
+        RagSearchResult highVector = result(
+                "high.md", 0, "tenant isolation retrieval", 0.85d);
+        RagSearchResult lowKeyword = result(
+                "low.md", 0, "tenant isolation retrieval", 0.40d);
+
+        when(knowledgeBaseRepository.findById(knowledgeBaseId))
+                .thenReturn(Optional.of(knowledgeBase));
+        when(providerFactory.get("OLLAMA")).thenReturn(provider);
+        when(provider.embed(List.of("tenant isolation retrieval"), "nomic-embed-text"))
+                .thenReturn(List.of(vector(1.0f, 2.0f, 3.0f)));
+        when(vectorSearchRepository.search(
+                eq(knowledgeBaseId), eq("[1,2,3]"), eq("OLLAMA"), eq("nomic-embed-text"),
+                eq(3), eq(10), eq(0.70d)))
+                .thenReturn(List.of(highVector));
+        when(keywordSearchRepository.search(
+                eq(knowledgeBaseId), eq("tenant isolation retrieval"), eq(10)))
+                .thenReturn(List.of(lowKeyword));
+
+        RagSearchResponse response = service.search(
+                tenantId,
+                knowledgeBaseId,
+                RagSearchRequest.builder()
+                        .query("tenant isolation retrieval")
+                        .topK(5)
+                        .candidateLimit(10)
+                        .minScore(0.70d)
+                        .retrievalStrategy("HYBRID_RERANKED")
+                        .build());
+
+        assertEquals(1, response.getResults().size());
+        assertEquals("high.md", response.getResults().getFirst().getFileName());
+        assertTrue(response.getResults().stream()
+                .allMatch(r -> r.getSimilarity() >= 0.70d));
+    }
+
+    @Test
+    void shouldNotApplyDefaultMinScoreWhenItIsDisabled() {
+        UUID tenantId = UUID.randomUUID();
+        UUID knowledgeBaseId = UUID.randomUUID();
+        KnowledgeBase knowledgeBase = activePgVectorKnowledgeBase(
+                knowledgeBaseId, "OLLAMA", "nomic-embed-text");
+        EmbeddingProvider provider = mock(EmbeddingProvider.class);
+
+        RagSearchResult low = result("low.md", 0, "low relevance", 0.10d);
+
+        when(knowledgeBaseRepository.findById(knowledgeBaseId))
+                .thenReturn(Optional.of(knowledgeBase));
+        when(providerFactory.get("OLLAMA")).thenReturn(provider);
+        when(provider.embed(List.of("test"), "nomic-embed-text"))
+                .thenReturn(List.of(vector(1.0f, 2.0f, 3.0f)));
+        when(vectorSearchRepository.search(
+                eq(knowledgeBaseId), eq("[1,2,3]"), eq("OLLAMA"), eq("nomic-embed-text"),
+                eq(3), eq(5), eq(-1.0d)))
+                .thenReturn(List.of(low));
+
+        RagSearchResponse response = service.search(
+                tenantId,
+                knowledgeBaseId,
+                RagSearchRequest.builder()
+                        .query("test")
+                        .candidateLimit(5)
+                        .build());
+
+        assertEquals(1, response.getResults().size());
+        assertEquals("low.md", response.getResults().getFirst().getFileName());
     }
 
     private KnowledgeBase activePgVectorKnowledgeBase(

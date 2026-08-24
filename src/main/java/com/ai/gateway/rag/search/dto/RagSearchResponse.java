@@ -11,6 +11,7 @@ import java.util.UUID;
 public class RagSearchResponse {
     UUID knowledgeBaseId;
     String query;
+    String retrievalStrategy;
     String embeddingProvider;
     String embeddingModel;
     int queryEmbeddingDimension;

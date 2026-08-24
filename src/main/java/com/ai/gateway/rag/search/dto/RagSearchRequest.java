@@ -28,4 +28,15 @@ public class RagSearchRequest {
     @DecimalMax(value = "1.0", message = "minScore must not exceed 1.0.")
     @Builder.Default
     private double minScore = -1.0d;
+
+    @Builder.Default
+    private String retrievalStrategy = "VECTOR";
+
+    @Builder.Default
+    private boolean queryTransformation = false;
+
+    @Min(1)
+    @Max(200)
+    @Builder.Default
+    private int candidateLimit = 50;
 }
