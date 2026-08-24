@@ -245,6 +245,7 @@ public class GatewayServiceImpl implements GatewayService {
             return ChatResponse.builder()
                     .requestId(requestId)
                     .response(restored)
+                    .rag(buildRagMetadata(request.getRag(), ragResult))
                     .build();
 
         } catch (Exception ex) {
@@ -505,6 +506,39 @@ public class GatewayServiceImpl implements GatewayService {
                 response.getResponse(),
                 requestId);
 
+    }
+
+    private RagMetadata buildRagMetadata(
+            com.ai.gateway.rag.api.RagRequest request,
+            RagAugmentationResult result) {
+
+        if (request == null || !request.isEnabled()) {
+            return null;
+        }
+
+        java.util.List<RagSourceMetadata> sources = result.getChunks().stream()
+                .map(chunk -> RagSourceMetadata.builder()
+                        .knowledgeBaseId(chunk.getKnowledgeBaseId())
+                        .documentId(chunk.getDocumentId())
+                        .fileName(chunk.getFileName())
+                        .chunkIndex(chunk.getChunkIndex())
+                        .similarity(chunk.getSimilarity())
+                        .build())
+                .toList();
+
+        return RagMetadata.builder()
+                .enabled(true)
+                .retrievalStrategy(request.getRetrievalStrategy())
+                .knowledgeBaseCount(result.getKnowledgeBaseCount())
+                .retrievedCount(result.getRetrievedCount())
+                .selectedCount(result.getSelectedCount())
+                .deduplicatedCount(result.getDeduplicatedCount())
+                .droppedCount(result.getDroppedCount())
+                .truncatedCount(result.getTruncatedCount())
+                .estimatedContextTokens(result.getEstimatedContextTokens())
+                .contextTokenBudget(result.getContextTokenBudget())
+                .sources(sources)
+                .build();
     }
 
     private void validateFeature(

@@ -741,4 +741,32 @@ class ProviderFailoverServiceImplTest {
                 ModelStatus.ENABLED,
                 Set.of("CHAT"));
     }
+    @Test
+    void shouldMapUpstreamProviderAuthenticationFailureToGatewayException() {
+
+        allowPrimaryCircuit();
+
+        HttpClientErrorException failure =
+                HttpClientErrorException.create(
+                        HttpStatus.UNAUTHORIZED,
+                        "Unauthorized",
+                        HttpHeaders.EMPTY,
+                        null,
+                        null);
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(failure);
+
+        ProviderAuthenticationException thrown =
+                assertThrows(
+                        ProviderAuthenticationException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertEquals(Provider.GEMINI, thrown.getProvider());
+        assertSame(failure, thrown.getCause());
+        verify(providerFactory, never()).getProvider(Provider.OPENAI);
+    }
+
 }

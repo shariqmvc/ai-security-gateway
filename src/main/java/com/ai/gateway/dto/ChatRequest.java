@@ -8,6 +8,7 @@ import java.util.Set;
 import java.math.BigDecimal;
 import com.ai.gateway.rag.api.RagRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 
 @Setter
 @Getter
@@ -16,7 +17,7 @@ import jakarta.validation.Valid;
 @Builder
 public class ChatRequest {
 
-   // @NotBlank(message = "Prompt cannot be empty")
+   @NotBlank(message = "Prompt cannot be empty")
     private String prompt;
     private Provider provider;
     private String model;

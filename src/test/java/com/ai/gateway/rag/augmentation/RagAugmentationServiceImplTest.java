@@ -77,18 +77,40 @@ class RagAugmentationServiceImplTest {
     }
 
     @Test
-    void shouldRejectUnsupportedRetrievalStrategy() {
+    void shouldSupportHybridRetrievalStrategy() {
+        UUID tenantId = UUID.randomUUID();
+        UUID kb = UUID.randomUUID();
+        when(ragSearchService.search(eq(tenantId), eq(kb), any(RagSearchRequest.class)))
+                .thenReturn(response(kb, List.of(result("hybrid.md", 0, 0.91d))));
+
+        RagRequest request = RagRequest.builder()
+                .enabled(true)
+                .knowledgeBaseIds(List.of(kb.toString()))
+                .retrievalStrategy("HYBRID")
+                .contextTokenBudget(1000)
+                .build();
+
+        RagAugmentationResult result = service.augment(tenantId, "hello", request);
+
+        assertEquals(1, result.getSelectedCount());
+        assertEquals(1000, result.getContextTokenBudget());
+        verify(ragSearchService).search(eq(tenantId), eq(kb), argThat(r ->
+                r.getRetrievalStrategy().equals("HYBRID")));
+    }
+
+    @Test
+    void shouldRejectInvalidRetrievalStrategy() {
         RagRequest request = RagRequest.builder()
                 .enabled(true)
                 .knowledgeBaseIds(List.of(UUID.randomUUID().toString()))
-                .retrievalStrategy("HYBRID")
+                .retrievalStrategy("NOT_A_STRATEGY")
                 .build();
 
         BusinessException ex = assertThrows(
                 BusinessException.class,
                 () -> service.augment(UUID.randomUUID(), "hello", request));
 
-        assertTrue(ex.getMessage().contains("Phase 4 currently supports VECTOR only"));
+        assertTrue(ex.getMessage().contains("Supported values"));
         verifyNoInteractions(ragSearchService);
     }
 

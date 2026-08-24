@@ -75,7 +75,11 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
          * No failover metrics or analytics are recorded.
          */
         if (!properties.isEnabled()) {
-            return invoke(request, 1);
+            try {
+                return invoke(request, 1);
+            } catch (Exception ex) {
+                throw normalizeNonRetryableProviderFailure(request.getProvider(), ex);
+            }
         }
 
         int maxAttempts = Math.max(1, properties.getMaxAttempts());
@@ -124,7 +128,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                             requestId(),
                             primary,
                             ex.getClass().getSimpleName());
-                    throw propagate(primaryFailure, lastFailure);
+                    throw propagate(request.getProvider(), primaryFailure, lastFailure);
                 }
             }
 
@@ -169,6 +173,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
          */
         if (maxAttempts <= 1) {
             throw propagate(
+                    request.getProvider(),
                     primaryFailure,
                     lastFailure);
         }
@@ -349,6 +354,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
          * The final fallback failure is retained as a suppressed exception.
          */
         throw propagate(
+                request.getProvider(),
                 primaryFailure,
                 lastFailure);
     }
@@ -584,6 +590,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     }
 
     private RuntimeException propagate(
+            Provider provider,
             Throwable primaryFailure,
             Throwable finalFailure) {
 
@@ -591,6 +598,15 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 primaryFailure != null
                         ? primaryFailure
                         : finalFailure;
+
+        if (failure instanceof org.springframework.web.client.RestClientResponseException responseException) {
+            int status = responseException.getStatusCode().value();
+            if (status == 401 || status == 403) {
+                return new ProviderAuthenticationException(
+                        provider,
+                        responseException);
+            }
+        }
 
         if (failure instanceof RuntimeException runtimeException) {
             if (finalFailure != failure) {
@@ -603,4 +619,24 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 "Provider execution failed.",
                 failure);
     }
+
+    private RuntimeException normalizeNonRetryableProviderFailure(
+            Provider provider, Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof org.springframework.web.client.RestClientResponseException responseException) {
+                int status = responseException.getStatusCode().value();
+                if (status == 401 || status == 403) {
+                    return new ProviderAuthenticationException(provider, responseException);
+                }
+                break;
+            }
+            current = current.getCause();
+        }
+        return failure instanceof RuntimeException runtimeException
+                ? runtimeException
+                : new IllegalStateException("Provider execution failed.", failure);
+    }
+
+
 }
