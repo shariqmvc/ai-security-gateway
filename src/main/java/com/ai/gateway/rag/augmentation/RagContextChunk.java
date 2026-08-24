@@ -6,7 +6,7 @@ import lombok.Value;
 import java.util.UUID;
 
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class RagContextChunk {
     UUID id;
     UUID documentId;

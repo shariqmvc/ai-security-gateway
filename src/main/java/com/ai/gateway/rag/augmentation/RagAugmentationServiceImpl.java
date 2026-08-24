@@ -50,6 +50,11 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                     .knowledgeBaseCount(0)
                     .retrievedCount(0)
                     .selectedCount(0)
+                    .deduplicatedCount(0)
+                    .droppedCount(0)
+                    .truncatedCount(0)
+                    .estimatedContextTokens(0)
+                    .contextTokenBudget(0)
                     .build();
         }
 
@@ -103,10 +108,11 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                 .thenComparing(RagContextChunk::getId,
                         Comparator.nullsLast(Comparator.naturalOrder())));
 
-        List<RagContextChunk> selected = contextOptimizer.optimize(
+        RagContextOptimizationResult optimization = contextOptimizer.optimizeDetailed(
                 candidates,
                 request.getContextTokenBudget(),
                 request.getTopK());
+        List<RagContextChunk> selected = optimization.getSelectedChunks();
 
         return RagAugmentationResult.builder()
                 .augmentedPrompt(contextAssembler.augment(query.trim(), selected))
@@ -114,6 +120,11 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                 .knowledgeBaseCount(knowledgeBaseIds.size())
                 .retrievedCount(candidates.size())
                 .selectedCount(selected.size())
+                .deduplicatedCount(optimization.getDeduplicatedCount())
+                .droppedCount(optimization.getDroppedCount())
+                .truncatedCount(optimization.getTruncatedCount())
+                .estimatedContextTokens(optimization.getEstimatedContextTokens())
+                .contextTokenBudget(optimization.getContextTokenBudget())
                 .build();
     }
 
@@ -143,11 +154,19 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
         }
 
         String strategy = request.getRetrievalStrategy();
-        if (strategy == null || strategy.isBlank()
-                || !"VECTOR".equalsIgnoreCase(strategy.trim())) {
-            throw new BusinessException(
-                    "Unsupported RAG retrievalStrategy: " + strategy
-                            + ". Phase 4 currently supports VECTOR only.");
+        if (strategy == null || strategy.isBlank()) {
+            throw new BusinessException("RAG retrievalStrategy is required when RAG is enabled.");
+        }
+        try {
+            com.ai.gateway.rag.search.RagRetrievalStrategy.from(strategy);
+        } catch (BusinessException ex) {
+            throw ex;
+        }
+        if (request.getCandidateLimit() < 1 || request.getCandidateLimit() > 200) {
+            throw new BusinessException("RAG candidateLimit must be between 1 and 200.");
+        }
+        if (request.getContextTokenBudget() < 256 || request.getContextTokenBudget() > 32768) {
+            throw new BusinessException("RAG contextTokenBudget must be between 256 and 32768.");
         }
     }
 

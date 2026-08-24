@@ -1,5 +1,6 @@
 package com.ai.gateway.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.util.UUID;
@@ -9,10 +10,14 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ChatResponse {
 
     private UUID requestId;
 
     private String response;
+
+    /** Phase 4 RAG execution metadata; null when RAG is disabled. */
+    private RagMetadata rag;
 
 }

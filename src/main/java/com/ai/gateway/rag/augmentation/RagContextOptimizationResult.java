@@ -7,12 +7,9 @@ import java.util.List;
 
 @Value
 @Builder
-public class RagAugmentationResult {
-    String augmentedPrompt;
-    List<RagContextChunk> chunks;
-    int knowledgeBaseCount;
-    int retrievedCount;
-    int selectedCount;
+public class RagContextOptimizationResult {
+    List<RagContextChunk> selectedChunks;
+    int candidateCount;
     int deduplicatedCount;
     int droppedCount;
     int truncatedCount;
