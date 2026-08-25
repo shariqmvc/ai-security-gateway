@@ -8,6 +8,8 @@ import com.ai.gateway.rag.search.dto.RagSearchResponse;
 import com.ai.gateway.rag.search.dto.RagSearchResult;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.MDC;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -108,14 +110,26 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                 .thenComparing(RagContextChunk::getId,
                         Comparator.nullsLast(Comparator.naturalOrder())));
 
+        UUID requestId = requestId();
+
+        long optimizationStart = System.nanoTime();
         RagContextOptimizationResult optimization = contextOptimizer.optimizeDetailed(
                 candidates,
                 request.getContextTokenBudget(),
                 request.getTopK());
+        logStage("RAG_CONTEXT_OPTIMIZATION", requestId, optimizationStart,
+                "selected=" + optimization.getSelectedChunks().size()
+                        + " estimatedTokens=" + optimization.getEstimatedContextTokens());
+
         List<RagContextChunk> selected = optimization.getSelectedChunks();
 
+        long assemblyStart = System.nanoTime();
+        String augmentedPrompt = contextAssembler.augment(query.trim(), selected);
+        logStage("RAG_CONTEXT_ASSEMBLY", requestId, assemblyStart,
+                "selected=" + selected.size());
+
         return RagAugmentationResult.builder()
-                .augmentedPrompt(contextAssembler.augment(query.trim(), selected))
+                .augmentedPrompt(augmentedPrompt)
                 .chunks(selected)
                 .knowledgeBaseCount(knowledgeBaseIds.size())
                 .retrievedCount(candidates.size())
@@ -126,6 +140,23 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                 .estimatedContextTokens(optimization.getEstimatedContextTokens())
                 .contextTokenBudget(optimization.getContextTokenBudget())
                 .build();
+    }
+
+    private void logStage(String stage, UUID requestId, long started, String outcome) {
+        long durationMs = (System.nanoTime() - started) / 1_000_000L;
+        LoggerFactory.getLogger("com.ai.gateway.performance")
+                .info("event=RAG_STAGE stage={} requestId={} durationMs={} outcome={}",
+                        stage, requestId, durationMs, outcome);
+    }
+
+    private UUID requestId() {
+        String value = MDC.get("requestId");
+        if (value == null || value.isBlank()) return null;
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private void validate(UUID tenantId, String query, RagRequest request) {

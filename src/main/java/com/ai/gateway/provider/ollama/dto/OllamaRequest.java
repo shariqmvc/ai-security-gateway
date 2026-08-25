@@ -1,5 +1,6 @@
 package com.ai.gateway.provider.ollama.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.util.List;
@@ -17,4 +18,10 @@ public class OllamaRequest {
 
     @Builder.Default
     private boolean stream = false;
+
+    private OllamaOptions options;
+
+    /** Ollama keeps the loaded model in memory for this duration when set. */
+    @JsonProperty("keep_alive")
+    private String keepAlive;
 }

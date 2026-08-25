@@ -64,6 +64,51 @@ public class PerformanceLogger {
                 outcome);
     }
 
+    /**
+     * Provider-native inference telemetry. Durations are supplied by Ollama
+     * in nanoseconds and converted here to milliseconds. No prompt/response
+     * content is logged.
+     */
+    public void providerTelemetry(
+            UUID requestId,
+            String provider,
+            String model,
+            int attempt,
+            Integer inputTokens,
+            Integer outputTokens,
+            Long totalDurationNs,
+            Long loadDurationNs,
+            Long promptEvalDurationNs,
+            Long evalDurationNs) {
+
+        Double tokensPerSecond = null;
+        if (outputTokens != null
+                && outputTokens > 0
+                && evalDurationNs != null
+                && evalDurationNs > 0) {
+            tokensPerSecond =
+                    (outputTokens * 1_000_000_000.0) / evalDurationNs;
+        }
+
+        LOG.info(
+                "event=PROVIDER_INFERENCE_TELEMETRY requestId={} provider={} model={} attempt={} inputTokens={} outputTokens={} totalDurationMs={} modelLoadMs={} promptEvalMs={} generationMs={} tokensPerSecond={}",
+                requestId,
+                provider,
+                model,
+                attempt,
+                inputTokens,
+                outputTokens,
+                nanosToMs(totalDurationNs),
+                nanosToMs(loadDurationNs),
+                nanosToMs(promptEvalDurationNs),
+                nanosToMs(evalDurationNs),
+                tokensPerSecond);
+    }
+
+    private Long nanosToMs(Long nanos) {
+        return nanos == null ? null : nanos / 1_000_000L;
+    }
+
     public void failover(
             UUID requestId,
             String fromProvider,

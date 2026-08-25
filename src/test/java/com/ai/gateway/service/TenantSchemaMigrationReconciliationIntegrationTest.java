@@ -109,7 +109,7 @@ class TenantSchemaMigrationReconciliationIntegrationTest {
         assertTrue(result.migratedTenants() >= 1);
 
         assertEquals(
-                6,
+                7,
                 flywayVersion(schemaName));
 
         assertTenantTableExists(schemaName, "knowledge_base");

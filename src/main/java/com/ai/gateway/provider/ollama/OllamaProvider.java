@@ -11,6 +11,7 @@ import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.ollama.dto.OllamaMessage;
 import com.ai.gateway.provider.ollama.dto.OllamaRequest;
 import com.ai.gateway.provider.ollama.dto.OllamaResponse;
+import com.ai.gateway.provider.ollama.dto.OllamaOptions;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -100,6 +101,12 @@ public class OllamaProvider implements AIProvider {
                                 )
                         )
                         .stream(false)
+                        .options(
+                                OllamaOptions.builder()
+                                        .numCtx(ollamaConfig.getNumCtx())
+                                        .numPredict(ollamaConfig.getNumPredict())
+                                        .build())
+                        .keepAlive(ollamaConfig.getKeepAlive())
                         .build();
 
         HttpHeaders headers =
@@ -149,15 +156,7 @@ public class OllamaProvider implements AIProvider {
                     OllamaResponse.class
             );
 
-            performanceLogger.providerCompleted(
-                    requestId,
-                    provider().name(),
-                    request.getModel(),
-                    providerAttempt(),
-                    elapsedMs(started),
-                    "HTTP_" + response.getStatusCode().value()
-            );
-        }catch (RuntimeException ex) {
+        } catch (RuntimeException ex) {
 
             performanceLogger.providerCompleted(
                     requestId,
@@ -184,20 +183,45 @@ public class OllamaProvider implements AIProvider {
                         .value()
         );
 
-        String answer =
-                response.getBody()
-                        .getMessage()
-                        .getContent();
+        OllamaResponse body = response.getBody();
+        if (body == null || body.getMessage() == null) {
+            throw new IllegalStateException("Ollama returned an empty response body.");
+        }
 
+        String answer = body.getMessage().getContent();
+
+        Integer inputTokens = body.getPromptEvalCount();
+        Integer outputTokens = body.getEvalCount();
+        Integer totalTokens = null;
+        if (inputTokens != null || outputTokens != null) {
+            totalTokens = (inputTokens == null ? 0 : inputTokens)
+                    + (outputTokens == null ? 0 : outputTokens);
+        }
+
+        performanceLogger.providerTelemetry(
+                requestId,
+                provider().name(),
+                selectedModel,
+                providerAttempt(),
+                inputTokens,
+                outputTokens,
+                body.getTotalDuration(),
+                body.getLoadDuration(),
+                body.getPromptEvalDuration(),
+                body.getEvalDuration());
+
+        long latencyMs = elapsedMs(started);
         return AIResponse.builder()
                 .response(answer)
+                .provider(provider())
+                .model(selectedModel)
                 .usage(
                         Usage.builder()
-                                .inputTokens(0)
-                                .outputTokens(0)
-                                .totalTokens(0)
-                                .build()
-                )
+                                .inputTokens(inputTokens == null ? 0 : inputTokens)
+                                .outputTokens(outputTokens == null ? 0 : outputTokens)
+                                .totalTokens(totalTokens == null ? 0 : totalTokens)
+                                .latencyMs(latencyMs)
+                                .build())
                 .build();
     }
 

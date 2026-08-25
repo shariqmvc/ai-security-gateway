@@ -55,7 +55,12 @@ gemini:
 ollama:
   base:
     url: http://localhost:11434
-  model: llama3.1:8b
+  model: ${OLLAMA_MODEL:llama3.2:3b}
+  # Keep the local model resident between requests and cap generation so
+  # provider latency cannot grow without bound. Override per environment.
+  keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
+  num-ctx: ${OLLAMA_NUM_CTX:4096}
+  num-predict: ${OLLAMA_NUM_PREDICT:512}
 
 aegis:
   security:
@@ -171,6 +176,7 @@ rag:
     batch-size: ${RAG_EMBEDDING_BATCH_SIZE:8}
     default-provider: ${RAG_EMBEDDING_DEFAULT_PROVIDER:OLLAMA}
     ollama-model: ${RAG_OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    ollama-keep-alive: ${RAG_OLLAMA_EMBEDDING_KEEP_ALIVE:2m}
     openai-model: ${RAG_OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
     gemini-model: ${RAG_GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
   ingestion:

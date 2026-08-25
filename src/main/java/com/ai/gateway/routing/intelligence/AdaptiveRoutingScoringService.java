@@ -49,5 +49,6 @@ public class AdaptiveRoutingScoringService {
         double total = values.values().stream().mapToDouble(Double::doubleValue).sum();
         if (total <= 0.0) throw new IllegalStateException("Adaptive routing weights must contain a positive total.");
         values.replaceAll((k, v) -> v / total);
+
     }
 }
