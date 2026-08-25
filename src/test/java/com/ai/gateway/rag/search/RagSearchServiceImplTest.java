@@ -86,7 +86,10 @@ class RagSearchServiceImplTest {
         assertEquals(0.91d, response.getResults().getFirst().getSimilarity());
 
         verify(tenantAccessGuard).requireAccess(tenantId);
-        verify(tenantSchemaRoutingService).useTenantSchema(tenantId);
+        // The optimized service deliberately uses two short DB transactions:
+        // one for KB resolution and one for retrieval, so tenant schema routing
+        // is applied once per transaction.
+        verify(tenantSchemaRoutingService, times(2)).useTenantSchema(tenantId);
         verify(provider).embed(List.of("pgvector semantic search"), "nomic-embed-text");
         verify(vectorSearchRepository).search(
                 knowledgeBaseId, "[1,2,3]", "OLLAMA", "nomic-embed-text", 3, 5, -1.0d);
@@ -122,6 +125,46 @@ class RagSearchServiceImplTest {
         assertTrue(response.getResults().isEmpty());
         verify(vectorSearchRepository).search(
                 knowledgeBaseId, "[1,2,3]", "OLLAMA", "nomic-embed-text", 3, 10, 0.75d);
+    }
+
+    @Test
+    void shouldReturnKeywordResultsWithDefaultMinScore() {
+        UUID tenantId = UUID.randomUUID();
+        UUID knowledgeBaseId = UUID.randomUUID();
+        KnowledgeBase knowledgeBase = activePgVectorKnowledgeBase(
+                knowledgeBaseId, "OLLAMA", "nomic-embed-text");
+
+        RagSearchResult keyword = result(
+                "tenant-b-security.md",
+                0,
+                "Tenant B requires strict retrieval isolation and API-key authentication.",
+                0.014285714d);
+
+        when(knowledgeBaseRepository.findById(knowledgeBaseId))
+                .thenReturn(Optional.of(knowledgeBase));
+        when(keywordSearchRepository.search(
+                eq(knowledgeBaseId),
+                eq("tenant isolation API key"),
+                eq(5)))
+                .thenReturn(List.of(keyword));
+
+        RagSearchResponse response = service.search(
+                tenantId,
+                knowledgeBaseId,
+                RagSearchRequest.builder()
+                        .query("tenant isolation API key")
+                        .retrievalStrategy("KEYWORD")
+                        .topK(5)
+                        .candidateLimit(5)
+                        .build());
+
+        assertEquals("KEYWORD", response.getRetrievalStrategy());
+        assertEquals(1, response.getResults().size());
+        assertEquals("tenant-b-security.md", response.getResults().getFirst().getFileName());
+        assertEquals(0.014285714d, response.getResults().getFirst().getSimilarity());
+        verify(keywordSearchRepository).search(
+                knowledgeBaseId, "tenant isolation API key", 5);
+        verifyNoInteractions(providerFactory, vectorSearchRepository);
     }
 
     @Test

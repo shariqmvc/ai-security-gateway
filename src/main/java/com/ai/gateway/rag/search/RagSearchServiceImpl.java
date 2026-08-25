@@ -13,7 +13,9 @@ import com.ai.gateway.tenant.TenantAccessGuard;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.slf4j.MDC;
 
 import java.util.*;
 
@@ -30,6 +32,7 @@ public class RagSearchServiceImpl implements RagSearchService {
     private final RagEmbeddingProperties embeddingProperties;
     private final TenantAccessGuard tenantAccessGuard;
     private final TenantSchemaRoutingService tenantSchemaRoutingService;
+    private final TransactionTemplate transactionTemplate;
 
     @Autowired
     public RagSearchServiceImpl(
@@ -42,7 +45,8 @@ public class RagSearchServiceImpl implements RagSearchService {
             EmbeddingProviderFactory providerFactory,
             RagEmbeddingProperties embeddingProperties,
             TenantAccessGuard tenantAccessGuard,
-            TenantSchemaRoutingService tenantSchemaRoutingService) {
+            TenantSchemaRoutingService tenantSchemaRoutingService,
+            PlatformTransactionManager transactionManager) {
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.vectorSearchRepository = vectorSearchRepository;
         this.keywordSearchRepository = keywordSearchRepository;
@@ -53,6 +57,38 @@ public class RagSearchServiceImpl implements RagSearchService {
         this.embeddingProperties = embeddingProperties;
         this.tenantAccessGuard = tenantAccessGuard;
         this.tenantSchemaRoutingService = tenantSchemaRoutingService;
+        this.transactionTemplate = transactionManager == null
+                ? null
+                : new TransactionTemplate(transactionManager);
+    }
+
+    /**
+     * Backward-compatible constructor for the Phase 4 test suite and integrations
+     * that provide the full retrieval collaborators but do not manage transactions.
+     */
+    public RagSearchServiceImpl(
+            KnowledgeBaseRepository knowledgeBaseRepository,
+            RagVectorSearchRepository vectorSearchRepository,
+            RagKeywordSearchRepository keywordSearchRepository,
+            RagResultFusionService fusionService,
+            RagReranker reranker,
+            RagQueryTransformer queryTransformer,
+            EmbeddingProviderFactory providerFactory,
+            RagEmbeddingProperties embeddingProperties,
+            TenantAccessGuard tenantAccessGuard,
+            TenantSchemaRoutingService tenantSchemaRoutingService) {
+        this(
+                knowledgeBaseRepository,
+                vectorSearchRepository,
+                keywordSearchRepository,
+                fusionService,
+                reranker,
+                queryTransformer,
+                providerFactory,
+                embeddingProperties,
+                tenantAccessGuard,
+                tenantSchemaRoutingService,
+                null);
     }
 
     /**
@@ -76,23 +112,34 @@ public class RagSearchServiceImpl implements RagSearchService {
                 providerFactory,
                 embeddingProperties,
                 tenantAccessGuard,
-                tenantSchemaRoutingService);
+                tenantSchemaRoutingService,
+                null);
     }
 
     @Override
-    @Transactional(readOnly = true)
     public RagSearchResponse search(
             UUID tenantId,
             UUID knowledgeBaseId,
             RagSearchRequest request) {
 
+        long totalStart = System.nanoTime();
+        UUID requestId = requestId();
+
+        long stage = System.nanoTime();
         tenantAccessGuard.requireAccess(tenantId);
         validateRequest(request);
+        logStage("RAG_ACCESS_VALIDATION", requestId, stage, "SUCCESS");
 
-        tenantSchemaRoutingService.useTenantSchema(tenantId);
-
-        KnowledgeBase knowledgeBase = knowledgeBaseRepository.findById(knowledgeBaseId)
-                .orElseThrow(() -> new KnowledgeBaseNotFoundException(knowledgeBaseId));
+        /*
+         * Database transactions are deliberately limited to database work.
+         * Tenant schema routing uses SET LOCAL, so DB access must remain inside
+         * an active transaction. Provider embedding HTTP calls do not need one.
+         * This prevents a slow embedding provider (for example Ollama) from
+         * holding a database connection for the duration of the HTTP call.
+         */
+        stage = System.nanoTime();
+        KnowledgeBase knowledgeBase = loadKnowledgeBase(tenantId, knowledgeBaseId);
+        logStage("RAG_KB_RESOLUTION", requestId, stage, "SUCCESS");
 
         if (knowledgeBase.getStatus() != KnowledgeBaseStatus.ACTIVE) {
             throw new BusinessException(
@@ -107,74 +154,90 @@ public class RagSearchServiceImpl implements RagSearchService {
 
         RagRetrievalStrategy strategy = RagRetrievalStrategy.from(request.getRetrievalStrategy());
         String query = request.getQuery().trim();
+
+        stage = System.nanoTime();
         List<String> queries = request.isQueryTransformation()
                 ? queryTransformer.transform(query)
                 : List.of(query);
+        logStage("RAG_QUERY_TRANSFORMATION", requestId, stage,
+                "queries=" + queries.size());
 
         String providerName = null;
         String model = null;
-        List<RagSearchResult> vectorResults = new ArrayList<>();
         int dimension = 0;
+        List<VectorSearchInput> vectorInputs = new ArrayList<>();
 
         if (strategy != RagRetrievalStrategy.KEYWORD) {
+            stage = System.nanoTime();
             providerName = normalizeProvider(knowledgeBase.getEmbeddingProvider());
             EmbeddingProvider provider = providerFactory.get(providerName);
-
             model = trimToNull(knowledgeBase.getEmbeddingModel());
             if (model == null) {
                 model = provider.defaultModel();
             }
+
             for (String transformedQuery : queries) {
                 EmbeddingVector embedding = singleEmbedding(provider, transformedQuery, model);
                 dimension = embedding.dimension();
-
-                vectorResults.addAll(vectorSearchRepository.search(
-                        knowledgeBaseId,
+                vectorInputs.add(new VectorSearchInput(
                         EmbeddingVectorFormatter.toPgVector(embedding),
-                        providerName,
-                        model,
-                        dimension,
-                        request.getCandidateLimit(),
-                        request.getMinScore()));
+                        dimension));
             }
-            vectorResults = deduplicate(vectorResults, request.getCandidateLimit());
+
+            logStage("RAG_EMBEDDING", requestId, stage,
+                    "provider=" + providerName
+                            + " model=" + model
+                            + " queries=" + queries.size());
         }
 
-        List<RagSearchResult> keywordResults = List.of();
-        if (strategy == RagRetrievalStrategy.KEYWORD
-                || strategy == RagRetrievalStrategy.HYBRID
-                || strategy == RagRetrievalStrategy.HYBRID_RERANKED) {
-
-            List<RagSearchResult> all = new ArrayList<>();
-            for (String transformedQuery : queries) {
-                all.addAll(keywordSearchRepository.search(
-                        knowledgeBaseId,
-                        transformedQuery,
-                        request.getCandidateLimit()));
-            }
-            keywordResults = deduplicate(all, request.getCandidateLimit());
-        }
+        stage = System.nanoTime();
+        RetrievalResults retrieval = executeDatabaseRetrieval(
+                tenantId,
+                knowledgeBaseId,
+                strategy,
+                request,
+                queries,
+                providerName,
+                model,
+                vectorInputs,
+                requestId);
+        logStage("RAG_DATABASE_RETRIEVAL", requestId, stage,
+                "vector=" + retrieval.vectorResults().size()
+                        + " keyword=" + retrieval.keywordResults().size());
 
         List<RagSearchResult> results;
         if (strategy == RagRetrievalStrategy.VECTOR) {
-            results = vectorResults;
+            results = retrieval.vectorResults();
         } else if (strategy == RagRetrievalStrategy.KEYWORD) {
-            results = keywordResults;
+            results = retrieval.keywordResults();
         } else {
+            stage = System.nanoTime();
             results = fusionService.fuse(
-                    vectorResults, keywordResults, request.getCandidateLimit());
+                    retrieval.vectorResults(),
+                    retrieval.keywordResults(),
+                    request.getCandidateLimit());
+            logStage("RAG_FUSION", requestId, stage,
+                    "candidates=" + results.size());
+
             if (strategy == RagRetrievalStrategy.HYBRID_RERANKED) {
-                results = reranker.rerank(query, results, request.getCandidateLimit());
+                stage = System.nanoTime();
+                results = reranker.rerank(
+                        query, results, request.getCandidateLimit());
+                logStage("RAG_RERANK", requestId, stage,
+                        "candidates=" + results.size());
             }
         }
 
-        // minScore is a final retrieval-quality gate. This is intentionally
-        // applied after fusion/reranking so a low-scoring keyword candidate
-        // cannot bypass the threshold in HYBRID retrieval.
+        stage = System.nanoTime();
         results = filterByMinScore(results, request.getMinScore())
                 .stream()
                 .limit(request.getTopK())
                 .toList();
+        logStage("RAG_FINAL_FILTER", requestId, stage,
+                "selected=" + results.size());
+
+        logStage("RAG_TOTAL", requestId, totalStart,
+                "strategy=" + strategy.name());
 
         return RagSearchResponse.builder()
                 .knowledgeBaseId(knowledgeBaseId)
@@ -187,6 +250,150 @@ public class RagSearchServiceImpl implements RagSearchService {
                 .results(results)
                 .build();
     }
+
+    private KnowledgeBase loadKnowledgeBase(UUID tenantId, UUID knowledgeBaseId) {
+        if (transactionTemplate == null) {
+            tenantSchemaRoutingService.useTenantSchema(tenantId);
+            return knowledgeBaseRepository.findById(knowledgeBaseId)
+                    .orElseThrow(() -> new KnowledgeBaseNotFoundException(knowledgeBaseId));
+        }
+
+        return transactionTemplate.execute(status -> {
+            tenantSchemaRoutingService.useTenantSchema(tenantId);
+            return knowledgeBaseRepository.findById(knowledgeBaseId)
+                    .orElseThrow(() -> new KnowledgeBaseNotFoundException(knowledgeBaseId));
+        });
+    }
+
+    private RetrievalResults executeDatabaseRetrieval(
+            UUID tenantId,
+            UUID knowledgeBaseId,
+            RagRetrievalStrategy strategy,
+            RagSearchRequest request,
+            List<String> queries,
+            String providerName,
+            String model,
+            List<VectorSearchInput> vectorInputs,
+            UUID requestId) {
+
+        if (transactionTemplate == null) {
+            tenantSchemaRoutingService.useTenantSchema(tenantId);
+            return executeRetrievalQueries(
+                    knowledgeBaseId,
+                    strategy,
+                    request,
+                    queries,
+                    providerName,
+                    model,
+                    vectorInputs,
+                    requestId);
+        }
+
+        return transactionTemplate.execute(status -> {
+            tenantSchemaRoutingService.useTenantSchema(tenantId);
+            return executeRetrievalQueries(
+                    knowledgeBaseId,
+                    strategy,
+                    request,
+                    queries,
+                    providerName,
+                    model,
+                    vectorInputs,
+                    requestId);
+        });
+    }
+
+    private RetrievalResults executeRetrievalQueries(
+            UUID knowledgeBaseId,
+            RagRetrievalStrategy strategy,
+            RagSearchRequest request,
+            List<String> queries,
+            String providerName,
+            String model,
+            List<VectorSearchInput> vectorInputs,
+            UUID requestId) {
+
+        List<RagSearchResult> vectorResults = new ArrayList<>();
+
+        if (strategy != RagRetrievalStrategy.KEYWORD) {
+            long vectorStart = System.nanoTime();
+            for (VectorSearchInput input : vectorInputs) {
+                vectorResults.addAll(vectorSearchRepository.search(
+                        knowledgeBaseId,
+                        input.queryVector(),
+                        providerName,
+                        model,
+                        input.dimension(),
+                        request.getCandidateLimit(),
+                        request.getMinScore()));
+            }
+            vectorResults = deduplicate(
+                    vectorResults, request.getCandidateLimit());
+            logStage("RAG_VECTOR_SEARCH", requestId, vectorStart,
+                    "results=" + vectorResults.size());
+        }
+
+        List<RagSearchResult> keywordResults = List.of();
+        if (strategy == RagRetrievalStrategy.KEYWORD
+                || strategy == RagRetrievalStrategy.HYBRID
+                || strategy == RagRetrievalStrategy.HYBRID_RERANKED) {
+
+            long keywordStart = System.nanoTime();
+            List<RagSearchResult> all = new ArrayList<>();
+            for (String transformedQuery : queries) {
+                all.addAll(keywordSearchRepository.search(
+                        knowledgeBaseId,
+                        transformedQuery,
+                        request.getCandidateLimit()));
+            }
+            keywordResults = deduplicate(
+                    all, request.getCandidateLimit());
+            logStage("RAG_KEYWORD_SEARCH", requestId, keywordStart,
+                    "results=" + keywordResults.size());
+        }
+
+        return new RetrievalResults(vectorResults, keywordResults);
+    }
+
+    private void logStage(
+            String stage,
+            UUID requestId,
+            long started,
+            String outcome) {
+
+        long durationMs =
+                (System.nanoTime() - started) / 1_000_000L;
+
+        org.slf4j.LoggerFactory
+                .getLogger("com.ai.gateway.performance")
+                .info(
+                        "event=RAG_STAGE stage={} requestId={} durationMs={} outcome={}",
+                        stage,
+                        requestId,
+                        durationMs,
+                        outcome);
+    }
+
+    private UUID requestId() {
+        String value = MDC.get("requestId");
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private record RetrievalResults(
+            List<RagSearchResult> vectorResults,
+            List<RagSearchResult> keywordResults) {}
+
+    private record VectorSearchInput(
+            String queryVector,
+            int dimension) {}
 
     private EmbeddingVector singleEmbedding(
             EmbeddingProvider provider, String query, String model) {

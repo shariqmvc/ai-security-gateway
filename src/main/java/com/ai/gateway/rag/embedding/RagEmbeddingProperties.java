@@ -14,6 +14,7 @@ public class RagEmbeddingProperties {
     private int batchSize = 8;
     private String defaultProvider = "OLLAMA";
     private String ollamaModel = "nomic-embed-text";
+    private String ollamaKeepAlive = "2m";
     private String openaiModel = "text-embedding-3-small";
     private String geminiModel = "gemini-embedding-001";
 }

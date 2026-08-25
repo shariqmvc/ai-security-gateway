@@ -1,6 +1,7 @@
 package com.ai.gateway.rag.embedding.ollama;
 
 import com.ai.gateway.config.OllamaConfig;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ai.gateway.rag.embedding.EmbeddingProvider;
 import com.ai.gateway.rag.embedding.EmbeddingProviderException;
 import com.ai.gateway.rag.embedding.EmbeddingVector;
@@ -33,7 +34,7 @@ public class OllamaEmbeddingProvider implements EmbeddingProvider {
     @Override
     public List<EmbeddingVector> embed(List<String> texts, String model) {
         String selected = model == null || model.isBlank() ? defaultModel() : model;
-        OllamaEmbedRequest request = new OllamaEmbedRequest(selected, texts);
+        OllamaEmbedRequest request = new OllamaEmbedRequest(selected, texts, properties.getOllamaKeepAlive());
         try {
             OllamaEmbedResponse response = restTemplate.postForObject(
                     config.getBase().getUrl() + "/api/embed", request, OllamaEmbedResponse.class);
@@ -48,6 +49,9 @@ public class OllamaEmbeddingProvider implements EmbeddingProvider {
         }
     }
 
-    private record OllamaEmbedRequest(String model, List<String> input) {}
+    private record OllamaEmbedRequest(
+            String model,
+            List<String> input,
+            @JsonProperty("keep_alive") String keepAlive) {}
     private record OllamaEmbedResponse(List<List<Double>> embeddings) {}
 }
