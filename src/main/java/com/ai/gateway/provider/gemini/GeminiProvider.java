@@ -18,6 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.ArrayList;
+import com.ai.gateway.multimodal.MediaContent;
+import com.ai.gateway.multimodal.MediaSourceType;
+import com.ai.gateway.multimodal.MediaTypeKind;
+import com.ai.gateway.multimodal.MediaUrlFetcher;
+import com.ai.gateway.multimodal.MediaInputException;
 
 @Service
 public class GeminiProvider implements AIProvider {
@@ -25,15 +31,18 @@ public class GeminiProvider implements AIProvider {
     public GeminiProvider(
             @Qualifier("geminiRestTemplate") RestTemplate restTemplate,
             GeminiConfig geminiConfig,
-            PerformanceLogger performanceLogger) {
+            PerformanceLogger performanceLogger,
+            MediaUrlFetcher mediaUrlFetcher) {
         this.restTemplate = restTemplate;
         this.geminiConfig = geminiConfig;
         this.performanceLogger = performanceLogger;
+        this.mediaUrlFetcher = mediaUrlFetcher;
     }
 
     private final RestTemplate restTemplate;
     private final GeminiConfig geminiConfig;
     private final PerformanceLogger performanceLogger;
+    private final MediaUrlFetcher mediaUrlFetcher;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -80,10 +89,7 @@ public class GeminiProvider implements AIProvider {
         GeminiRequest geminiRequest = GeminiRequest.builder()
                 .contents(List.of(
                         GeminiContent.builder()
-                                .parts(List.of(
-                                        GeminiPart.builder()
-                                                .text(request.getPrompt())
-                                                .build()))
+                                .parts(buildParts(request))
                                 .build()))
                 .build();
 
@@ -151,6 +157,36 @@ public class GeminiProvider implements AIProvider {
                         usage
                 )
                 .build();
+    }
+
+    private List<GeminiPart> buildParts(AIRequest request) {
+        List<GeminiPart> parts = new ArrayList<>();
+        if (request.getPrompt() != null && !request.getPrompt().isBlank()) {
+            parts.add(GeminiPart.builder().text(request.getPrompt()).build());
+        }
+        if (request.getMedia() != null) {
+            for (MediaContent media : request.getMedia()) {
+                if (media.getSourceType() == MediaSourceType.BASE64) {
+                    parts.add(GeminiPart.builder()
+                            .inlineData(GeminiPart.InlineData.builder()
+                                    .mimeType(media.getMimeType())
+                                    .data(media.getData())
+                                    .build())
+                            .build());
+                } else if (media.getSourceType() == MediaSourceType.URL) {
+                    MediaUrlFetcher.ResolvedMedia resolved = mediaUrlFetcher.fetch(media);
+                    parts.add(GeminiPart.builder()
+                            .inlineData(GeminiPart.InlineData.builder()
+                                    .mimeType(resolved.mimeType())
+                                    .data(resolved.base64Data())
+                                    .build())
+                            .build());
+                } else {
+                    throw new MediaInputException("Unsupported Gemini media source type.");
+                }
+            }
+        }
+        return parts;
     }
 
     private int providerAttempt() {

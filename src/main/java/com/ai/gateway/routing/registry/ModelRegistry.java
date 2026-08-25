@@ -11,6 +11,8 @@ public interface ModelRegistry {
             Provider provider,
             String modelId);
 
+    List<ModelDefinition> findAll();
+
     List<ModelDefinition> findByProvider(
             Provider provider);
 

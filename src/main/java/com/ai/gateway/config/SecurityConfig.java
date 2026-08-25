@@ -30,6 +30,18 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/public/**").permitAll()
+                        /*
+                         * /api/chat is authenticated by the mandatory
+                         * AuthenticationFilter using X-API-Key. Spring Security
+                         * must not apply a second role/authorization decision
+                         * to this endpoint, because tenant identity and role
+                         * are already established by that filter.
+                         *
+                         * AuthenticationFilter does NOT skip /api/chat:
+                         * missing/invalid API keys therefore still fail with
+                         * HTTP 401 before the controller is reached.
+                         */
+                        .requestMatchers("/api/chat").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(
                         authenticationFilter,

@@ -55,7 +55,7 @@ public class ProviderCircuitBreakerProperties {
             case SERVER_ERROR ->
                     serverErrorOpenDuration;
 
-            case CLIENT_ERROR, REQUEST_BUDGET_EXHAUSTED ->
+            case CLIENT_ERROR, REQUEST_BUDGET_EXHAUSTED, MEDIA_INPUT ->
                     Duration.ZERO;
 
             case UNKNOWN ->

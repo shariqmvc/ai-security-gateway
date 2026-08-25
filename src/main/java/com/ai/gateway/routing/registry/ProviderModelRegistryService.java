@@ -5,6 +5,8 @@ import com.ai.gateway.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
+
 @Service
 @RequiredArgsConstructor
 public class ProviderModelRegistryService {
@@ -39,4 +41,18 @@ public class ProviderModelRegistryService {
                                         provider +
                                         "."));
     }
+    public ModelDefinition requireModel(
+            Provider provider,
+            String modelId,
+            Set<String> requiredCapabilities) {
+        ModelDefinition model = requireModel(provider, modelId);
+        if (requiredCapabilities != null && !requiredCapabilities.isEmpty()
+                && !model.capabilities().containsAll(requiredCapabilities)) {
+            throw new BusinessException(
+                    "Model " + modelId + " for provider " + provider
+                            + " does not support required capabilities: " + requiredCapabilities);
+        }
+        return model;
+    }
+
 }

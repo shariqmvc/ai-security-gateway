@@ -1,6 +1,7 @@
 package com.ai.gateway.failover;
 
 import com.ai.gateway.config.ProviderRequestBudgetExceededException;
+import com.ai.gateway.multimodal.MediaInputException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -74,6 +75,19 @@ class ProviderFailureClassifierTest {
                 ProviderFailureClassifier.classify(failure));
         assertFalse(ProviderFailureClassifier.isRetryable(failure));
     }
+
+    @Test
+    void classifiesMediaInputFailureAsNonRetryable() {
+        MediaInputException failure =
+                new MediaInputException("Unable to fetch media URL: HTTP 403.");
+
+        assertEquals(
+                ProviderFailureCategory.MEDIA_INPUT,
+                ProviderFailureClassifier.classify(failure));
+
+        assertFalse(ProviderFailureClassifier.isRetryable(failure));
+    }
+
     @Test
     void classifiesRequestBudgetExhaustionAsNonRetryable() {
         ProviderRequestBudgetExceededException failure =

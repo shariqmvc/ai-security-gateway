@@ -88,9 +88,17 @@ public class ExplicitProviderRoutingStrategy
                             + provider + ".");
         }
 
-        registryService.requireModel(
-                provider,
-                model);
+        java.util.Set<String> requiredCapabilities =
+                context.request().getRequiredCapabilities();
+
+        if (requiredCapabilities == null || requiredCapabilities.isEmpty()) {
+            registryService.requireModel(provider, model);
+        } else {
+            registryService.requireModel(
+                    provider,
+                    model,
+                    requiredCapabilities);
+        }
 
         return new RoutingDecision(
                 provider,

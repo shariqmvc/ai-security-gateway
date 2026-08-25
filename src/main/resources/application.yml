@@ -76,6 +76,15 @@ gateway:
   tenant-schema:
     migration:
       reconcile-on-startup: ${GATEWAY_TENANT_SCHEMA_RECONCILE_ON_STARTUP:true}
+  multimodal:
+    remote-media:
+      # Public HTTPS media URLs are resolved by the gateway and translated to
+      # provider-native inline media. HTTP is disabled by default.
+      allow-http: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_ALLOW_HTTP:false}
+      max-bytes: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_MAX_BYTES:15000000}
+      connect-timeout: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_CONNECT_TIMEOUT:5s}
+      read-timeout: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_READ_TIMEOUT:15s}
+
   provider:
 
     http:
@@ -131,6 +140,14 @@ gateway:
         provider: ${ROUTING_FAILURE_INJECTION_PROVIDER:}
         model: ${ROUTING_FAILURE_INJECTION_MODEL:}
         failure-type: ${ROUTING_FAILURE_INJECTION_TYPE:PROVIDER_ERROR}
+
+    # Phase 9 model capability registry. Override per deployment/model.
+    # The registry starts with the configured provider default model.
+    model-capabilities:
+      openai: ${GATEWAY_OPENAI_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING}
+      gemini: ${GATEWAY_GEMINI_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING}
+      ollama: ${GATEWAY_OLLAMA_MODEL_CAPABILITIES:}
+      claude: ${GATEWAY_CLAUDE_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING}
 
     scoring:
       weights:

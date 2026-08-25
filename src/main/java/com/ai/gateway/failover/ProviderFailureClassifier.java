@@ -1,6 +1,7 @@
 package com.ai.gateway.failover;
 
 import com.ai.gateway.config.ProviderRequestBudgetExceededException;
+import com.ai.gateway.multimodal.MediaInputException;
 
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
@@ -28,6 +29,10 @@ public final class ProviderFailureClassifier {
         while (current != null) {
             if (current instanceof ProviderRequestBudgetExceededException) {
                 return ProviderFailureCategory.REQUEST_BUDGET_EXHAUSTED;
+            }
+
+            if (current instanceof MediaInputException) {
+                return ProviderFailureCategory.MEDIA_INPUT;
             }
 
             if (current instanceof ResourceAccessException) {

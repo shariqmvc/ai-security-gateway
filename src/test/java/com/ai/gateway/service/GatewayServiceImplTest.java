@@ -101,6 +101,9 @@ class GatewayServiceImplTest {
     @Mock
     private RagAugmentationService ragAugmentationService;
 
+    @Mock
+    private com.ai.gateway.multimodal.MultimodalRequestValidator multimodalRequestValidator;
+
     @InjectMocks
     private GatewayServiceImpl gatewayService;
 
@@ -156,6 +159,10 @@ class GatewayServiceImplTest {
                         .retrievedCount(0)
                         .selectedCount(0)
                         .build());
+
+        lenient().doNothing()
+                .when(multimodalRequestValidator)
+                .validate(any(ChatRequest.class));
 
         RequestContextHolder.setRequestAttributes(
                 servletRequestAttributes);

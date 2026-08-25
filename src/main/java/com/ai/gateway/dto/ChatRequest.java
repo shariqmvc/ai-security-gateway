@@ -7,6 +7,8 @@ import java.util.Collections;
 import java.util.Set;
 import java.math.BigDecimal;
 import com.ai.gateway.rag.api.RagRequest;
+import com.ai.gateway.multimodal.MediaContent;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 
@@ -20,6 +22,12 @@ public class ChatRequest {
    @NotBlank(message = "Prompt cannot be empty")
     private String prompt;
     private Provider provider;
+
+   /** Optional multimodal input. Text remains in prompt for backward compatibility. */
+   @Builder.Default
+   @Valid
+   @Size(max = 8, message = "A maximum of 8 media items is allowed per request.")
+   private java.util.List<MediaContent> media = java.util.Collections.emptyList();
     private String model;
 
    /** Optional user-requested capabilities used by intelligent routing. */

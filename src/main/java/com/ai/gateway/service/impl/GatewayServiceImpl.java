@@ -22,6 +22,10 @@ import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.rag.augmentation.RagAugmentationResult;
 import com.ai.gateway.rag.augmentation.RagAugmentationService;
+import com.ai.gateway.multimodal.MediaContent;
+import com.ai.gateway.multimodal.MediaTypeKind;
+import com.ai.gateway.multimodal.MultimodalRequestValidator;
+import com.ai.gateway.routing.registry.ModelCapabilities;
 import com.ai.gateway.routing.RoutingContext;
 import com.ai.gateway.routing.RoutingDecision;
 import com.ai.gateway.routing.RoutingService;
@@ -70,6 +74,8 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final RagAugmentationService ragAugmentationService;
 
+    private final MultimodalRequestValidator multimodalRequestValidator;
+
     @Override
     @RequiresFeature(Feature.CHAT)
     public ChatResponse process(ChatRequest request) {
@@ -97,6 +103,8 @@ public class GatewayServiceImpl implements GatewayService {
 
         try {
 
+            multimodalRequestValidator.validate(request);
+            addMultimodalCapabilities(request);
 
             stageStart = System.nanoTime();
             if (request.isExtensiveResearch()) {
@@ -475,6 +483,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .prompt(prompt)
                     .routingDecisionMetadata(routingDecision.metadata())
                     .routingStrategy(routingDecision.strategy())
+                    .media(request.getMedia())
                     .build();
         } catch (Exception ex) {
 
@@ -492,6 +501,24 @@ public class GatewayServiceImpl implements GatewayService {
             throw ex;
         }
     }
+
+    private void addMultimodalCapabilities(ChatRequest request) {
+        if (request.getMedia() == null || request.getMedia().isEmpty()) {
+            return;
+        }
+        java.util.LinkedHashSet<String> capabilities =
+                new java.util.LinkedHashSet<>(request.getRequiredCapabilities() == null
+                        ? java.util.Set.of() : request.getRequiredCapabilities());
+        for (MediaContent media : request.getMedia()) {
+            if (media != null && media.getType() == MediaTypeKind.IMAGE) {
+                capabilities.add(ModelCapabilities.VISION);
+            } else if (media != null && media.getType() == MediaTypeKind.AUDIO) {
+                capabilities.add(ModelCapabilities.AUDIO);
+            }
+        }
+        request.setRequiredCapabilities(java.util.Set.copyOf(capabilities));
+    }
+
     private AIResponse invokeProvider(
             AIRequest request) {
 

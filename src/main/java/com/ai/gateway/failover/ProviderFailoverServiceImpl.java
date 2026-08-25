@@ -458,6 +458,16 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             return;
         }
 
+        /*
+         * Media acquisition/validation failures originate from caller-supplied
+         * input, not from provider availability. Do not mark the provider
+         * unhealthy and do not update its circuit state.
+         */
+        if (ProviderFailureClassifier.classify(ex)
+                == ProviderFailureCategory.MEDIA_INPUT) {
+            return;
+        }
+
         if (routingHealthService != null) {
             routingHealthService.recordFailure(
                     new RoutingCandidate(
@@ -488,6 +498,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     .provider(fallback)
                     .model(fallbackModel.modelId())
                     .prompt(primaryRequest.getPrompt())
+                    .media(primaryRequest.getMedia())
                     .routingDecisionMetadata(primaryRequest.getRoutingDecisionMetadata())
                     .routingStrategy(primaryRequest.getRoutingStrategy())
                     .build();

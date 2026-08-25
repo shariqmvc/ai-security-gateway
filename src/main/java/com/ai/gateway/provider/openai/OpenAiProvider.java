@@ -15,6 +15,15 @@ import com.ai.gateway.provider.openai.dto.OpenAIResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
+import com.ai.gateway.multimodal.MediaContent;
+import com.ai.gateway.multimodal.MediaSourceType;
+import com.ai.gateway.multimodal.MediaTypeKind;
+import com.ai.gateway.provider.openai.dto.OpenAIInputAudio;
+import com.ai.gateway.provider.openai.dto.OpenAIInputContent;
+import com.ai.gateway.provider.openai.dto.OpenAIInputImage;
+import com.ai.gateway.provider.openai.dto.OpenAIInputText;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -53,7 +62,7 @@ public class OpenAiProvider implements AIProvider {
         log.info("Calling OpenAI. model={}", request.getModel());
         OpenAIRequest openAIRequest = OpenAIRequest.builder()
                 .model(request.getModel())
-                .input(request.getPrompt())
+                .input(buildInput(request))
                 .build();
 
         OpenAIResponse response;
@@ -113,6 +122,37 @@ public class OpenAiProvider implements AIProvider {
                 .providerRequestId(response.getId())
                 .usage(usage)
                 .build();
+    }
+
+    private Object buildInput(AIRequest request) {
+        if (request.getMedia() == null || request.getMedia().isEmpty()) {
+            return request.getPrompt();
+        }
+        List<Object> content = new ArrayList<>();
+        if (request.getPrompt() != null && !request.getPrompt().isBlank()) {
+            content.add(OpenAIInputText.builder().text(request.getPrompt()).build());
+        }
+        for (MediaContent media : request.getMedia()) {
+            if (media.getType() == MediaTypeKind.IMAGE) {
+                String imageUrl = media.getSourceType() == MediaSourceType.URL
+                        ? media.getUrl()
+                        : "data:" + media.getMimeType() + ";base64," + media.getData();
+                content.add(OpenAIInputImage.builder()
+                        .imageUrl(imageUrl)
+                        .detail(media.getDetail())
+                        .build());
+            } else if (media.getType() == MediaTypeKind.AUDIO) {
+                String format = media.getMimeType().substring(media.getMimeType().indexOf('/') + 1);
+                String data = media.getData();
+                if (data == null || data.isBlank()) {
+                    throw new IllegalArgumentException("OpenAI audio input currently requires base64 data.");
+                }
+                content.add(OpenAIInputAudio.builder()
+                        .inputAudio(OpenAIInputAudio.InputAudio.builder().data(data).format(format).build())
+                        .build());
+            }
+        }
+        return List.of(OpenAIInputContent.builder().role("user").content(content).build());
     }
 
     private int providerAttempt() {

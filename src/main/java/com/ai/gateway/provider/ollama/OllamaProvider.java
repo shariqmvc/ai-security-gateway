@@ -11,6 +11,9 @@ import com.ai.gateway.provider.AIProvider;
 import com.ai.gateway.provider.ollama.dto.OllamaMessage;
 import com.ai.gateway.provider.ollama.dto.OllamaRequest;
 import com.ai.gateway.provider.ollama.dto.OllamaResponse;
+import com.ai.gateway.multimodal.MediaContent;
+import com.ai.gateway.multimodal.MediaSourceType;
+import com.ai.gateway.multimodal.MediaTypeKind;
 import com.ai.gateway.provider.ollama.dto.OllamaOptions;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -90,16 +93,7 @@ public class OllamaProvider implements AIProvider {
         OllamaRequest ollamaRequest =
                 OllamaRequest.builder()
                         .model(selectedModel)
-                        .messages(
-                                List.of(
-                                        OllamaMessage.builder()
-                                                .role("user")
-                                                .content(
-                                                        request.getPrompt()
-                                                )
-                                                .build()
-                                )
-                        )
+                        .messages(List.of(buildMessage(request)))
                         .stream(false)
                         .options(
                                 OllamaOptions.builder()
@@ -222,6 +216,26 @@ public class OllamaProvider implements AIProvider {
                                 .totalTokens(totalTokens == null ? 0 : totalTokens)
                                 .latencyMs(latencyMs)
                                 .build())
+                .build();
+    }
+
+    private OllamaMessage buildMessage(AIRequest request) {
+        List<String> images = new java.util.ArrayList<>();
+        if (request.getMedia() != null) {
+            for (MediaContent media : request.getMedia()) {
+                if (media.getType() != MediaTypeKind.IMAGE) {
+                    throw new IllegalArgumentException("Ollama provider currently supports IMAGE media only.");
+                }
+                if (media.getSourceType() != MediaSourceType.BASE64) {
+                    throw new IllegalArgumentException("Ollama image input currently requires BASE64 data.");
+                }
+                images.add(media.getData());
+            }
+        }
+        return OllamaMessage.builder()
+                .role("user")
+                .content(request.getPrompt())
+                .images(images.isEmpty() ? null : images)
                 .build();
     }
 

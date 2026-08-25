@@ -24,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
+import com.ai.gateway.multimodal.MediaInputException;
 
 import java.util.List;
 import java.util.Set;
@@ -114,6 +115,50 @@ class ProviderFailoverServiceImplTest {
     private void allowPrimaryCircuit() {
         when(providerCircuitBreaker.allowRequest(any(), any()))
                 .thenReturn(true);
+    }
+
+
+    @Test
+    void shouldNotFailoverOrMarkProviderUnhealthyForMediaInputFailure() {
+
+        allowPrimaryCircuit();
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+
+        MediaInputException failure =
+                new MediaInputException(
+                        "Unable to fetch media URL: HTTP 403.");
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(failure);
+
+        MediaInputException thrown =
+                assertThrows(
+                        MediaInputException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertSame(failure, thrown);
+
+        verify(geminiProvider).chat(primaryRequest);
+
+        verify(providerFactory, never())
+                .getProvider(Provider.OPENAI);
+
+        verify(metricsService, never())
+                .increment(MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
+
+        verify(routingAnalyticsService, never())
+                .recordFailoverAttempt();
+
+        verify(routingAnalyticsService, never())
+                .recordFailoverFailure();
+
+        verify(providerCircuitBreaker, never())
+                .recordFailure(
+                        any(),
+                        any(),
+                        any(ProviderFailureCategory.class));
     }
 
     @Test

@@ -11,6 +11,8 @@ public final class ModelCapabilities {
 
     public static final String VISION = "VISION";
 
+    public static final String AUDIO = "AUDIO";
+
     public static final String TOOLS = "TOOLS";
 
     public static final String REASONING = "REASONING";

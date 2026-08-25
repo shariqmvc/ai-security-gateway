@@ -9,6 +9,6 @@ public class OpenAIRequest {
 
     private String model;
 
-    private String input;
+    private Object input;
 
 }
