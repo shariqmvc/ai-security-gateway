@@ -1,6 +1,8 @@
 package com.ai.gateway.tenant;
 
 import com.ai.gateway.entitlement.enums.Plan;
+import com.ai.gateway.business.Business;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ai.gateway.enums.Provider;
 import jakarta.persistence.*;
 import lombok.*;
@@ -35,6 +37,11 @@ public class Tenant {
 
     @Enumerated(EnumType.STRING)
     private TenantType type;
+
+    /** Business is the organizational identity for this technical tenant. */
+    @OneToOne(mappedBy = "tenant", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Business business;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
