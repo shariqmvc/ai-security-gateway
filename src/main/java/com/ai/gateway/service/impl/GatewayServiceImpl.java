@@ -24,6 +24,8 @@ import com.ai.gateway.rag.augmentation.RagAugmentationResult;
 import com.ai.gateway.rag.augmentation.RagAugmentationService;
 import com.ai.gateway.multimodal.MediaContent;
 import com.ai.gateway.multimodal.MediaTypeKind;
+import com.ai.gateway.cache.CachedInferenceResponse;
+import com.ai.gateway.cache.InferenceCacheService;
 import com.ai.gateway.multimodal.MultimodalRequestValidator;
 import com.ai.gateway.routing.registry.ModelCapabilities;
 import com.ai.gateway.routing.RoutingContext;
@@ -75,6 +77,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final RagAugmentationService ragAugmentationService;
 
     private final MultimodalRequestValidator multimodalRequestValidator;
+
+    private final InferenceCacheService inferenceCacheService;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -166,6 +170,64 @@ public class GatewayServiceImpl implements GatewayService {
                     auth,
                     feature);
             performanceLogger.stage("PROVIDER_ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            // Phase 10 exact-response cache. Security, firewall/policy, PII
+            // masking, RAG augmentation, routing and entitlement checks have
+            // already completed, so a cache hit cannot bypass those controls.
+            // Extensive research is deliberately excluded from exact caching.
+            if (!request.isExtensiveResearch()) {
+                stageStart = System.nanoTime();
+                CachedInferenceResponse cached =
+                        inferenceCacheService.get(auth, aiRequest);
+                long cacheLookupLatency = elapsedMs(stageStart);
+
+                if (cached != null) {
+                    metricsService.increment(MetricsConstants.INFERENCE_CACHE_HITS);
+                    performanceLogger.stage(
+                            "INFERENCE_CACHE",
+                            requestId,
+                            cacheLookupLatency,
+                            "HIT");
+
+                    AIResponse cachedResponse = AIResponse.builder()
+                            .response(cached.response())
+                            .provider(cached.provider())
+                            .model(cached.model())
+                            .build();
+
+                    String restored = restoreResponse(requestId, cachedResponse);
+                    performanceLogger.stage(
+                            "RESPONSE_RESTORE",
+                            requestId,
+                            0L,
+                            "SUCCESS");
+
+                    long latency = elapsedMs(start);
+                    long gatewayOverhead = latency;
+                    performanceLogger.requestCompleted(
+                            requestId,
+                            latency,
+                            cached.provider() == null ? null : cached.provider().name(),
+                            cached.model(),
+                            "CACHE_HIT",
+                            0L,
+                            gatewayOverhead);
+
+                    return ChatResponse.builder()
+                            .requestId(requestId)
+                            .response(restored)
+                            .rag(buildRagMetadata(request.getRag(), ragResult))
+                            .build();
+                }
+
+                metricsService.increment(MetricsConstants.INFERENCE_CACHE_MISSES);
+                performanceLogger.stage(
+                        "INFERENCE_CACHE",
+                        requestId,
+                        cacheLookupLatency,
+                        "MISS");
+            }
+
             // -------------------------------
             // Provider Invocation
             // -------------------------------
@@ -204,6 +266,16 @@ public class GatewayServiceImpl implements GatewayService {
                     requestId,
                     elapsedMs(stageStart),
                     "SUCCESS");
+
+            if (!request.isExtensiveResearch()) {
+                inferenceCacheService.put(
+                        auth,
+                        aiRequest,
+                        new CachedInferenceResponse(
+                                aiResponse.getResponse(),
+                                aiResponse.getProvider(),
+                                aiResponse.getModel()));
+            }
 
             stageStart = System.nanoTime();
             String restored =

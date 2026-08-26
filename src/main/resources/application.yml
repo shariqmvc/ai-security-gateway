@@ -55,7 +55,13 @@ gemini:
 ollama:
   base:
     url: http://localhost:11434
-  model: ${OLLAMA_MODEL:llama3.2:3b}
+  # Backward-compatible default model used when a request does not select one.
+  model: ${OLLAMA_MODEL:llama3.1:8b}
+  # Models exposed to Alroute's provider/model registry. The first entry
+  # remains the default; additional models can be selected per request.
+  models:
+    - ${OLLAMA_MODEL:llama3.1:8b}
+    - ${OLLAMA_MODEL_2:llama3.2:3b}
   # Keep the local model resident between requests and cap generation so
   # provider latency cannot grow without bound. Override per environment.
   keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
@@ -73,6 +79,11 @@ security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
+  cache:
+    exact:
+      enabled: ${GATEWAY_CACHE_EXACT_ENABLED:true}
+      maximum-size: ${GATEWAY_CACHE_EXACT_MAXIMUM_SIZE:10000}
+      ttl: ${GATEWAY_CACHE_EXACT_TTL:10m}
   tenant-schema:
     migration:
       reconcile-on-startup: ${GATEWAY_TENANT_SCHEMA_RECONCILE_ON_STARTUP:true}

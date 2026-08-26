@@ -79,4 +79,46 @@ class ModelRegistryTest {
                                 "unknown-model")
                         .isEmpty());
     }
+
+    @Test
+    void shouldRegisterAllConfiguredOllamaModels() {
+        when(providerFactory.getProvider(Provider.OLLAMA))
+                .thenReturn(provider);
+
+        when(provider.defaultModel())
+                .thenReturn("llama3.1:8b");
+
+        com.ai.gateway.config.OllamaConfig ollamaConfig =
+                new com.ai.gateway.config.OllamaConfig();
+        ollamaConfig.setModel("llama3.1:8b");
+        ollamaConfig.setModels(java.util.List.of(
+                "llama3.1:8b",
+                "llama3.2:3b"));
+
+        registry = new ModelRegistryImpl(
+                providerFactory,
+                ollamaConfig,
+                "VISION,AUDIO,TOOLS,REASONING",
+                "VISION,AUDIO,TOOLS,REASONING",
+                "",
+                "VISION,AUDIO,TOOLS,REASONING");
+
+        assertEquals(
+                java.util.List.of("llama3.1:8b", "llama3.2:3b"),
+                registry.findByProvider(Provider.OLLAMA)
+                        .stream()
+                        .map(ModelDefinition::modelId)
+                        .toList());
+
+        assertTrue(
+                registry.find(
+                                Provider.OLLAMA,
+                                "llama3.2:3b")
+                        .isPresent());
+
+        assertEquals(
+                "llama3.1:8b",
+                registry.defaultModel(Provider.OLLAMA));
+    }
+
 }

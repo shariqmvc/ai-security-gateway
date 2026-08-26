@@ -2,6 +2,7 @@ package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.cache.InferenceCacheService;
 import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.ChatRequest;
@@ -103,6 +104,9 @@ class GatewayServiceImplTest {
 
     @Mock
     private com.ai.gateway.multimodal.MultimodalRequestValidator multimodalRequestValidator;
+
+    @Mock
+    private InferenceCacheService inferenceCacheService;
 
     @InjectMocks
     private GatewayServiceImpl gatewayService;

@@ -39,6 +39,14 @@ public class GatewayMetricsService {
                 new AtomicLong());
 
         counters.put(
+                MetricsConstants.INFERENCE_CACHE_HITS,
+                new AtomicLong());
+
+        counters.put(
+                MetricsConstants.INFERENCE_CACHE_MISSES,
+                new AtomicLong());
+
+        counters.put(
                 MetricsConstants.ACCESS_DENIED,
                 new AtomicLong());
 
@@ -167,6 +175,16 @@ public class GatewayMetricsService {
                 .policyBlockedRequests(
                         counters.get(
                                         MetricsConstants.POLICY_BLOCKED)
+                                .get())
+
+                .inferenceCacheHits(
+                        counters.get(
+                                        MetricsConstants.INFERENCE_CACHE_HITS)
+                                .get())
+
+                .inferenceCacheMisses(
+                        counters.get(
+                                        MetricsConstants.INFERENCE_CACHE_MISSES)
                                 .get())
 
                 .openAiRequests(

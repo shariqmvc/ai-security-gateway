@@ -12,6 +12,9 @@ public final class MetricsConstants {
     public static final String FIREWALL_BLOCKED = "FIREWALL_BLOCKED";
     public static final String POLICY_BLOCKED = "POLICY_BLOCKED";
 
+    public static final String INFERENCE_CACHE_HITS = "INFERENCE_CACHE_HITS";
+    public static final String INFERENCE_CACHE_MISSES = "INFERENCE_CACHE_MISSES";
+
     public static final String ACCESS_DENIED = "ACCESS_DENIED";
 
     public static final String RATE_LIMIT_ALLOWED = "RATE_LIMIT_ALLOWED";

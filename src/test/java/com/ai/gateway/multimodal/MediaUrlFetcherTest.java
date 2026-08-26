@@ -13,7 +13,7 @@ class MediaUrlFetcherTest {
         RemoteMediaProperties properties = new RemoteMediaProperties();
         MediaUrlFetcher fetcher = new MediaUrlFetcher(properties);
 
-        IllegalArgumentException ex = assertThrows(
+        MediaInputException ex = assertThrows(
                 MediaInputException.class,
                 () -> fetcher.fetch(MediaContent.builder()
                         .type(MediaTypeKind.IMAGE)
@@ -30,7 +30,7 @@ class MediaUrlFetcherTest {
         RemoteMediaProperties properties = new RemoteMediaProperties();
         MediaUrlFetcher fetcher = new MediaUrlFetcher(properties);
 
-        IllegalArgumentException ex = assertThrows(
+        MediaInputException ex = assertThrows(
                 MediaInputException.class,
                 () -> fetcher.fetch(MediaContent.builder()
                         .type(MediaTypeKind.IMAGE)
@@ -47,7 +47,7 @@ class MediaUrlFetcherTest {
         RemoteMediaProperties properties = new RemoteMediaProperties();
         MediaUrlFetcher fetcher = new MediaUrlFetcher(properties);
 
-        IllegalArgumentException ex = assertThrows(
+        MediaInputException ex = assertThrows(
                 MediaInputException.class,
                 () -> fetcher.fetch(MediaContent.builder()
                         .type(MediaTypeKind.IMAGE)

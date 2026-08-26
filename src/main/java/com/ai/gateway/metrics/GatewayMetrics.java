@@ -19,6 +19,10 @@ public class GatewayMetrics {
 
     private long policyBlockedRequests;
 
+    private long inferenceCacheHits;
+
+    private long inferenceCacheMisses;
+
     private long openAiRequests;
 
     private long geminiRequests;

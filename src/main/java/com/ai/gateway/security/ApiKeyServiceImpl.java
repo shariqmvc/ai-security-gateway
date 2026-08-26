@@ -63,7 +63,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
             return ApiKeyProvisioningResult.from(existing.get(), null);
         }
 
-        ApiKey key = createKey(tenant, "tenant-bootstrap");
+        ApiKey key = createKey(tenant, "tenant-bootstrap",SecurityRole.TENANT_USER);
         return ApiKeyProvisioningResult.from(key, key.getApiKey());
     }
 
@@ -94,7 +94,8 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                 tenant,
                 clientName == null || clientName.isBlank()
                         ? "tenant-rotation"
-                        : clientName);
+                        : clientName,
+                role);
 
         return ApiKeyProvisioningResult.from(key, key.getApiKey());
     }
@@ -115,7 +116,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         repository.save(key);
     }
 
-    private ApiKey createKey(Tenant tenant, String clientName) {
+    private ApiKey createKey(Tenant tenant, String clientName, SecurityRole role) {
         for (int attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
             String secret = generateSecret();
             if (repository.findByApiKeyWithTenant(secret).isPresent()) {
@@ -127,9 +128,9 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                     .clientName(clientName)
                     .tenant(tenant)
                     .status(ApiKeyStatus.ACTIVE)
+                    .role(role)
                     .createdAt(LocalDateTime.now())
                     .build();
-
             return repository.save(key);
         }
 
