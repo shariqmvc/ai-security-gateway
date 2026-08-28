@@ -610,17 +610,17 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         ? primaryFailure
                         : finalFailure;
 
-        if (failure instanceof org.springframework.web.client.RestClientResponseException responseException) {
-            int status = responseException.getStatusCode().value();
-            if (status == 401 || status == 403) {
-                return new ProviderAuthenticationException(
-                        provider,
-                        responseException);
-            }
+        org.springframework.web.client.RestClientResponseException
+                authenticationFailure = findAuthenticationFailure(failure);
+
+        if (authenticationFailure != null) {
+            return new ProviderAuthenticationException(
+                    provider,
+                    authenticationFailure);
         }
 
         if (failure instanceof RuntimeException runtimeException) {
-            if (finalFailure != failure) {
+            if (finalFailure != null && finalFailure != failure) {
                 runtimeException.addSuppressed(finalFailure);
             }
             return runtimeException;
@@ -633,20 +633,40 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
     private RuntimeException normalizeNonRetryableProviderFailure(
             Provider provider, Throwable failure) {
+
+        org.springframework.web.client.RestClientResponseException
+                authenticationFailure = findAuthenticationFailure(failure);
+
+        if (authenticationFailure != null) {
+            return new ProviderAuthenticationException(
+                    provider,
+                    authenticationFailure);
+        }
+
+        return failure instanceof RuntimeException runtimeException
+                ? runtimeException
+                : new IllegalStateException(
+                        "Provider execution failed.",
+                        failure);
+    }
+
+    private org.springframework.web.client.RestClientResponseException
+    findAuthenticationFailure(Throwable failure) {
+
         Throwable current = failure;
+
         while (current != null) {
             if (current instanceof org.springframework.web.client.RestClientResponseException responseException) {
                 int status = responseException.getStatusCode().value();
                 if (status == 401 || status == 403) {
-                    return new ProviderAuthenticationException(provider, responseException);
+                    return responseException;
                 }
-                break;
             }
+
             current = current.getCause();
         }
-        return failure instanceof RuntimeException runtimeException
-                ? runtimeException
-                : new IllegalStateException("Provider execution failed.", failure);
+
+        return null;
     }
 
 

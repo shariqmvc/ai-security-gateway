@@ -8,6 +8,9 @@ import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.mapper.ProviderFeatureMapper;
 import com.ai.gateway.entitlement.service.EntitlementService;
 import com.ai.gateway.failover.ProviderFailoverService;
+import com.ai.gateway.provider.AIStreamResult;
+import com.ai.gateway.provider.StreamingAIProvider;
+import com.ai.gateway.provider.AIProviderFactory;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.firewall.FirewallResult;
@@ -42,6 +45,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -79,6 +83,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final MultimodalRequestValidator multimodalRequestValidator;
 
     private final InferenceCacheService inferenceCacheService;
+
+    private final AIProviderFactory providerFactory;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -374,6 +380,349 @@ public class GatewayServiceImpl implements GatewayService {
             throw ex;
         }
 
+    }
+
+
+    @Override
+    @RequiresFeature(Feature.CHAT)
+    public void stream(
+            ChatRequest request,
+            Consumer<GatewayStreamEvent> eventConsumer) {
+
+        metricsService.increment(MetricsConstants.TOTAL_REQUESTS);
+
+        UUID requestId = resolveRequestId();
+        long start = System.nanoTime();
+        performanceLogger.requestStart(requestId, "/api/chat/stream");
+
+        AuthenticationContext auth = getAuthenticationContext();
+        AIRequest aiRequest = null;
+        String maskedPrompt = request.getPrompt();
+        long providerStart = 0L;
+        boolean providerInvocationStarted = false;
+        boolean providerInvocationSucceeded = false;
+        boolean successPersisted = false;
+
+        try {
+            multimodalRequestValidator.validate(request);
+            addMultimodalCapabilities(request);
+
+            long stageStart = System.nanoTime();
+            if (request.isExtensiveResearch()) {
+                entitlementService.validateFeature(
+                        auth.getTenantId(),
+                        Feature.EXTENSIVE_RESEARCH);
+            }
+            performanceLogger.stage(
+                    "ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            stageStart = System.nanoTime();
+            validateRequest(request.getPrompt());
+            performanceLogger.stage(
+                    "FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            stageStart = System.nanoTime();
+            MaskingResult maskingResult =
+                    maskPrompt(requestId, request.getPrompt());
+            maskedPrompt = maskingResult.getMaskedPrompt();
+            performanceLogger.stage(
+                    "PII_MASKING_AND_TOKEN_VAULT",
+                    requestId,
+                    elapsedMs(stageStart),
+                    "SUCCESS");
+
+            stageStart = System.nanoTime();
+            RagAugmentationResult ragResult =
+                    ragAugmentationService.augment(
+                            auth.getTenantId(),
+                            maskedPrompt,
+                            request.getRag());
+            String providerPrompt = ragResult.getAugmentedPrompt();
+            performanceLogger.stage(
+                    "RAG_AUGMENTATION",
+                    requestId,
+                    elapsedMs(stageStart),
+                    request.getRag() != null && request.getRag().isEnabled()
+                            ? "ENABLED" : "DISABLED");
+
+            stageStart = System.nanoTime();
+            aiRequest = buildAIRequest(
+                    requestId,
+                    request,
+                    auth,
+                    providerPrompt);
+            performanceLogger.stage(
+                    "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            stageStart = System.nanoTime();
+            Feature feature =
+                    ProviderFeatureMapper.toFeature(aiRequest.getProvider());
+            validateFeature(auth, feature);
+            performanceLogger.stage(
+                    "PROVIDER_ENTITLEMENT",
+                    requestId,
+                    elapsedMs(stageStart),
+                    "SUCCESS");
+
+            eventConsumer.accept(GatewayStreamEvent.builder()
+                    .requestId(requestId)
+                    .type("start")
+                    .provider(aiRequest.getProvider().name())
+                    .model(aiRequest.getModel())
+                    .build());
+
+            var provider = providerFactory.getProvider(aiRequest.getProvider());
+            if (!(provider instanceof StreamingAIProvider streamingProvider)) {
+                throw new UnsupportedOperationException(
+                        "Streaming is not supported by provider "
+                                + aiRequest.getProvider()
+                                + " / "
+                                + aiRequest.getModel());
+            }
+
+            providerStart = System.nanoTime();
+            providerInvocationStarted = true;
+            StringBuilder restoredSoFar = new StringBuilder();
+            String[] lastEmitted = {""};
+
+            AIStreamResult result = streamingProvider.stream(
+                    aiRequest,
+                    delta -> {
+                        if (delta == null || delta.isEmpty()) {
+                            return;
+                        }
+
+                        restoredSoFar.append(delta);
+                        String restored = restoreService.restore(
+                                restoredSoFar.toString(),
+                                requestId);
+                        String emitted = lastEmitted[0];
+
+                        if (restored.startsWith(emitted)
+                                && restored.length() > emitted.length()) {
+                            String suffix =
+                                    restored.substring(emitted.length());
+                            lastEmitted[0] = restored;
+                            eventConsumer.accept(
+                                    GatewayStreamEvent.builder()
+                                            .requestId(requestId)
+                                            .type("delta")
+                                            .content(suffix)
+                                            .build());
+                        } else if (!restored.equals(emitted)) {
+                            lastEmitted[0] = restored;
+                            eventConsumer.accept(
+                                    GatewayStreamEvent.builder()
+                                            .requestId(requestId)
+                                            .type("replace")
+                                            .content(restored)
+                                            .build());
+                        }
+                    });
+            providerInvocationSucceeded = true;
+
+            long providerLatency = elapsedMs(providerStart);
+
+            AIResponse finalResponse = AIResponse.builder()
+                    .response(result.getResponse())
+                    .provider(result.getProvider())
+                    .model(result.getModel())
+                    .usage(Usage.builder()
+                            .inputTokens(result.getInputTokens() == null ? 0 : result.getInputTokens())
+                            .outputTokens(result.getOutputTokens() == null ? 0 : result.getOutputTokens())
+                            .totalTokens(result.getTotalTokens() == null ? 0 : result.getTotalTokens())
+                            .latencyMs(result.getLatencyMs() == null ? providerLatency : result.getLatencyMs())
+                            .build())
+                    .build();
+
+            aiRequest.setProvider(result.getProvider());
+            aiRequest.setModel(result.getModel());
+
+            stageStart = System.nanoTime();
+            enforcePostProviderGuardrails(
+                    requestId,
+                    auth,
+                    aiRequest,
+                    finalResponse);
+            performanceLogger.stage(
+                    "GOVERNANCE_GUARDRAILS",
+                    requestId,
+                    elapsedMs(stageStart),
+                    "SUCCESS");
+
+            stageStart = System.nanoTime();
+            restoreService.restore(result.getResponse(), requestId);
+            performanceLogger.stage(
+                    "RESPONSE_RESTORE",
+                    requestId,
+                    elapsedMs(stageStart),
+                    "SUCCESS");
+
+            long latency = elapsedMs(start);
+            postProviderPersistenceService.persistSuccess(
+                    requestId,
+                    auth,
+                    aiRequest,
+                    finalResponse,
+                    new RoutingDecision(
+                            aiRequest.getProvider(),
+                            aiRequest.getModel(),
+                            aiRequest.getRoutingStrategy(),
+                            aiRequest.getRoutingDecisionMetadata()),
+                    providerLatency,
+                    maskedPrompt,
+                    latency);
+            successPersisted = true;
+
+            performanceLogger.stage(
+                    "POST_PROVIDER_PERSISTENCE_ASYNC",
+                    requestId,
+                    0L,
+                    "QUEUED");
+
+            performanceLogger.requestCompleted(
+                    requestId,
+                    latency,
+                    aiRequest.getProvider().name(),
+                    aiRequest.getModel(),
+                    "STREAM_SUCCESS",
+                    providerLatency,
+                    Math.max(0L, latency - providerLatency));
+
+            eventConsumer.accept(GatewayStreamEvent.builder()
+                    .requestId(requestId)
+                    .type("done")
+                    .provider(aiRequest.getProvider().name())
+                    .model(aiRequest.getModel())
+                    .inputTokens(result.getInputTokens())
+                    .outputTokens(result.getOutputTokens())
+                    .totalTokens(result.getTotalTokens())
+                    .latencyMs(latency)
+                    .build());
+
+        } catch (StreamClientDisconnectedException ex) {
+            long latency = elapsedMs(start);
+            long providerLatency = providerInvocationStarted
+                    ? elapsedMs(providerStart) : 0L;
+
+            if (!successPersisted) {
+                postProviderPersistenceService.persistFailure(
+                        requestId,
+                        auth,
+                        aiRequest,
+                        aiRequest == null ? null :
+                                new RoutingDecision(
+                                        aiRequest.getProvider(),
+                                        aiRequest.getModel(),
+                                        aiRequest.getRoutingStrategy(),
+                                        aiRequest.getRoutingDecisionMetadata()),
+                        providerLatency,
+                        maskedPrompt,
+                        latency,
+                        providerInvocationStarted && !providerInvocationSucceeded,
+                        "CLIENT_DISCONNECT");
+                performanceLogger.stage(
+                        "POST_PROVIDER_PERSISTENCE_ASYNC",
+                        requestId,
+                        0L,
+                        "QUEUED");
+            }
+
+            performanceLogger.requestCompleted(
+                    requestId,
+                    latency,
+                    aiRequest != null && aiRequest.getProvider() != null
+                            ? aiRequest.getProvider().name() : null,
+                    aiRequest != null ? aiRequest.getModel() : null,
+                    "STREAM_CLIENT_DISCONNECTED",
+                    providerLatency,
+                    Math.max(0L, latency - providerLatency));
+
+            // The socket is already gone. Never attempt a second SSE write.
+            return;
+
+        } catch (Exception ex) {
+            long latency = elapsedMs(start);
+            long providerLatency = providerInvocationStarted
+                    ? elapsedMs(providerStart) : 0L;
+
+            if (!successPersisted) {
+                postProviderPersistenceService.persistFailure(
+                        requestId,
+                        auth,
+                        aiRequest,
+                        aiRequest == null ? null :
+                                new RoutingDecision(
+                                        aiRequest.getProvider(),
+                                        aiRequest.getModel(),
+                                        aiRequest.getRoutingStrategy(),
+                                        aiRequest.getRoutingDecisionMetadata()),
+                        providerLatency,
+                        maskedPrompt,
+                        latency,
+                        providerInvocationStarted && !providerInvocationSucceeded,
+                        ex.getClass().getSimpleName());
+
+                performanceLogger.stage(
+                        "POST_PROVIDER_PERSISTENCE_ASYNC",
+                        requestId,
+                        0L,
+                        "QUEUED");
+            }
+
+            performanceLogger.requestCompleted(
+                    requestId,
+                    latency,
+                    aiRequest != null && aiRequest.getProvider() != null
+                            ? aiRequest.getProvider().name() : null,
+                    aiRequest != null ? aiRequest.getModel() : null,
+                    "STREAM_FAILED",
+                    providerLatency,
+                    Math.max(0L, latency - providerLatency));
+
+            /*
+             * The HTTP status is normally already committed after the first
+             * SSE event. Therefore stream failures are represented as a
+             * terminal SSE error event, not as a second HTTP response.
+             */
+            eventConsumer.accept(GatewayStreamEvent.builder()
+                    .requestId(requestId)
+                    .type("error")
+                    .error(streamErrorMessage(ex))
+                    .build());
+        }
+    }
+
+    private String streamErrorMessage(Throwable ex) {
+        Throwable current = ex;
+
+        while (current != null) {
+            if (current instanceof java.net.SocketTimeoutException
+                    || current instanceof java.util.concurrent.TimeoutException
+                    || current.getClass().getSimpleName().contains("Timeout")) {
+                return "Provider request timed out.";
+            }
+
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(java.util.Locale.ROOT);
+
+                if (normalized.contains("timed out")
+                        || normalized.contains("timeout")
+                        || normalized.contains("read timed out")
+                        || normalized.contains("connect timed out")) {
+                    return "Provider request timed out.";
+                }
+            }
+
+            current = current.getCause();
+        }
+
+        if (ex instanceof UnsupportedOperationException) {
+            return ex.getMessage();
+        }
+
+        return "Streaming request failed.";
     }
 
     private UUID resolveRequestId() {

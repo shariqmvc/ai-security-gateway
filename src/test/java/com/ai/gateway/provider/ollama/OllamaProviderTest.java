@@ -7,17 +7,28 @@ import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.enums.Provider;
 import com.ai.gateway.observability.PerformanceLogger;
+import com.ai.gateway.provider.AIStreamResult;
 import com.ai.gateway.provider.ollama.dto.OllamaMessage;
 import com.ai.gateway.provider.ollama.dto.OllamaOptions;
 import com.ai.gateway.provider.ollama.dto.OllamaRequest;
 import com.ai.gateway.provider.ollama.dto.OllamaResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.http.client.MockClientHttpResponse;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.web.client.RequestCallback;
+import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -29,6 +40,7 @@ class OllamaProviderTest {
     void sendsLatencyControlsAndMapsOllamaTelemetry() {
         RestTemplate restTemplate = mock(RestTemplate.class);
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("llama3.1:8b");
@@ -67,7 +79,8 @@ class OllamaProviderTest {
                 restTemplate,
                 config,
                 performanceLogger,
-                limiter);
+                limiter,
+                objectMapper);
 
         AIResponse result = provider.chat(
                 AIRequest.builder()
@@ -111,4 +124,120 @@ class OllamaProviderTest {
                 eq(30_000_000L),
                 eq(2_000_000_000L));
     }
+
+    @Test
+    void streamsNdjsonDeltasAndMapsFinalTelemetry() throws Exception {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        OllamaConfig config = new OllamaConfig();
+        config.setModel("llama3.2:3b");
+        config.setNumCtx(4096);
+        config.setNumPredict(512);
+        config.setKeepAlive("10m");
+
+        ProviderConcurrencyProperties concurrencyProperties =
+                new ProviderConcurrencyProperties();
+        concurrencyProperties.setProviders(new EnumMap<>(Provider.class));
+        ProviderConcurrencyLimiter limiter = new ProviderConcurrencyLimiter(
+                concurrencyProperties,
+                performanceLogger);
+
+        OllamaProvider provider = new OllamaProvider(
+                restTemplate,
+                config,
+                performanceLogger,
+                limiter,
+                objectMapper);
+        ReflectionTestUtils.setField(provider, "baseUrl", "http://localhost:11434");
+
+        when(restTemplate.execute(
+                anyString(),
+                eq(HttpMethod.POST),
+                any(RequestCallback.class),
+                any(ResponseExtractor.class)))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    ResponseExtractor<Object> extractor =
+                            invocation.getArgument(3);
+                    String body = """
+                            {"message":{"role":"assistant","content":"hello "},"prompt_eval_count":4}
+                            {"message":{"role":"assistant","content":"world"},"eval_count":2,"total_duration":5000000}
+                            """;
+                    ClientHttpResponse response = new MockClientHttpResponse(
+                            body.getBytes(StandardCharsets.UTF_8),
+                            HttpStatus.OK);
+                    return extractor.extractData(response);
+                });
+
+        List<String> deltas = new java.util.ArrayList<>();
+        AIStreamResult result = provider.stream(
+                AIRequest.builder()
+                        .provider(Provider.OLLAMA)
+                        .model("llama3.2:3b")
+                        .prompt("hello")
+                        .build(),
+                deltas::add);
+
+        assertEquals(List.of("hello ", "world"), deltas);
+        assertEquals("hello world", result.getResponse());
+        assertEquals(Provider.OLLAMA, result.getProvider());
+        assertEquals("llama3.2:3b", result.getModel());
+        assertEquals(4, result.getInputTokens());
+        assertEquals(2, result.getOutputTokens());
+        assertEquals(6, result.getTotalTokens());
+
+        verify(performanceLogger).providerCompleted(
+                any(), eq("OLLAMA"), eq("llama3.2:3b"), eq(1), anyLong(), eq("HTTP_200"));
+    }
+
+    @Test
+    void propagatesProviderTimeoutAndLogsFailure() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        OllamaConfig config = new OllamaConfig();
+        config.setModel("llama3.2:3b");
+
+        ProviderConcurrencyProperties concurrencyProperties =
+                new ProviderConcurrencyProperties();
+        concurrencyProperties.setProviders(new EnumMap<>(Provider.class));
+        ProviderConcurrencyLimiter limiter = new ProviderConcurrencyLimiter(
+                concurrencyProperties,
+                performanceLogger);
+
+        OllamaProvider provider = new OllamaProvider(
+                restTemplate,
+                config,
+                performanceLogger,
+                limiter,
+                objectMapper);
+
+        ResourceAccessException timeout = new ResourceAccessException(
+                "Read timed out",
+                new java.net.SocketTimeoutException("Read timed out"));
+        when(restTemplate.execute(
+                anyString(),
+                eq(HttpMethod.POST),
+                any(RequestCallback.class),
+                any(ResponseExtractor.class)))
+                .thenThrow(timeout);
+
+        ResourceAccessException thrown = assertThrows(
+                ResourceAccessException.class,
+                () -> provider.stream(
+                        AIRequest.builder()
+                                .provider(Provider.OLLAMA)
+                                .model("llama3.2:3b")
+                                .prompt("hello")
+                                .build(),
+                        delta -> { }));
+
+        assertSame(timeout, thrown);
+        verify(performanceLogger).providerCompleted(
+                any(), eq("OLLAMA"), eq("llama3.2:3b"), eq(1), anyLong(), eq("FAILED:ResourceAccessException"));
+    }
+
 }

@@ -765,6 +765,160 @@ class ProviderFailoverServiceImplTest {
                 result.getModel());
     }
 
+    @Test
+    void shouldFailoverOnProviderServerError() {
+
+        allowPrimaryCircuit();
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+        when(providerFactory.getProvider(Provider.OPENAI))
+                .thenReturn(openAiProvider);
+
+        org.springframework.web.client.HttpServerErrorException serverFailure =
+                org.springframework.web.client.HttpServerErrorException.create(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Provider unavailable",
+                        HttpHeaders.EMPTY,
+                        null,
+                        null);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(serverFailure);
+        when(openAiProvider.defaultModel())
+                .thenReturn("gpt-test");
+        when(registry.requireProvider(Provider.OPENAI))
+                .thenReturn(enabledProvider(Provider.OPENAI));
+        when(registry.requireModel(Provider.OPENAI, "gpt-test"))
+                .thenReturn(enabledModel(Provider.OPENAI, "gpt-test"));
+        when(openAiProvider.chat(any(AIRequest.class)))
+                .thenReturn(response);
+
+        assertSame(response, service.execute(primaryRequest));
+
+        verify(geminiProvider).chat(primaryRequest);
+        verify(openAiProvider).chat(any(AIRequest.class));
+        verify(metricsService).increment(MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
+        verify(metricsService).increment(MetricsConstants.ROUTING_FAILOVER_SUCCESS);
+        verify(providerCircuitBreaker).recordFailure(
+                eq(Provider.GEMINI),
+                eq("gemini-test"),
+                eq(ProviderFailureCategory.SERVER_ERROR));
+    }
+
+    @Test
+    void shouldFailoverOnRateLimitAndUseRetryAfterForCircuitDuration() {
+
+        allowPrimaryCircuit();
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+        when(providerFactory.getProvider(Provider.OPENAI))
+                .thenReturn(openAiProvider);
+
+        HttpClientErrorException rateLimited =
+                HttpClientErrorException.create(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        "Rate limited",
+                        retryAfterHeaders(),
+                        null,
+                        null);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(rateLimited);
+        when(openAiProvider.defaultModel())
+                .thenReturn("gpt-test");
+        when(registry.requireProvider(Provider.OPENAI))
+                .thenReturn(enabledProvider(Provider.OPENAI));
+        when(registry.requireModel(Provider.OPENAI, "gpt-test"))
+                .thenReturn(enabledModel(Provider.OPENAI, "gpt-test"));
+        when(openAiProvider.chat(any(AIRequest.class)))
+                .thenReturn(response);
+
+        assertSame(response, service.execute(primaryRequest));
+
+        verify(providerCircuitBreaker).recordFailure(
+                eq(Provider.GEMINI),
+                eq("gemini-test"),
+                eq(ProviderFailureCategory.RATE_LIMITED),
+                eq(7000L));
+        verify(openAiProvider).chat(any(AIRequest.class));
+    }
+
+    @Test
+    void shouldFailoverOnWrappedProviderTimeout() {
+
+        allowPrimaryCircuit();
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+        when(providerFactory.getProvider(Provider.OPENAI))
+                .thenReturn(openAiProvider);
+
+        RuntimeException timeout =
+                new RuntimeException(
+                        "provider call failed",
+                        new java.net.SocketTimeoutException("Read timed out"));
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(timeout);
+        when(openAiProvider.defaultModel())
+                .thenReturn("gpt-test");
+        when(registry.requireProvider(Provider.OPENAI))
+                .thenReturn(enabledProvider(Provider.OPENAI));
+        when(registry.requireModel(Provider.OPENAI, "gpt-test"))
+                .thenReturn(enabledModel(Provider.OPENAI, "gpt-test"));
+        when(openAiProvider.chat(any(AIRequest.class)))
+                .thenReturn(response);
+
+        assertSame(response, service.execute(primaryRequest));
+
+        verify(providerCircuitBreaker).recordFailure(
+                eq(Provider.GEMINI),
+                eq("gemini-test"),
+                eq(ProviderFailureCategory.TIMEOUT));
+        verify(openAiProvider).chat(any(AIRequest.class));
+    }
+
+    @Test
+    void shouldNotFailoverWhenFallbackIsUnavailable() {
+
+        allowPrimaryCircuit();
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(new RuntimeException("Gemini unavailable"));
+
+        when(registry.requireProvider(Provider.OPENAI))
+                .thenThrow(
+                        new IllegalStateException(
+                                "OPENAI disabled"));
+
+        RuntimeException thrown =
+                assertThrows(
+                        RuntimeException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertEquals(
+                "Gemini unavailable",
+                thrown.getMessage());
+
+        verify(openAiProvider, never())
+                .chat(any(AIRequest.class));
+
+        verify(metricsService, never())
+                .increment(
+                        MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
+    }
+
+    private HttpHeaders retryAfterHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Retry-After", "7");
+        return headers;
+    }
+
     private ProviderDefinition enabledProvider(
             Provider provider) {
 

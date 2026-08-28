@@ -12,11 +12,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 
 /**
  * Executor for post-provider persistence/observability work.
@@ -27,10 +28,10 @@ import java.util.concurrent.Executor;
  */
 @Configuration
 @EnableAsync
-public class GatewayAsyncConfig {
+public class GatewayAsyncConfig implements WebMvcConfigurer {
 
     @Bean(name = "gatewayAsyncExecutor")
-    public Executor gatewayAsyncExecutor() {
+    public ThreadPoolTaskExecutor gatewayAsyncExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(4);
         executor.setMaxPoolSize(16);
@@ -39,6 +40,16 @@ public class GatewayAsyncConfig {
         executor.setTaskDecorator(new TenantContextTaskDecorator());
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * Spring MVC executes StreamingResponseBody on an async worker thread.
+     * Use the same context-propagating executor so request/tenant/security
+     * context is available to provider streaming telemetry.
+     */
+    @Override
+    public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
+        configurer.setTaskExecutor(gatewayAsyncExecutor());
     }
 
     @Bean

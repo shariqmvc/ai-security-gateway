@@ -6,6 +6,7 @@ import com.ai.gateway.multimodal.MediaInputException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.net.SocketTimeoutException;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 
@@ -33,6 +34,10 @@ public final class ProviderFailureClassifier {
 
             if (current instanceof MediaInputException) {
                 return ProviderFailureCategory.MEDIA_INPUT;
+            }
+
+            if (current instanceof SocketTimeoutException) {
+                return ProviderFailureCategory.TIMEOUT;
             }
 
             if (current instanceof ResourceAccessException) {
@@ -90,7 +95,7 @@ public final class ProviderFailureClassifier {
                         responseException.getResponseHeaders() == null
                                 ? null
                                 : responseException.getResponseHeaders()
-                                        .getFirst("Retry-After");
+                                .getFirst("Retry-After");
 
                 if (header == null || header.isBlank()) {
                     return java.util.Optional.empty();

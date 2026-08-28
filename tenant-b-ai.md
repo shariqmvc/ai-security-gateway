@@ -1,0 +1,1 @@
+AegisAI Tenant B uses Ollama for local embedding generation.

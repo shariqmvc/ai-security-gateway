@@ -7,6 +7,10 @@ import com.ai.gateway.dto.AIRequest;
 import com.ai.gateway.dto.AIResponse;
 import com.ai.gateway.dto.ChatRequest;
 import com.ai.gateway.dto.ChatResponse;
+import com.ai.gateway.provider.AIProvider;
+import com.ai.gateway.provider.AIProviderFactory;
+import com.ai.gateway.provider.AIStreamResult;
+import com.ai.gateway.provider.StreamingAIProvider;
 import com.ai.gateway.dto.MaskingResult;
 import com.ai.gateway.dto.Usage;
 import com.ai.gateway.entitlement.enums.Feature;
@@ -44,6 +48,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -107,6 +112,9 @@ class GatewayServiceImplTest {
 
     @Mock
     private InferenceCacheService inferenceCacheService;
+
+    @Mock
+    private AIProviderFactory providerFactory;
 
     @InjectMocks
     private GatewayServiceImpl gatewayService;
@@ -239,6 +247,195 @@ class GatewayServiceImplTest {
                         anyLong());
     }
 
+
+    // ============================================================
+    // PHASE 11.2 - STREAM FAILURE PATHS
+    // ============================================================
+
+    @Test
+    void streamShouldEmitDoneAndPersistOnlyAfterProviderCompletes() {
+
+        mockSuccessfulPreProviderFlow();
+        mockOllamaRouting();
+
+        AIProvider provider = mock(
+                AIProvider.class,
+                withSettings().extraInterfaces(StreamingAIProvider.class));
+        StreamingAIProvider streamingProvider =
+                (StreamingAIProvider) provider;
+        when(providerFactory.getProvider(Provider.OLLAMA))
+                .thenReturn(provider);
+
+        when(restoreService.restore(anyString(), any(UUID.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AIStreamResult result = AIStreamResult.builder()
+                .response("hello world")
+                .provider(Provider.OLLAMA)
+                .model("llama3.2:3b")
+                .inputTokens(4)
+                .outputTokens(2)
+                .totalTokens(6)
+                .latencyMs(12L)
+                .build();
+
+        doAnswer(invocation -> {
+            java.util.function.Consumer<String> consumer =
+                    invocation.getArgument(1);
+            consumer.accept("hello ");
+            consumer.accept("world");
+            return result;
+        }).when(streamingProvider).stream(any(AIRequest.class), any());
+
+        java.util.List<GatewayStreamEvent> events = new java.util.ArrayList<>();
+
+        gatewayService.stream(
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.OLLAMA)
+                        .model("llama3.2:3b")
+                        .build(),
+                events::add);
+
+        assertEquals(
+                java.util.List.of("start", "delta", "delta", "done"),
+                events.stream().map(GatewayStreamEvent::getType).toList());
+        assertEquals("hello ", events.get(1).getContent());
+        assertEquals("world", events.get(2).getContent());
+        assertEquals(6, events.get(3).getTotalTokens());
+
+        verify(postProviderPersistenceService).persistSuccess(
+                any(UUID.class),
+                eq(authenticationContext),
+                any(AIRequest.class),
+                any(AIResponse.class),
+                any(RoutingDecision.class),
+                anyLong(),
+                eq("hello"),
+                anyLong());
+        verify(postProviderPersistenceService, never()).persistFailure(
+                any(), any(), any(), any(), anyLong(), anyString(), anyLong(), anyBoolean(), anyString());
+    }
+
+    @Test
+    void streamShouldEmitTerminalErrorAfterPartialProviderFailureAndNeverPersistSuccess() {
+
+        mockSuccessfulPreProviderFlow();
+        mockOllamaRouting();
+
+        AIProvider provider = mock(
+                AIProvider.class,
+                withSettings().extraInterfaces(StreamingAIProvider.class));
+        StreamingAIProvider streamingProvider =
+                (StreamingAIProvider) provider;
+        when(providerFactory.getProvider(Provider.OLLAMA))
+                .thenReturn(provider);
+
+        when(restoreService.restore(anyString(), any(UUID.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        doAnswer(invocation -> {
+            java.util.function.Consumer<String> consumer =
+                    invocation.getArgument(1);
+            consumer.accept("partial ");
+            throw new ResourceAccessException("Read timed out");
+        }).when(streamingProvider).stream(any(AIRequest.class), any());
+
+        java.util.List<GatewayStreamEvent> events = new java.util.ArrayList<>();
+
+        gatewayService.stream(
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.OLLAMA)
+                        .model("llama3.2:3b")
+                        .build(),
+                events::add);
+
+        assertEquals(
+                java.util.List.of("start", "delta", "error"),
+                events.stream().map(GatewayStreamEvent::getType).toList());
+        assertEquals("partial ", events.get(1).getContent());
+        assertEquals("Provider request timed out.", events.get(2).getError());
+
+        verify(postProviderPersistenceService, never()).persistSuccess(
+                any(), any(), any(), any(), any(), anyLong(), anyString(), anyLong());
+        verify(postProviderPersistenceService).persistFailure(
+                any(UUID.class),
+                eq(authenticationContext),
+                any(AIRequest.class),
+                any(RoutingDecision.class),
+                anyLong(),
+                eq("hello"),
+                anyLong(),
+                eq(true),
+                eq("ResourceAccessException"));
+    }
+
+    @Test
+    void streamShouldTreatClientDisconnectAsCancellationAndNeverWriteSecondErrorEvent() {
+
+        mockSuccessfulPreProviderFlow();
+        mockOllamaRouting();
+
+        AIProvider provider = mock(
+                AIProvider.class,
+                withSettings().extraInterfaces(StreamingAIProvider.class));
+        StreamingAIProvider streamingProvider =
+                (StreamingAIProvider) provider;
+        when(providerFactory.getProvider(Provider.OLLAMA))
+                .thenReturn(provider);
+
+        when(restoreService.restore(anyString(), any(UUID.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        doAnswer(invocation -> {
+            java.util.function.Consumer<String> consumer =
+                    invocation.getArgument(1);
+            consumer.accept("partial");
+            return AIStreamResult.builder()
+                    .response("partial")
+                    .provider(Provider.OLLAMA)
+                    .model("llama3.2:3b")
+                    .inputTokens(1)
+                    .outputTokens(1)
+                    .totalTokens(2)
+                    .latencyMs(1L)
+                    .build();
+        }).when(streamingProvider).stream(any(AIRequest.class), any());
+
+        java.util.List<GatewayStreamEvent> events = new java.util.ArrayList<>();
+        java.util.function.Consumer<GatewayStreamEvent> consumer = event -> {
+            events.add(event);
+            if ("delta".equals(event.getType())) {
+                throw new StreamClientDisconnectedException(
+                        new java.io.IOException("broken pipe"));
+            }
+        };
+
+        gatewayService.stream(
+                ChatRequest.builder()
+                        .prompt("hello")
+                        .provider(Provider.OLLAMA)
+                        .model("llama3.2:3b")
+                        .build(),
+                consumer);
+
+        assertEquals(
+                java.util.List.of("start", "delta"),
+                events.stream().map(GatewayStreamEvent::getType).toList());
+        verify(postProviderPersistenceService, never()).persistSuccess(
+                any(), any(), any(), any(), any(), anyLong(), anyString(), anyLong());
+        verify(postProviderPersistenceService).persistFailure(
+                any(UUID.class),
+                eq(authenticationContext),
+                any(AIRequest.class),
+                any(RoutingDecision.class),
+                anyLong(),
+                eq("hello"),
+                anyLong(),
+                eq(true),
+                eq("CLIENT_DISCONNECT"));
+    }
 
     // ============================================================
     // PHASE 4 - RAG AUGMENTATION
@@ -784,11 +981,7 @@ class GatewayServiceImplTest {
 
         mockPreProviderFlowWithoutEntitlement();
 
-        doNothing()
-                .when(entitlementService)
-                .validateFeature(
-                        tenantId,
-                        Feature.GEMINI);
+
     }
 
 
@@ -868,6 +1061,24 @@ class GatewayServiceImplTest {
                                 RoutingStrategy.EXPLICIT_PROVIDER));
     }
 
+
+
+    private void mockOllamaRouting() {
+
+        when(routingService.route(
+                any(RoutingContext.class)))
+                .thenReturn(
+                        new RoutingDecision(
+                                Provider.OLLAMA,
+                                "llama3.2:3b",
+                                RoutingStrategy.EXPLICIT_PROVIDER));
+
+        doNothing()
+                .when(entitlementService)
+                .validateFeature(
+                        tenantId,
+                        Feature.OLLAMA);
+    }
 
     /**
      * Standard Gemini request.

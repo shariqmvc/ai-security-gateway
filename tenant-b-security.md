@@ -1,0 +1,1 @@
+Tenant B requires strict retrieval isolation and API-key authentication.

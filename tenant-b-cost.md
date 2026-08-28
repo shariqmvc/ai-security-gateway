@@ -1,0 +1,1 @@
+Tenant B uses request cost estimation and cost guardrails.

@@ -8,6 +8,7 @@ import com.ai.gateway.tenant.TenantContext;
 import com.ai.gateway.tenant.TenantSchemaContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -32,6 +33,7 @@ class GatewayAsyncConfigSecurityContextTest {
         TenantSchemaContext.clear();
         TenantContext.clear();
         SecurityContextHolder.clearContext();
+        MDC.clear();
     }
 
     @Test
@@ -61,6 +63,9 @@ class GatewayAsyncConfigSecurityContextTest {
 
         TenantContext.set(tenantId);
         TenantSchemaContext.set(tenantId, schemaName);
+        MDC.put("requestId", "11111111-1111-1111-1111-111111111111");
+        MDC.put("tenantId", tenantId.toString());
+        MDC.put("tenantCode", "ASYNC-TEST");
 
         GatewayAsyncConfig configuration =
                 new GatewayAsyncConfig();
@@ -80,7 +85,10 @@ class GatewayAsyncConfigSecurityContextTest {
                             resolved,
                             TenantContext.get(),
                             TenantSchemaContext.get(),
-                            TenantSchemaContext.getTenantId());
+                            TenantSchemaContext.getTenantId(),
+                            MDC.get("requestId"),
+                            MDC.get("tenantId"),
+                            MDC.get("tenantCode"));
                 });
 
         AsyncContextSnapshot snapshot =
@@ -101,12 +109,27 @@ class GatewayAsyncConfigSecurityContextTest {
         assertEquals(
                 tenantId,
                 snapshot.schemaTenantId());
+
+        assertEquals(
+                "11111111-1111-1111-1111-111111111111",
+                snapshot.requestId());
+
+        assertEquals(
+                tenantId.toString(),
+                snapshot.mdcTenantId());
+
+        assertEquals(
+                "ASYNC-TEST",
+                snapshot.mdcTenantCode());
     }
 
     private record AsyncContextSnapshot(
             AuthenticationContext authenticationContext,
             UUID tenantId,
             String schema,
-            UUID schemaTenantId) {
+            UUID schemaTenantId,
+            String requestId,
+            String mdcTenantId,
+            String mdcTenantCode) {
     }
 }
