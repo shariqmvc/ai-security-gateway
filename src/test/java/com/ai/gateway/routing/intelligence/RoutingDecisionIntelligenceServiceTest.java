@@ -1,11 +1,11 @@
-package com.ai.gateway.routing.intelligence;
+package com.ai.gateway.core.routing.intelligence;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.routing.RoutingContext;
-import com.ai.gateway.routing.policy.RoutingPolicy;
-import com.ai.gateway.routing.scoring.config.RoutingScoringProperties;
-import com.ai.gateway.routing.scoring.CandidateScoreDimension;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.routing.RoutingContext;
+import com.ai.gateway.core.routing.policy.RoutingPolicy;
+import com.ai.gateway.core.routing.scoring.config.RoutingScoringProperties;
+import com.ai.gateway.core.routing.scoring.CandidateScoreDimension;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.test.context.ActiveProfiles;

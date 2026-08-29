@@ -1,11 +1,11 @@
 package com.ai.gateway.service;
 
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.engine.CandidateEligibilityFilter;
-import com.ai.gateway.routing.engine.CandidateEligibilityFilterImpl;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.routing.policy.RoutingPolicy;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.engine.CandidateEligibilityFilter;
+import com.ai.gateway.core.routing.engine.CandidateEligibilityFilterImpl;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.routing.policy.RoutingPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

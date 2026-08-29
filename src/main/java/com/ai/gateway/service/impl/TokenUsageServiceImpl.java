@@ -1,8 +1,8 @@
 package com.ai.gateway.service.impl;
 
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.dto.AIResponse;
-import com.ai.gateway.dto.Usage;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.contract.AIResponse;
+import com.ai.gateway.core.contract.Usage;
 import com.ai.gateway.entity.TokenUsage;
 import com.ai.gateway.repository.TokenUsageRepository;
 import com.ai.gateway.service.TokenUsageService;

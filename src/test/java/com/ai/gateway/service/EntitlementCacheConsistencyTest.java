@@ -10,7 +10,7 @@ import com.ai.gateway.entitlement.mapper.TenantEntitlementMapper;
 import com.ai.gateway.entitlement.repository.TenantEntitlementRepository;
 import com.ai.gateway.entitlement.service.impl.EntitlementServiceImpl;
 import com.ai.gateway.exception.BusinessException;
-import com.ai.gateway.metrics.GatewayMetricsService;
+import com.ai.gateway.core.metrics.GatewayMetricsService;
 import com.ai.gateway.provisioning.EntitlementProvisioningService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

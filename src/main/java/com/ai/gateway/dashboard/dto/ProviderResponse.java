@@ -1,6 +1,6 @@
 package com.ai.gateway.dashboard.dto;
 
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 
 public record ProviderResponse(
         Provider provider,

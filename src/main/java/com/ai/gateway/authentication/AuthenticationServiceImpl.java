@@ -4,6 +4,7 @@ import com.ai.gateway.entity.ApiKey;
 import com.ai.gateway.security.ApiKeyService;
 import com.ai.gateway.security.SecurityRole;
 import com.ai.gateway.tenant.Tenant;
+import com.ai.gateway.personal.PersonalAuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final ApiKeyService apiKeyService;
+    private final PersonalAuthService personalAuthService;
 
     /**
      * Optional bootstrap credential for the first platform owner.
@@ -30,6 +32,28 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public AuthenticationResult authenticate(HttpServletRequest request) {
+
+        String authorization = request.getHeader("Authorization");
+        if (authorization != null
+                && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+
+            String bearer = authorization.substring(7).trim();
+            if (bearer.isBlank()) {
+                return unauthenticated("Invalid Bearer token");
+            }
+
+            try {
+                AuthenticationContext context =
+                        personalAuthService.authenticateBearer(bearer);
+
+                return AuthenticationResult.builder()
+                        .authenticated(true)
+                        .context(context)
+                        .build();
+            } catch (org.springframework.security.access.AccessDeniedException ex) {
+                return unauthenticated("Invalid or expired session");
+            }
+        }
 
         Enumeration<String> headerValues = request.getHeaders("X-API-Key");
 

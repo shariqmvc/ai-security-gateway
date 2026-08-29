@@ -1,8 +1,8 @@
 package com.ai.gateway.controller;
 
 import com.ai.gateway.common.APIResponse;
-import com.ai.gateway.routing.registry.ModelCatalogItem;
-import com.ai.gateway.routing.registry.ModelRegistry;
+import com.ai.gateway.core.routing.registry.ModelCatalogItem;
+import com.ai.gateway.core.routing.registry.ModelRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

@@ -1,7 +1,5 @@
 package com.ai.gateway.provisioning;
 
-import com.ai.gateway.tenant.Tenant;
-import com.ai.gateway.tenant.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Reconciles tenant schemas that pre-date newly introduced tenant migrations.
@@ -34,7 +33,6 @@ public class TenantSchemaMigrationReconciliationService
             LoggerFactory.getLogger(
                     TenantSchemaMigrationReconciliationService.class);
 
-    private final TenantRepository tenantRepository;
     private final TenantSchemaProvisioningService provisioningService;
     private final JdbcTemplate jdbcTemplate;
 
@@ -59,14 +57,26 @@ public class TenantSchemaMigrationReconciliationService
      */
     public ReconciliationResult reconcileAll() {
 
-        List<Tenant> tenants = tenantRepository.findAll();
+        List<TenantSchemaMetadata> tenants = jdbcTemplate.query(
+                """
+                SELECT id, tenant_code, schema_name
+                FROM tenants
+                WHERE schema_name IS NOT NULL
+                  AND schema_name <> ''
+                  AND status <> 'FAILED'
+                ORDER BY schema_name
+                """,
+                (rs, rowNum) -> new TenantSchemaMetadata(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("tenant_code"),
+                        rs.getString("schema_name")));
 
         int migrated = 0;
         int skipped = 0;
 
-        for (Tenant tenant : tenants) {
+        for (TenantSchemaMetadata tenant : tenants) {
 
-            String schemaName = tenant.getSchemaName();
+            String schemaName = tenant.schemaName();
 
             if (schemaName == null || schemaName.isBlank()) {
                 skipped++;
@@ -74,8 +84,8 @@ public class TenantSchemaMigrationReconciliationService
                 log.warn(
                         "Skipping tenant schema reconciliation: "
                                 + "tenantId={} tenantCode={} has no schema name.",
-                        tenant.getId(),
-                        tenant.getTenantCode());
+                        tenant.id(),
+                        tenant.tenantCode());
 
                 continue;
             }
@@ -90,8 +100,8 @@ public class TenantSchemaMigrationReconciliationService
                                 + "automatic schema creation is intentionally avoided during "
                                 + "reconciliation to prevent accidental recreation of a "
                                 + "potentially deleted tenant database.",
-                        tenant.getId(),
-                        tenant.getTenantCode(),
+                        tenant.id(),
+                        tenant.tenantCode(),
                         schemaName);
 
                 continue;
@@ -100,8 +110,8 @@ public class TenantSchemaMigrationReconciliationService
             log.info(
                     "Reconciling tenant schema: tenantId={} tenantCode={} "
                             + "schema={}",
-                    tenant.getId(),
-                    tenant.getTenantCode(),
+                    tenant.id(),
+                    tenant.tenantCode(),
                     schemaName);
 
             provisioningService.migrateSchema(schemaName);
@@ -123,17 +133,24 @@ public class TenantSchemaMigrationReconciliationService
 
 
     private boolean schemaExists(String schemaName) {
-
-        Integer count = jdbcTemplate.queryForObject(
+        Boolean exists = jdbcTemplate.queryForObject(
                 """
-                SELECT COUNT(*)
-                FROM information_schema.schemata
-                WHERE schema_name = ?
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_namespace
+                    WHERE nspname = ?
+                )
                 """,
-                Integer.class,
+                Boolean.class,
                 schemaName);
 
-        return count != null && count == 1;
+        return Boolean.TRUE.equals(exists);
+    }
+
+    public record TenantSchemaMetadata(
+            UUID id,
+            String tenantCode,
+            String schemaName) {
     }
 
     public record ReconciliationResult(

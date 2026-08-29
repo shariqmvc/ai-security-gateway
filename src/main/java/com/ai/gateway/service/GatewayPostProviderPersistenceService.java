@@ -1,15 +1,15 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.cost.service.CostService;
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.business.cost.service.CostService;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.contract.AIResponse;
 import com.ai.gateway.enums.AuditStatus;
-import com.ai.gateway.metrics.GatewayMetricsService;
-import com.ai.gateway.routing.RoutingDecision;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.routing.health.RoutingOutcomeService;
-import com.ai.gateway.routing.intelligence.RoutingRuntimeSignalService;
+import com.ai.gateway.core.metrics.GatewayMetricsService;
+import com.ai.gateway.core.routing.RoutingDecision;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.business.routing.health.RoutingOutcomeService;
+import com.ai.gateway.core.routing.intelligence.RoutingRuntimeSignalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -75,7 +75,7 @@ public class GatewayPostProviderPersistenceService {
                     AuditStatus.SUCCESS);
 
             metricsService.addLatency(totalLatency);
-            metricsService.increment(com.ai.gateway.metrics.MetricsConstants.SUCCESSFUL_REQUESTS);
+            metricsService.increment(com.ai.gateway.core.metrics.MetricsConstants.SUCCESSFUL_REQUESTS);
         } catch (Exception ex) {
             log.error("Post-provider success persistence failed: requestId={}", requestId, ex);
         }
@@ -130,7 +130,7 @@ public class GatewayPostProviderPersistenceService {
                     AuditStatus.FAILED);
 
             metricsService.addLatency(totalLatency);
-            metricsService.increment(com.ai.gateway.metrics.MetricsConstants.FAILED_REQUESTS);
+            metricsService.increment(com.ai.gateway.core.metrics.MetricsConstants.FAILED_REQUESTS);
         } catch (Exception ex) {
             log.error("Post-provider failure persistence failed: requestId={}", requestId, ex);
         }

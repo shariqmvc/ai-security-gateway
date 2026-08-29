@@ -1,11 +1,13 @@
 package com.ai.gateway.routing.health;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.routing.health.config.RoutingHealthProperties;
-import com.ai.gateway.routing.health.entity.RoutingHealthProfile;
-import com.ai.gateway.routing.health.repository.RoutingHealthProfileRepository;
-import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.routing.health.RoutingHealthServiceImpl;
+import com.ai.gateway.core.routing.health.RoutingHealthStatus;
+import com.ai.gateway.core.routing.health.RoutingOutcomeReader;
+import com.ai.gateway.core.routing.health.config.RoutingHealthProperties;
+import com.ai.gateway.core.routing.health.entity.RoutingHealthProfile;
+import com.ai.gateway.core.routing.health.repository.RoutingHealthProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
 @ActiveProfiles("test")
 @ExtendWith(MockitoExtension.class)
 class RoutingHealthServiceImplTest {
@@ -29,7 +32,7 @@ class RoutingHealthServiceImplTest {
     private RoutingHealthProfileRepository profiles;
 
     @Mock
-    private RoutingOutcomeRepository outcomes;
+    private RoutingOutcomeReader outcomes;
 
     private RoutingHealthProperties properties;
     private RoutingHealthServiceImpl service;
@@ -59,10 +62,15 @@ class RoutingHealthServiceImplTest {
 
     @Test
     void firstObservationIsUnknown() {
-        when(outcomes.findTop100ByProviderAndModelOrderByCreatedAtDesc(
+        when(outcomes.findRecent(
                 Provider.OPENAI,
                 "gpt-5"))
                 .thenReturn(List.of());
+
+        when(profiles.findByProviderAndModel(
+                Provider.OPENAI,
+                "gpt-5"))
+                .thenReturn(Optional.empty());
 
         when(profiles.save(any(RoutingHealthProfile.class)))
                 .thenAnswer(i -> i.getArgument(0));
@@ -89,6 +97,11 @@ class RoutingHealthServiceImplTest {
                 Provider.OPENAI,
                 "gpt-5"))
                 .thenReturn(Optional.of(profile));
+
+        when(outcomes.findRecent(
+                Provider.OPENAI,
+                "gpt-5"))
+                .thenReturn(List.of());
 
         when(profiles.save(any(RoutingHealthProfile.class)))
                 .thenAnswer(i -> i.getArgument(0));

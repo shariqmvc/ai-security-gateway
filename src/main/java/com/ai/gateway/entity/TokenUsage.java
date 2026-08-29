@@ -1,6 +1,6 @@
 package com.ai.gateway.entity;
 
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import jakarta.persistence.*;
 import lombok.*;
 

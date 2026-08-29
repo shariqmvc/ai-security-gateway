@@ -3,11 +3,16 @@ package com.ai.gateway.service;
 import com.ai.gateway.authentication.AuthenticationResult;
 import com.ai.gateway.authentication.AuthenticationServiceImpl;
 import com.ai.gateway.entity.ApiKey;
+import com.ai.gateway.personal.PersonalAuthService;
 import com.ai.gateway.security.ApiKeyService;
 import com.ai.gateway.tenant.Tenant;
 import com.ai.gateway.tenant.TenantStatus;
 import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,12 +21,27 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
-
+@ExtendWith(MockitoExtension.class)
 class AuthenticationServiceImplTest {
 
-    private final ApiKeyService apiKeyService = mock(ApiKeyService.class);
-    private final AuthenticationServiceImpl service =
-            new AuthenticationServiceImpl(apiKeyService);
+  //  private final ApiKeyService apiKeyService = mock(ApiKeyService.class);
+  //  private final AuthenticationServiceImpl service =
+    //        new AuthenticationServiceImpl(apiKeyService);
+
+    @Mock
+    private ApiKeyService apiKeyService;
+
+    @Mock
+    private PersonalAuthService personalAuthService;
+
+    private AuthenticationServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        service = new AuthenticationServiceImpl(
+                apiKeyService,
+                personalAuthService);
+    }
 
     @Test
     void shouldRejectDuplicateApiKeyHeaders() {

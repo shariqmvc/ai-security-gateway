@@ -1,8 +1,8 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.multimodal.*;
-import com.ai.gateway.routing.registry.ModelCapabilities;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.multimodal.*;
+import com.ai.gateway.core.routing.registry.ModelCapabilities;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;

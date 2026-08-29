@@ -1,4 +1,4 @@
-package com.ai.gateway.multimodal;
+package com.ai.gateway.core.multimodal;
 
 import com.ai.gateway.config.RemoteMediaProperties;
 import org.junit.jupiter.api.Test;

@@ -1,14 +1,15 @@
 package com.ai.gateway.routing.health;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.RoutingDecision;
-import com.ai.gateway.routing.RoutingDecisionMetadata;
-import com.ai.gateway.routing.RoutingStrategy;
-import com.ai.gateway.routing.health.entity.RoutingOutcome;
-import com.ai.gateway.routing.health.repository.RoutingOutcomeRepository;
-import com.ai.gateway.routing.intelligence.RoutingDecisionExplanation;
+import com.ai.gateway.business.routing.health.RoutingOutcomeServiceImpl;
+import com.ai.gateway.business.routing.health.entity.RoutingOutcome;
+import com.ai.gateway.business.routing.health.repository.RoutingOutcomeRepository;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.RoutingDecision;
+import com.ai.gateway.core.routing.RoutingDecisionMetadata;
+import com.ai.gateway.core.routing.RoutingStrategy;
+import com.ai.gateway.core.routing.intelligence.RoutingDecisionExplanation;
 import com.ai.gateway.security.AuthorizationService;
 import com.ai.gateway.security.SecurityRole;
 import com.ai.gateway.tenant.TenantAccessGuard;

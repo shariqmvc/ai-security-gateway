@@ -1,8 +1,8 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.routing.PolicyBasedRoutingStrategy;
-import com.ai.gateway.routing.scoring.CandidateScoringEngine;
-import com.ai.gateway.routing.selection.CandidateSelectionEngine;
+import com.ai.gateway.core.routing.PolicyBasedRoutingStrategy;
+import com.ai.gateway.core.routing.scoring.CandidateScoringEngine;
+import com.ai.gateway.core.routing.selection.CandidateSelectionEngine;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

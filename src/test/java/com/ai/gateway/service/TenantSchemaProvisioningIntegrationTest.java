@@ -1,6 +1,6 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.entitlement.enums.Plan;
 import com.ai.gateway.provisioning.TenantSchemaProvisioningService;
 import com.ai.gateway.tenant.Tenant;

@@ -1,7 +1,7 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.entitlement.enums.Plan;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.provisioning.TenantSchemaCreationService;
 import com.ai.gateway.provisioning.TenantSchemaMigrationReconciliationService;
 import com.ai.gateway.provisioning.TenantSchemaNameResolver;

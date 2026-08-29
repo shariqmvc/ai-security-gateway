@@ -1,7 +1,7 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.dto.ChatResponse;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.contract.ChatResponse;
 
 import java.util.function.Consumer;
 

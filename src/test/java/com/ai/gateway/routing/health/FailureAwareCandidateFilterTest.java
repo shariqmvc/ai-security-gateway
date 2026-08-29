@@ -1,8 +1,8 @@
-package com.ai.gateway.routing.health;
+package com.ai.gateway.core.routing.health;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.failover.ProviderCircuitBreaker;
-import com.ai.gateway.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.failover.ProviderCircuitBreaker;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.ActiveProfiles;
 

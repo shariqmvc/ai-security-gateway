@@ -1,10 +1,10 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.RoutingDecision;
-import com.ai.gateway.routing.RoutingStrategy;
-import com.ai.gateway.routing.analytics.RoutingAnalytics;
-import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.RoutingDecision;
+import com.ai.gateway.core.routing.RoutingStrategy;
+import com.ai.gateway.core.routing.analytics.RoutingAnalytics;
+import com.ai.gateway.core.routing.analytics.RoutingAnalyticsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

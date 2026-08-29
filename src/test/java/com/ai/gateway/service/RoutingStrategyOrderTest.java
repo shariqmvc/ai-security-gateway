@@ -1,6 +1,6 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.routing.RoutingStrategyHandler;
+import com.ai.gateway.core.routing.RoutingStrategyHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

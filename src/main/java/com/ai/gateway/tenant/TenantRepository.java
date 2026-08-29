@@ -26,4 +26,5 @@ public interface TenantRepository
             """)
     Optional<Tenant> findByIdForUpdate(
             @Param("tenantId") UUID tenantId);
+
 }

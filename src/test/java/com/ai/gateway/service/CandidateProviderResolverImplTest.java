@@ -1,13 +1,13 @@
 package com.ai.gateway.service;
 
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.engine.CandidateProviderResolver;
-import com.ai.gateway.routing.engine.CandidateProviderResolverImpl;
-import com.ai.gateway.routing.policy.RoutingPolicy;
-import com.ai.gateway.routing.registry.ProviderDefinition;
-import com.ai.gateway.routing.registry.ProviderRegistry;
-import com.ai.gateway.routing.registry.ProviderStatus;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.engine.CandidateProviderResolver;
+import com.ai.gateway.core.routing.engine.CandidateProviderResolverImpl;
+import com.ai.gateway.core.routing.policy.RoutingPolicy;
+import com.ai.gateway.core.routing.registry.ProviderDefinition;
+import com.ai.gateway.core.routing.registry.ProviderRegistry;
+import com.ai.gateway.core.routing.registry.ProviderStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,7 +1,7 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.multimodal.*;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.multimodal.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

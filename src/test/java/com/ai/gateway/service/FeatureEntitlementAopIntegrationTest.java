@@ -6,7 +6,7 @@ import com.ai.gateway.entitlement.aop.FeatureEntitlementAspect;
 import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.security.AuthenticationContextResolver;
 import com.ai.gateway.entitlement.service.EntitlementService;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;

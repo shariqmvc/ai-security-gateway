@@ -2,10 +2,10 @@ package com.ai.gateway.service;
 
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.policy.RoutingPolicy;
-import com.ai.gateway.routing.policy.RoutingPolicyServiceImpl;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.policy.RoutingPolicy;
+import com.ai.gateway.core.routing.policy.RoutingPolicyServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

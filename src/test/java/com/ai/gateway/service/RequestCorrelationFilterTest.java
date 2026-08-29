@@ -1,6 +1,6 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.observability.RequestCorrelationFilter;
+import com.ai.gateway.core.observability.RequestCorrelationFilter;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

@@ -3,39 +3,41 @@ package com.ai.gateway.service.impl;
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.dto.*;
+import com.ai.gateway.core.contract.*;
 import com.ai.gateway.entitlement.annotation.RequiresFeature;
 import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.mapper.ProviderFeatureMapper;
 import com.ai.gateway.entitlement.service.EntitlementService;
-import com.ai.gateway.failover.ProviderFailoverService;
-import com.ai.gateway.provider.AIStreamResult;
-import com.ai.gateway.provider.StreamingAIProvider;
-import com.ai.gateway.provider.AIProviderFactory;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.failover.ProviderFailoverService;
+import com.ai.gateway.core.provider.AIStreamResult;
+import com.ai.gateway.core.provider.StreamingAIProvider;
+import com.ai.gateway.core.provider.AIProviderFactory;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.firewall.FirewallResult;
 import com.ai.gateway.governance.service.GovernanceGuardrailService;
 import com.ai.gateway.firewall.service.PromptFireWallService;
-import com.ai.gateway.metrics.GatewayMetricsService;
-import com.ai.gateway.metrics.MetricsConstants;
-import com.ai.gateway.observability.PerformanceLogger;
-import com.ai.gateway.observability.RequestCorrelationFilter;
+import com.ai.gateway.core.metrics.GatewayMetricsService;
+import com.ai.gateway.core.metrics.MetricsConstants;
+import com.ai.gateway.core.observability.PerformanceLogger;
+import com.ai.gateway.core.observability.RequestCorrelationFilter;
 import org.slf4j.MDC;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.rag.augmentation.RagAugmentationResult;
 import com.ai.gateway.rag.augmentation.RagAugmentationService;
-import com.ai.gateway.multimodal.MediaContent;
-import com.ai.gateway.multimodal.MediaTypeKind;
-import com.ai.gateway.cache.CachedInferenceResponse;
-import com.ai.gateway.cache.InferenceCacheService;
-import com.ai.gateway.multimodal.MultimodalRequestValidator;
-import com.ai.gateway.routing.registry.ModelCapabilities;
-import com.ai.gateway.routing.RoutingContext;
-import com.ai.gateway.routing.RoutingDecision;
-import com.ai.gateway.routing.RoutingService;
-import com.ai.gateway.routing.analytics.RoutingAnalyticsService;
-import com.ai.gateway.routing.registry.ProviderModelRegistryService;
+import com.ai.gateway.core.multimodal.MediaContent;
+import com.ai.gateway.core.multimodal.MediaTypeKind;
+import com.ai.gateway.core.cache.CachedInferenceResponse;
+import com.ai.gateway.core.cache.InferenceCacheService;
+import com.ai.gateway.core.multimodal.MultimodalRequestValidator;
+import com.ai.gateway.core.routing.registry.ModelCapabilities;
+import com.ai.gateway.core.routing.RoutingContext;
+import com.ai.gateway.core.routing.RoutingDecision;
+import com.ai.gateway.core.routing.RoutingService;
+import com.ai.gateway.core.routing.analytics.RoutingAnalyticsService;
+import com.ai.gateway.core.routing.registry.ProviderModelRegistryService;
+import com.ai.gateway.personal.billing.PersonalBillingModeResolver;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -85,6 +87,8 @@ public class GatewayServiceImpl implements GatewayService {
     private final InferenceCacheService inferenceCacheService;
 
     private final AIProviderFactory providerFactory;
+
+    private final PersonalBillingModeResolver personalBillingModeResolver;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -166,6 +170,12 @@ public class GatewayServiceImpl implements GatewayService {
                             providerPrompt);
 
             performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            if (auth.isPersonalPrincipal()) {
+                aiRequest.setBillingMode(personalBillingModeResolver
+                        .resolve(auth, aiRequest.getProvider(), aiRequest.getModel(), request.getBillingMode())
+                        .name());
+            }
 
             stageStart = System.nanoTime();
             Feature feature =
@@ -453,6 +463,12 @@ public class GatewayServiceImpl implements GatewayService {
                     providerPrompt);
             performanceLogger.stage(
                     "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            if (auth.isPersonalPrincipal()) {
+                aiRequest.setBillingMode(personalBillingModeResolver
+                        .resolve(auth, aiRequest.getProvider(), aiRequest.getModel(), request.getBillingMode())
+                        .name());
+            }
 
             stageStart = System.nanoTime();
             Feature feature =

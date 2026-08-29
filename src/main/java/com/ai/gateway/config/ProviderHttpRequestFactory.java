@@ -1,6 +1,6 @@
 package com.ai.gateway.config;
 
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 

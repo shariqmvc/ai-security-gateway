@@ -1,6 +1,6 @@
 package com.ai.gateway.config;
 
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;

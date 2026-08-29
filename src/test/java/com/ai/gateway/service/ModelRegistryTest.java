@@ -1,10 +1,10 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.provider.AIProvider;
-import com.ai.gateway.provider.AIProviderFactory;
-import com.ai.gateway.routing.registry.ModelDefinition;
-import com.ai.gateway.routing.registry.impl.ModelRegistryImpl;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.provider.AIProvider;
+import com.ai.gateway.core.provider.AIProviderFactory;
+import com.ai.gateway.core.routing.registry.ModelDefinition;
+import com.ai.gateway.core.routing.registry.impl.ModelRegistryImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -11,7 +11,7 @@ import com.ai.gateway.entitlement.mapper.TenantEntitlementMapper;
 import com.ai.gateway.entitlement.repository.TenantEntitlementRepository;
 import com.ai.gateway.entitlement.service.EntitlementService;
 import com.ai.gateway.exception.BusinessException;
-import com.ai.gateway.metrics.GatewayMetricsService;
+import com.ai.gateway.core.metrics.GatewayMetricsService;
 import com.ai.gateway.provisioning.EntitlementProvisioningService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

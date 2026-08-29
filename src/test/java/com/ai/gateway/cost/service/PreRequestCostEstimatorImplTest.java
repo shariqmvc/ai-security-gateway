@@ -1,11 +1,11 @@
-package com.ai.gateway.cost.service;
+package com.ai.gateway.core.cost.service;
 
-import com.ai.gateway.cost.dto.ModelPricing;
-import com.ai.gateway.cost.dto.PreRequestCostEstimate;
-import com.ai.gateway.cost.dto.PreRequestCostRequest;
-import com.ai.gateway.cost.pricing.PricingCatalog;
-import com.ai.gateway.cost.service.impl.PreRequestCostEstimatorImpl;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.cost.dto.ModelPricing;
+import com.ai.gateway.core.cost.dto.PreRequestCostEstimate;
+import com.ai.gateway.core.cost.dto.PreRequestCostRequest;
+import com.ai.gateway.core.cost.pricing.PricingCatalog;
+import com.ai.gateway.core.cost.service.impl.PreRequestCostEstimatorImpl;
+import com.ai.gateway.core.model.Provider;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

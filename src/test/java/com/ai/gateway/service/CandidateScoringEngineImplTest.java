@@ -1,19 +1,19 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.cost.config.PricingConfig;
-import com.ai.gateway.cost.dto.ModelPricing;
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.routing.policy.RoutingPolicy;
-import com.ai.gateway.routing.scoring.CandidateScoreDimension;
-import com.ai.gateway.routing.scoring.CandidateScoringContext;
-import com.ai.gateway.routing.scoring.ScoredCandidate;
-import com.ai.gateway.routing.scoring.config.RoutingScoringProperties;
-import com.ai.gateway.routing.scoring.impl.CandidateScoringEngineImpl;
-import com.ai.gateway.routing.scoring.strategy.AvailabilityScoreStrategy;
-import com.ai.gateway.routing.scoring.strategy.CostScoreStrategy;
-import com.ai.gateway.routing.scoring.strategy.LatencyScoreStrategy;
-import com.ai.gateway.routing.scoring.strategy.PolicyPreferenceScoreStrategy;
+import com.ai.gateway.core.cost.config.PricingConfig;
+import com.ai.gateway.core.cost.dto.ModelPricing;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.routing.policy.RoutingPolicy;
+import com.ai.gateway.core.routing.scoring.CandidateScoreDimension;
+import com.ai.gateway.core.routing.scoring.CandidateScoringContext;
+import com.ai.gateway.core.routing.scoring.ScoredCandidate;
+import com.ai.gateway.core.routing.scoring.config.RoutingScoringProperties;
+import com.ai.gateway.core.routing.scoring.impl.CandidateScoringEngineImpl;
+import com.ai.gateway.core.routing.scoring.strategy.AvailabilityScoreStrategy;
+import com.ai.gateway.core.routing.scoring.strategy.CostScoreStrategy;
+import com.ai.gateway.core.routing.scoring.strategy.LatencyScoreStrategy;
+import com.ai.gateway.core.routing.scoring.strategy.PolicyPreferenceScoreStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -308,7 +308,7 @@ class CandidateScoringEngineImplTest {
         );
     }
 
-    private com.ai.gateway.routing.scoring.CandidateScoreComponent component(
+    private com.ai.gateway.core.routing.scoring.CandidateScoreComponent component(
             ScoredCandidate candidate,
             CandidateScoreDimension dimension
     ) {

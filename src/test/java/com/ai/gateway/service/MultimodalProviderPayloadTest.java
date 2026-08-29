@@ -1,8 +1,8 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.multimodal.*;
-import com.ai.gateway.provider.openai.dto.OpenAIRequest;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.multimodal.*;
+import com.ai.gateway.core.provider.openai.dto.OpenAIRequest;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

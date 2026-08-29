@@ -160,9 +160,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
-    @ExceptionHandler(com.ai.gateway.failover.ProviderAuthenticationException.class)
+    @ExceptionHandler(com.ai.gateway.core.failover.ProviderAuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleProviderAuthentication(
-            com.ai.gateway.failover.ProviderAuthenticationException ex,
+            com.ai.gateway.core.failover.ProviderAuthenticationException ex,
             HttpServletRequest request) {
 
         ErrorResponse response = ErrorResponse.builder()
@@ -176,15 +176,64 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response);
     }
 
-    @ExceptionHandler(com.ai.gateway.multimodal.MediaInputException.class)
+    @ExceptionHandler(com.ai.gateway.core.multimodal.MediaInputException.class)
     public ResponseEntity<ErrorResponse> handleMediaInput(
-            com.ai.gateway.multimodal.MediaInputException ex,
+            com.ai.gateway.core.multimodal.MediaInputException ex,
             HttpServletRequest request) {
 
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Media Input Error")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+
+    @ExceptionHandler(com.ai.gateway.personal.PersonalAccountConflictException.class)
+    public ResponseEntity<ErrorResponse> handlePersonalAccountConflict(
+            com.ai.gateway.personal.PersonalAccountConflictException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(com.ai.gateway.personal.PersonalAuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handlePersonalAuthentication(
+            com.ai.gateway.personal.PersonalAuthenticationException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error(HttpStatus.UNAUTHORIZED.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    @ExceptionHandler(com.ai.gateway.personal.PersonalProviderConnectionException.class)
+    public ResponseEntity<ErrorResponse> handlePersonalProviderConnection(
+            com.ai.gateway.personal.PersonalProviderConnectionException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Provider Connection Error")
                 .message(ex.getMessage())
                 .path(request.getRequestURI())
                 .build();

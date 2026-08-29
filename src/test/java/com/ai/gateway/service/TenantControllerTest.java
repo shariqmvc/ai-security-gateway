@@ -2,7 +2,7 @@ package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationService;
 import com.ai.gateway.entitlement.enums.Plan;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.ratelimit.service.RateLimiterService;
 import com.ai.gateway.security.AuthorizationService;
 import com.ai.gateway.tenant.Tenant;
@@ -17,7 +17,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;

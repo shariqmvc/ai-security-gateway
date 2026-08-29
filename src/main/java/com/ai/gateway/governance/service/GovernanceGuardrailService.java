@@ -1,9 +1,9 @@
 package com.ai.gateway.governance.service;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.cost.service.CostService;
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.business.cost.service.CostService;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.contract.AIResponse;
 import com.ai.gateway.quota.service.QuotaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

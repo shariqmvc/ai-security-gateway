@@ -1,7 +1,7 @@
-package com.ai.gateway.routing.intelligence;
+package com.ai.gateway.core.routing.intelligence;
 
-import com.ai.gateway.routing.scoring.CandidateScoreDimension;
-import com.ai.gateway.routing.scoring.config.RoutingScoringProperties;
+import com.ai.gateway.core.routing.scoring.CandidateScoreDimension;
+import com.ai.gateway.core.routing.scoring.config.RoutingScoringProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.ActiveProfiles;
 

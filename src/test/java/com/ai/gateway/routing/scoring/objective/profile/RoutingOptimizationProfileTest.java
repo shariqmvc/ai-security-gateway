@@ -1,7 +1,7 @@
-package com.ai.gateway.routing.scoring.objective.profile;
+package com.ai.gateway.core.routing.scoring.objective.profile;
 
-import com.ai.gateway.routing.scoring.objective.RoutingObjective;
-import com.ai.gateway.routing.scoring.objective.RoutingObjectiveWeights;
+import com.ai.gateway.core.routing.scoring.objective.RoutingObjective;
+import com.ai.gateway.core.routing.scoring.objective.RoutingObjectiveWeights;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

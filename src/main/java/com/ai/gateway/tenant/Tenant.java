@@ -3,7 +3,7 @@ package com.ai.gateway.tenant;
 import com.ai.gateway.entitlement.enums.Plan;
 import com.ai.gateway.business.Business;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import jakarta.persistence.*;
 import lombok.*;
 

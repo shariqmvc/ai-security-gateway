@@ -7,7 +7,7 @@ import com.ai.gateway.tenant.Tenant;
 import com.ai.gateway.tenant.TenantRepository;
 import com.ai.gateway.tenant.TenantType;
 import com.ai.gateway.entitlement.enums.Plan;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.provisioning.TenantSchemaProvisioningService;
 import com.ai.gateway.tenant.TenantSchemaRoutingService;
 import org.junit.jupiter.api.AfterEach;

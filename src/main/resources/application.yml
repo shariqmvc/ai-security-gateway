@@ -79,6 +79,17 @@ security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
+  personal:
+    quota:
+      # P10.1 policy foundation. Limits remain unconfigured until Personal v1
+      # commercial values are explicitly frozen; enforcement is added later in P10.
+      enabled: ${GATEWAY_PERSONAL_QUOTA_ENABLED:true}
+      requests-per-minute: ${GATEWAY_PERSONAL_REQUESTS_PER_MINUTE:0}
+      requests-per-day: ${GATEWAY_PERSONAL_REQUESTS_PER_DAY:0}
+      monthly-token-quota: ${GATEWAY_PERSONAL_MONTHLY_TOKEN_QUOTA:0}
+      max-input-tokens: ${GATEWAY_PERSONAL_MAX_INPUT_TOKENS:0}
+      max-output-tokens: ${GATEWAY_PERSONAL_MAX_OUTPUT_TOKENS:0}
+      max-concurrent-requests: ${GATEWAY_PERSONAL_MAX_CONCURRENT_REQUESTS:0}
   cache:
     exact:
       enabled: ${GATEWAY_CACHE_EXACT_ENABLED:true}
@@ -224,3 +235,26 @@ rag:
       - htm
       - json
       - csv
+
+# AIRoute Personal v1 identity foundation.
+alroute:
+  personal:
+    auth:
+      session-ttl: ${ALROUTE_PERSONAL_SESSION_TTL:30d}
+      verification-ttl: ${ALROUTE_PERSONAL_VERIFICATION_TTL:24h}
+      # Keep false in production. Enable only for local/integration testing
+      # when an email delivery adapter is not configured.
+      auto-verify-on-signup: ${ALROUTE_PERSONAL_AUTO_VERIFY_ON_SIGNUP:false}
+      # Keep false in production. When enabled, signup returns a one-time
+      # verification token to support local dogfooding without email delivery.
+      expose-verification-token: ${ALROUTE_PERSONAL_EXPOSE_VERIFICATION_TOKEN:false}
+
+    providers:
+      # Provider endpoints are system-level infrastructure configuration.
+      # Personal credentials and Personal model choices are stored in the DB.
+      openai:
+        base-url: ${ALROUTE_PERSONAL_OPENAI_BASE_URL:https://api.openai.com}
+      gemini:
+        base-url: ${ALROUTE_PERSONAL_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+      anthropic:
+        base-url: ${ALROUTE_PERSONAL_ANTHROPIC_BASE_URL:https://api.anthropic.com}

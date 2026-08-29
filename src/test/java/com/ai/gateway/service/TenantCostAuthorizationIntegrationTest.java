@@ -7,7 +7,7 @@ import com.ai.gateway.tenant.TenantService;
 import com.ai.gateway.tenant.TenantType;
 import com.ai.gateway.tenant.dto.TenantRequest;
 import com.ai.gateway.entitlement.enums.Plan;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

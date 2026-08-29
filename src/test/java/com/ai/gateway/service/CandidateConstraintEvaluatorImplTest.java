@@ -1,18 +1,18 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.constraint.CandidateConstraintEvaluation;
-import com.ai.gateway.routing.constraint.CandidateConstraintEvaluatorImpl;
-import com.ai.gateway.routing.constraint.ConstraintEvaluationResult;
-import com.ai.gateway.routing.constraint.HardConstraintType;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.routing.policy.RoutingPolicy;
-import com.ai.gateway.routing.registry.ModelDefinition;
-import com.ai.gateway.routing.registry.ModelRegistry;
-import com.ai.gateway.routing.registry.ModelStatus;
-import com.ai.gateway.routing.registry.ProviderDefinition;
-import com.ai.gateway.routing.registry.ProviderRegistry;
-import com.ai.gateway.routing.registry.ProviderStatus;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.constraint.CandidateConstraintEvaluation;
+import com.ai.gateway.core.routing.constraint.CandidateConstraintEvaluatorImpl;
+import com.ai.gateway.core.routing.constraint.ConstraintEvaluationResult;
+import com.ai.gateway.core.routing.constraint.HardConstraintType;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.routing.policy.RoutingPolicy;
+import com.ai.gateway.core.routing.registry.ModelDefinition;
+import com.ai.gateway.core.routing.registry.ModelRegistry;
+import com.ai.gateway.core.routing.registry.ModelStatus;
+import com.ai.gateway.core.routing.registry.ProviderDefinition;
+import com.ai.gateway.core.routing.registry.ProviderRegistry;
+import com.ai.gateway.core.routing.registry.ProviderStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

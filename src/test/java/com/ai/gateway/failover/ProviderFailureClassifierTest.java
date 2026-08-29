@@ -1,7 +1,7 @@
-package com.ai.gateway.failover;
+package com.ai.gateway.core.failover;
 
 import com.ai.gateway.config.ProviderRequestBudgetExceededException;
-import com.ai.gateway.multimodal.MediaInputException;
+import com.ai.gateway.core.multimodal.MediaInputException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

@@ -1,9 +1,9 @@
-package com.ai.gateway.cost.routing;
+package com.ai.gateway.core.cost.routing;
 
-import com.ai.gateway.cost.dto.PreRequestCostEstimate;
-import com.ai.gateway.cost.service.PreRequestCostEstimator;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.cost.dto.PreRequestCostEstimate;
+import com.ai.gateway.core.cost.service.PreRequestCostEstimator;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.model.Provider;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -21,7 +21,7 @@ class CostAwareRoutingEvaluatorTest {
 
         when(estimator.estimate(any()))
                 .thenAnswer(invocation -> {
-                    var request = invocation.<com.ai.gateway.cost.dto.PreRequestCostRequest>getArgument(0);
+                    var request = invocation.<com.ai.gateway.core.cost.dto.PreRequestCostRequest>getArgument(0);
                     BigDecimal cost =
                             request.getProvider() == Provider.OPENAI
                                     ? new BigDecimal("0.10")

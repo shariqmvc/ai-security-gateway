@@ -8,7 +8,7 @@ import com.ai.gateway.business.dto.BusinessOnboardingResponse;
 import com.ai.gateway.business.repository.BusinessRepository;
 import com.ai.gateway.business.service.BusinessOnboardingServiceImpl;
 import com.ai.gateway.entitlement.enums.Plan;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.provisioning.TenantProvisioningService;
 import com.ai.gateway.tenant.*;
 import org.junit.jupiter.api.Test;

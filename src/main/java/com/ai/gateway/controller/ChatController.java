@@ -1,8 +1,8 @@
 package com.ai.gateway.controller;
 
 import com.ai.gateway.common.APIResponse;
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.dto.ChatResponse;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.contract.ChatResponse;
 import com.ai.gateway.service.GatewayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

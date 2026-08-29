@@ -1,7 +1,7 @@
 package com.ai.gateway.dashboard.dto;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.health.RoutingHealthStatus;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.health.RoutingHealthStatus;
 
 public record ProviderHealthItem(
         Provider provider,

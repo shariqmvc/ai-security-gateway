@@ -1,7 +1,7 @@
 package com.ai.gateway.config;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.observability.PerformanceLogger;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.observability.PerformanceLogger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

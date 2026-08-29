@@ -1,13 +1,13 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.cache.CachedInferenceResponse;
-import com.ai.gateway.cache.InferenceCacheService;
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.multimodal.MediaContent;
-import com.ai.gateway.multimodal.MediaSourceType;
-import com.ai.gateway.multimodal.MediaTypeKind;
+import com.ai.gateway.core.cache.CachedInferenceResponse;
+import com.ai.gateway.core.cache.InferenceCacheService;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.multimodal.MediaContent;
+import com.ai.gateway.core.multimodal.MediaSourceType;
+import com.ai.gateway.core.multimodal.MediaTypeKind;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package com.ai.gateway.routing.scoring.objective.profile;
+package com.ai.gateway.core.routing.scoring.objective.profile;
 
 import org.junit.jupiter.api.Test;
 

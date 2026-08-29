@@ -1,8 +1,8 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.cache.InferenceCacheController;
-import com.ai.gateway.cache.InferenceCacheService;
-import com.ai.gateway.cache.InferenceCacheStats;
+import com.ai.gateway.business.cache.InferenceCacheController;
+import com.ai.gateway.core.cache.InferenceCacheService;
+import com.ai.gateway.core.cache.InferenceCacheStats;
 import com.ai.gateway.security.AuthorizationService;
 import com.ai.gateway.security.SecurityRole;
 import org.junit.jupiter.api.Test;

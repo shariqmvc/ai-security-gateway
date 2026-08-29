@@ -1,6 +1,6 @@
 package com.ai.gateway.dashboard.dto;
 
-import com.ai.gateway.cost.dto.CostSummary;
+import com.ai.gateway.core.cost.dto.CostSummary;
 
 import java.util.List;
 import java.util.UUID;

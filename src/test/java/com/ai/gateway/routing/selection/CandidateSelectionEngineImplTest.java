@@ -1,11 +1,11 @@
-package com.ai.gateway.routing.selection;
+package com.ai.gateway.core.routing.selection;
 
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.routing.engine.RoutingCandidate;
-import com.ai.gateway.routing.scoring.CandidateScoreComponent;
-import com.ai.gateway.routing.scoring.CandidateScoreDimension;
-import com.ai.gateway.routing.scoring.ScoredCandidate;
-import com.ai.gateway.routing.selection.impl.CandidateSelectionEngineImpl;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.routing.scoring.CandidateScoreComponent;
+import com.ai.gateway.core.routing.scoring.CandidateScoreDimension;
+import com.ai.gateway.core.routing.scoring.ScoredCandidate;
+import com.ai.gateway.core.routing.selection.impl.CandidateSelectionEngineImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.ActiveProfiles;
 

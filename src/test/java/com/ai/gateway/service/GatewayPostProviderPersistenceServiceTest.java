@@ -1,15 +1,15 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.cost.service.CostService;
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.dto.AIResponse;
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.metrics.GatewayMetricsService;
-import com.ai.gateway.routing.RoutingDecision;
-import com.ai.gateway.routing.RoutingStrategy;
-import com.ai.gateway.routing.health.RoutingOutcomeService;
-import com.ai.gateway.routing.intelligence.RoutingRuntimeSignalService;
+import com.ai.gateway.business.cost.service.CostService;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.contract.AIResponse;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.metrics.GatewayMetricsService;
+import com.ai.gateway.core.routing.RoutingDecision;
+import com.ai.gateway.core.routing.RoutingStrategy;
+import com.ai.gateway.business.routing.health.RoutingOutcomeService;
+import com.ai.gateway.core.routing.intelligence.RoutingRuntimeSignalService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

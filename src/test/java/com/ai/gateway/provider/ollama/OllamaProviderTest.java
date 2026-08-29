@@ -1,17 +1,17 @@
-package com.ai.gateway.provider.ollama;
+package com.ai.gateway.core.provider.ollama;
 
 import com.ai.gateway.config.OllamaConfig;
 import com.ai.gateway.config.ProviderConcurrencyLimiter;
 import com.ai.gateway.config.ProviderConcurrencyProperties;
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.dto.AIResponse;
-import com.ai.gateway.enums.Provider;
-import com.ai.gateway.observability.PerformanceLogger;
-import com.ai.gateway.provider.AIStreamResult;
-import com.ai.gateway.provider.ollama.dto.OllamaMessage;
-import com.ai.gateway.provider.ollama.dto.OllamaOptions;
-import com.ai.gateway.provider.ollama.dto.OllamaRequest;
-import com.ai.gateway.provider.ollama.dto.OllamaResponse;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.contract.AIResponse;
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.observability.PerformanceLogger;
+import com.ai.gateway.core.provider.AIStreamResult;
+import com.ai.gateway.core.provider.ollama.dto.OllamaMessage;
+import com.ai.gateway.core.provider.ollama.dto.OllamaOptions;
+import com.ai.gateway.core.provider.ollama.dto.OllamaRequest;
+import com.ai.gateway.core.provider.ollama.dto.OllamaResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;

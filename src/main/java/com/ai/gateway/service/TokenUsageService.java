@@ -1,7 +1,7 @@
 package com.ai.gateway.service;
 
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.dto.AIResponse;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.contract.AIResponse;
 
 import java.util.UUID;
 

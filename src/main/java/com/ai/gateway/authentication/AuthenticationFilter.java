@@ -40,7 +40,7 @@ public class AuthenticationFilter extends OncePerRequestFilter {
 
         AuthenticationContext context = result.getContext();
 
-        if (!context.isPlatformPrincipal()) {
+        if (!context.isPlatformPrincipal() && !context.isPersonalPrincipal()) {
             TenantContext.set(context.getTenantId());
             TenantSchemaContext.set(context.getTenantId(), context.getSchemaName());
 
@@ -76,8 +76,9 @@ public class AuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Authentication is now required for /admin and /platform APIs as well.
-     * Only explicitly public endpoints can bypass the filter.
+     * Enterprise API-key authentication and Personal Bearer-session
+     * authentication are established here. Only explicitly public endpoints
+     * can bypass the filter.
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

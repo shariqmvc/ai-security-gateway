@@ -1,4 +1,4 @@
-package com.ai.gateway.cost.routing;
+package com.ai.gateway.core.cost.routing;
 
 import org.junit.jupiter.api.Test;
 

@@ -84,13 +84,44 @@ public class TenantSchemaMigrationStartupConfig {
                     FROM tenants
                     WHERE schema_name IS NOT NULL
                       AND schema_name <> ''
+                      AND status <> 'FAILED'
                     ORDER BY schema_name
                     """,
                     (rs, rowNum) -> rs.getString("schema_name"));
 
             for (String schemaName : schemas) {
+                if (!schemaExists(schemaName)) {
+                    // A failed/incomplete tenant provisioning attempt can leave
+                    // a tenant metadata row behind before the physical schema
+                    // is created. Never invoke Flyway against a schema that
+                    // does not exist: with createSchemas=false Flyway fails
+                    // while creating flyway_schema_history and prevents the
+                    // entire ApplicationContext from starting.
+                    org.slf4j.LoggerFactory.getLogger(
+                            TenantSchemaMigrationStartupInitializer.class)
+                            .warn(
+                                    "Skipping tenant schema migration at startup: schema={} does not exist.",
+                                    schemaName);
+                    continue;
+                }
+
                 provisioningService.migrateSchema(schemaName);
             }
+        }
+
+        private boolean schemaExists(String schemaName) {
+            Boolean exists = jdbcTemplate.queryForObject(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM pg_namespace
+                        WHERE nspname = ?
+                    )
+                    """,
+                    Boolean.class,
+                    schemaName);
+
+            return Boolean.TRUE.equals(exists);
         }
 
         /**

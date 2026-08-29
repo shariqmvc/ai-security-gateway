@@ -1,14 +1,14 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.dto.ChatRequest;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.exception.BusinessException;
-import com.ai.gateway.routing.ExplicitModelRoutingStrategy;
-import com.ai.gateway.routing.RoutingContext;
-import com.ai.gateway.routing.RoutingDecision;
-import com.ai.gateway.routing.RoutingStrategy;
-import com.ai.gateway.routing.registry.*;
+import com.ai.gateway.core.routing.ExplicitModelRoutingStrategy;
+import com.ai.gateway.core.routing.RoutingContext;
+import com.ai.gateway.core.routing.RoutingDecision;
+import com.ai.gateway.core.routing.RoutingStrategy;
+import com.ai.gateway.core.routing.registry.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

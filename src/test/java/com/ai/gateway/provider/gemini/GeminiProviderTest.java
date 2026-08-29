@@ -1,18 +1,18 @@
-package com.ai.gateway.provider.gemini;
+package com.ai.gateway.core.provider.gemini;
 
 import com.ai.gateway.config.GeminiConfig;
-import com.ai.gateway.dto.AIRequest;
-import com.ai.gateway.dto.AIResponse;
-import com.ai.gateway.multimodal.MediaContent;
-import com.ai.gateway.multimodal.MediaSourceType;
-import com.ai.gateway.multimodal.MediaTypeKind;
-import com.ai.gateway.multimodal.MediaUrlFetcher;
-import com.ai.gateway.observability.PerformanceLogger;
-import com.ai.gateway.provider.gemini.dto.Candidate;
-import com.ai.gateway.provider.gemini.dto.CandidateContent;
-import com.ai.gateway.provider.gemini.dto.GeminiPart;
-import com.ai.gateway.provider.gemini.dto.GeminiResponse;
-import com.ai.gateway.provider.gemini.dto.UsageMetadata;
+import com.ai.gateway.core.contract.AIRequest;
+import com.ai.gateway.core.contract.AIResponse;
+import com.ai.gateway.core.multimodal.MediaContent;
+import com.ai.gateway.core.multimodal.MediaSourceType;
+import com.ai.gateway.core.multimodal.MediaTypeKind;
+import com.ai.gateway.core.multimodal.MediaUrlFetcher;
+import com.ai.gateway.core.observability.PerformanceLogger;
+import com.ai.gateway.core.provider.gemini.dto.Candidate;
+import com.ai.gateway.core.provider.gemini.dto.CandidateContent;
+import com.ai.gateway.core.provider.gemini.dto.GeminiPart;
+import com.ai.gateway.core.provider.gemini.dto.GeminiResponse;
+import com.ai.gateway.core.provider.gemini.dto.UsageMetadata;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -62,7 +62,7 @@ class GeminiProviderTest {
                 .thenReturn(ResponseEntity.ok(response));
 
         AIRequest request = AIRequest.builder()
-                .provider(com.ai.gateway.enums.Provider.GEMINI)
+                .provider(com.ai.gateway.core.model.Provider.GEMINI)
                 .model("gemini-3.6-flash")
                 .prompt("Describe this image")
                 .media(List.of(MediaContent.builder()
@@ -80,7 +80,7 @@ class GeminiProviderTest {
         verify(restTemplate).exchange(
                 any(String.class), eq(HttpMethod.POST), argThat(entity -> {
                     Object body = entity.getBody();
-                    if (!(body instanceof com.ai.gateway.provider.gemini.dto.GeminiRequest geminiRequest)) {
+                    if (!(body instanceof com.ai.gateway.core.provider.gemini.dto.GeminiRequest geminiRequest)) {
                         return false;
                     }
                     GeminiPart mediaPart = geminiRequest.getContents().getFirst().getParts().get(1);

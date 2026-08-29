@@ -1,0 +1,58 @@
+package com.ai.gateway.core.routing.registry;
+
+import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.exception.BusinessException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.Set;
+
+@Service
+@RequiredArgsConstructor
+public class ProviderModelRegistryService {
+
+    private final ProviderRegistry providerRegistry;
+    private final ModelRegistry modelRegistry;
+
+    public ProviderDefinition requireProvider(
+            Provider provider) {
+
+        return providerRegistry
+                .find(provider)
+                .filter(ProviderDefinition::isEnabled)
+                .orElseThrow(() ->
+                        new BusinessException(
+                                provider +
+                                        " provider is not available."));
+    }
+
+    public ModelDefinition requireModel(
+            Provider provider,
+            String modelId) {
+
+        return modelRegistry
+                .find(provider, modelId)
+                .filter(ModelDefinition::isEnabled)
+                .orElseThrow(() ->
+                        new BusinessException(
+                                "Model " +
+                                        modelId +
+                                        " is not available for provider " +
+                                        provider +
+                                        "."));
+    }
+    public ModelDefinition requireModel(
+            Provider provider,
+            String modelId,
+            Set<String> requiredCapabilities) {
+        ModelDefinition model = requireModel(provider, modelId);
+        if (requiredCapabilities != null && !requiredCapabilities.isEmpty()
+                && !model.capabilities().containsAll(requiredCapabilities)) {
+            throw new BusinessException(
+                    "Model " + modelId + " for provider " + provider
+                            + " does not support required capabilities: " + requiredCapabilities);
+        }
+        return model;
+    }
+
+}

@@ -1,6 +1,6 @@
-package com.ai.gateway.failover;
+package com.ai.gateway.core.failover;
 
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

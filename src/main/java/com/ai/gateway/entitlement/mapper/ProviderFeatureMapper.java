@@ -1,7 +1,7 @@
 package com.ai.gateway.entitlement.mapper;
 
 import com.ai.gateway.entitlement.enums.Feature;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 
 public final class ProviderFeatureMapper {
 

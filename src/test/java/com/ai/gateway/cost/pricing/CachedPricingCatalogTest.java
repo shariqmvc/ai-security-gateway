@@ -1,8 +1,8 @@
-package com.ai.gateway.cost.pricing;
+package com.ai.gateway.core.cost.pricing;
 
-import com.ai.gateway.cost.config.PricingConfig;
-import com.ai.gateway.cost.dto.ModelPricing;
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.cost.config.PricingConfig;
+import com.ai.gateway.core.cost.dto.ModelPricing;
+import com.ai.gateway.core.model.Provider;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

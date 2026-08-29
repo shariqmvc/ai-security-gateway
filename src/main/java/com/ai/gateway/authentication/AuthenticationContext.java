@@ -1,6 +1,6 @@
 package com.ai.gateway.authentication;
 
-import com.ai.gateway.enums.Provider;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.security.SecurityRole;
 import com.ai.gateway.tenant.TenantType;
 import lombok.*;
@@ -15,6 +15,9 @@ public class AuthenticationContext {
     private final AuthenticationType authenticationType;
     private final UUID apiKeyId;
     private final String clientName;
+
+    private final UUID personalUserId;
+    private final UUID personalAccountId;
 
     private final UUID tenantId;
     private final String tenantCode;
@@ -35,4 +38,7 @@ public class AuthenticationContext {
 
     @Builder.Default
     private final boolean platformPrincipal = false;
+
+    @Builder.Default
+    private final boolean personalPrincipal = false;
 }
