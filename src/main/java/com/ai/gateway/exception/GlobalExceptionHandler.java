@@ -225,6 +225,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
+    @ExceptionHandler(com.ai.gateway.personal.quota.exception.PersonalQuotaExceededException.class)
+    public ResponseEntity<ErrorResponse> handlePersonalQuotaExceeded(
+            com.ai.gateway.personal.quota.exception.PersonalQuotaExceededException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .error(HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
+    }
+
     @ExceptionHandler(com.ai.gateway.personal.PersonalProviderConnectionException.class)
     public ResponseEntity<ErrorResponse> handlePersonalProviderConnection(
             com.ai.gateway.personal.PersonalProviderConnectionException ex,

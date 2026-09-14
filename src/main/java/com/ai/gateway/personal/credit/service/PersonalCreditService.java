@@ -14,6 +14,9 @@ public interface PersonalCreditService {
     PersonalCreditLedger credit(UUID personalAccountId, BigDecimal amount,
                                 String referenceId, String description);
 
+    PersonalCreditLedger debit(UUID personalAccountId, BigDecimal amount,
+                               String referenceId, String description);
+
     PersonalCreditReservation reserve(UUID personalAccountId, BigDecimal amount,
                                       String referenceId, String description);
 

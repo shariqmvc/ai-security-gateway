@@ -38,7 +38,11 @@ public class PersonalRateLimiterService {
                         .refillDurationSeconds(60)
                         .build();
 
-        String key = "PERSONAL_ACCOUNT:" + context.getPersonalAccountId();
+        String key = context.getAuthenticationType()
+                == com.ai.gateway.authentication.AuthenticationType.PERSONAL_API_KEY
+                && context.getApiKeyId() != null
+                ? "PERSONAL_API_KEY:" + context.getApiKeyId()
+                : "PERSONAL_ACCOUNT:" + context.getPersonalAccountId();
 
         return strategy.allow(key, configuration);
     }

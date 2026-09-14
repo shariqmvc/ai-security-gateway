@@ -31,13 +31,24 @@ import com.ai.gateway.core.multimodal.MediaTypeKind;
 import com.ai.gateway.core.cache.CachedInferenceResponse;
 import com.ai.gateway.core.cache.InferenceCacheService;
 import com.ai.gateway.core.multimodal.MultimodalRequestValidator;
+import com.ai.gateway.core.context.ContextOptimizationResult;
+import com.ai.gateway.core.context.ContextOptimizationService;
 import com.ai.gateway.core.routing.registry.ModelCapabilities;
 import com.ai.gateway.core.routing.RoutingContext;
 import com.ai.gateway.core.routing.RoutingDecision;
 import com.ai.gateway.core.routing.RoutingService;
 import com.ai.gateway.core.routing.analytics.RoutingAnalyticsService;
 import com.ai.gateway.core.routing.registry.ProviderModelRegistryService;
+import com.ai.gateway.core.routing.registry.ModelRegistry;
+import com.ai.gateway.core.routing.registry.ModelDefinition;
 import com.ai.gateway.personal.billing.PersonalBillingModeResolver;
+import com.ai.gateway.personal.PersonalFeatureEntitlementService;
+import com.ai.gateway.personal.billing.PersonalCreditExecutionService;
+import com.ai.gateway.personal.intelligence.PersonalSecurityIntelligenceService;
+import com.ai.gateway.personal.intelligence.PersonalSecurityRisk;
+import com.ai.gateway.personal.security.PersonalChatSecurityProperties;
+import com.ai.gateway.personal.quota.service.PersonalQuotaService;
+import com.ai.gateway.personal.usage.service.PersonalRequestHistoryService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +64,8 @@ import java.util.function.Consumer;
 @Service
 @RequiredArgsConstructor
 public class GatewayServiceImpl implements GatewayService {
+
+    private static final int DEFAULT_RESERVED_OUTPUT_TOKENS = 1024;
 
     private final PIIDetectionService piiDetectionService;
 
@@ -84,11 +97,27 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final MultimodalRequestValidator multimodalRequestValidator;
 
+    private final ContextOptimizationService contextOptimizationService;
+
     private final InferenceCacheService inferenceCacheService;
 
     private final AIProviderFactory providerFactory;
 
     private final PersonalBillingModeResolver personalBillingModeResolver;
+
+    private final PersonalCreditExecutionService personalCreditExecutionService;
+
+    private final PersonalSecurityIntelligenceService personalSecurityIntelligenceService;
+
+    private final PersonalChatSecurityProperties personalChatSecurityProperties;
+
+    private final PersonalFeatureEntitlementService personalFeatureEntitlementService;
+
+    private final PersonalQuotaService personalQuotaService;
+
+    private final PersonalRequestHistoryService personalRequestHistoryService;
+
+    private final ModelRegistry modelRegistry;
 
     @Override
     @RequiresFeature(Feature.CHAT)
@@ -113,7 +142,13 @@ public class GatewayServiceImpl implements GatewayService {
         AIRequest aiRequest = null;
         boolean providerInvocationStarted = false;
         boolean providerInvocationSucceeded = false;
+        PersonalCreditExecutionService.ReservationContext creditReservation = null;
         long providerInvocationStart = 0L;
+        Integer estimatedInputTokens = null;
+        Integer estimatedOptimizedTokens = null;
+        Integer estimatedTokensSaved = null;
+        Integer contextWindowTokens = null;
+        boolean quotaAcquired = false;
 
         try {
 
@@ -122,8 +157,8 @@ public class GatewayServiceImpl implements GatewayService {
 
             stageStart = System.nanoTime();
             if (request.isExtensiveResearch()) {
-                entitlementService.validateFeature(
-                        auth.getTenantId(),
+                validateFeature(
+                        auth,
                         Feature.EXTENSIVE_RESEARCH);
             }
             performanceLogger.stage("ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
@@ -133,33 +168,36 @@ public class GatewayServiceImpl implements GatewayService {
             // Prompt Firewall
             // Policy Engine
             // -------------------------------
-            validateRequest(originalPrompt);
+            validateRequest(auth, originalPrompt);
+            if (auth.isPersonalPrincipal()) {
+                var securityAssessment =
+                        personalSecurityIntelligenceService.assess(originalPrompt);
+                performanceLogger.stage(
+                        "PERSONAL_SECURITY_INTELLIGENCE",
+                        requestId,
+                        0L,
+                        securityAssessment.risk().name()
+                                + ":"
+                                + securityAssessment.score());
+                if (securityAssessment.risk() == PersonalSecurityRisk.HIGH) {
+                    throw new com.ai.gateway.exception.BusinessException(
+                            "Personal security intelligence rejected the request.");
+                }
+            }
             performanceLogger.stage("FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
 
-
+            // Personal quota enforcement is account-scoped and independent of
+            // Business tenant quotas. The estimate is deliberately conservative
+            // and provider-neutral; actual provider usage is checked after inference.
+            if (auth.isPersonalPrincipal()) {
+                long estimatedRequestTokens = Math.max(1L, (originalPrompt == null ? 0 : originalPrompt.length() + 3) / 4);
+                personalQuotaService.beforeRequest(auth, estimatedRequestTokens);
+                quotaAcquired = true;
+            }
 
             stageStart = System.nanoTime();
-            MaskingResult maskingResult =
-                    maskPrompt(requestId, originalPrompt);
-
-            maskedPrompt =
-                    maskingResult.getMaskedPrompt();
+            maskedPrompt = maskContextMessages(requestId, request);
             performanceLogger.stage("PII_MASKING_AND_TOKEN_VAULT", requestId, elapsedMs(stageStart), "SUCCESS");
-
-            stageStart = System.nanoTime();
-            RagAugmentationResult ragResult =
-                    ragAugmentationService.augment(
-                            auth.getTenantId(),
-                            maskedPrompt,
-                            request.getRag());
-            String providerPrompt = ragResult.getAugmentedPrompt();
-            performanceLogger.stage(
-                    "RAG_AUGMENTATION",
-                    requestId,
-                    elapsedMs(stageStart),
-                    request.getRag() != null && request.getRag().isEnabled()
-                            ? "ENABLED"
-                            : "DISABLED");
 
             stageStart = System.nanoTime();
             aiRequest =
@@ -167,9 +205,49 @@ public class GatewayServiceImpl implements GatewayService {
                             requestId,
                             request,
                             auth,
-                            providerPrompt);
-
+                            maskedPrompt);
             performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            stageStart = System.nanoTime();
+            ContextOptimizationResult contextOptimization =
+                    optimizeContext(request, maskedPrompt, aiRequest);
+            if (contextOptimization == null) {
+                contextOptimization = noOpContextOptimization(maskedPrompt);
+            }
+            estimatedInputTokens = contextOptimization.getOriginalTokens();
+            estimatedOptimizedTokens = contextOptimization.getOptimizedTokens();
+            estimatedTokensSaved = contextOptimization.getTokensSaved();
+            contextWindowTokens = resolveContextWindow(aiRequest);
+            String providerPrompt = contextOptimization.getOptimizedContext();
+            performanceLogger.stage(
+                    "CONTEXT_OPTIMIZATION",
+                    requestId,
+                    elapsedMs(stageStart),
+                    "strategy=" + contextOptimization.getStrategy()
+                            + " provider=" + aiRequest.getProvider()
+                            + " model=" + aiRequest.getModel()
+                            + " contextWindowTokens=" + resolveContextWindow(aiRequest)
+                            + " reservedOutputTokens=" + DEFAULT_RESERVED_OUTPUT_TOKENS
+                            + " inputBudgetTokens=" + resolveContextInputBudget(aiRequest)
+                            + " estimatedOriginalTokens=" + contextOptimization.getOriginalTokens()
+                            + " estimatedOptimizedTokens=" + contextOptimization.getOptimizedTokens()
+                            + " estimatedTokensSaved=" + contextOptimization.getTokensSaved());
+
+            stageStart = System.nanoTime();
+            RagAugmentationResult ragResult =
+                    ragAugmentationService.augment(
+                            auth.getTenantId(),
+                            providerPrompt,
+                            request.getRag());
+            providerPrompt = ragResult.getAugmentedPrompt();
+            aiRequest.setPrompt(providerPrompt);
+            performanceLogger.stage(
+                    "RAG_AUGMENTATION",
+                    requestId,
+                    elapsedMs(stageStart),
+                    request.getRag() != null && request.getRag().isEnabled()
+                            ? "ENABLED"
+                            : "DISABLED");
 
             if (auth.isPersonalPrincipal()) {
                 aiRequest.setBillingMode(personalBillingModeResolver
@@ -220,6 +298,13 @@ public class GatewayServiceImpl implements GatewayService {
 
                     long latency = elapsedMs(start);
                     long gatewayOverhead = latency;
+                    if (auth.isPersonalPrincipal()) {
+                        personalRequestHistoryService.recordSuccess(
+                                requestId, auth, aiRequest, cachedResponse, maskedPrompt,
+                                latency, 0L, estimatedInputTokens, estimatedOptimizedTokens,
+                                estimatedTokensSaved, contextWindowTokens, true,
+                                request.getRag() != null && request.getRag().isEnabled());
+                    }
                     performanceLogger.requestCompleted(
                             requestId,
                             latency,
@@ -248,6 +333,12 @@ public class GatewayServiceImpl implements GatewayService {
             // Provider Invocation
             // -------------------------------
 
+            if (auth.isPersonalPrincipal()
+                    && "CREDIT".equalsIgnoreCase(aiRequest.getBillingMode())) {
+                creditReservation = personalCreditExecutionService.reserve(
+                        auth, aiRequest, "inference:" + requestId);
+            }
+
             providerInvocationStarted = true;
             providerInvocationStart = System.nanoTime();
 
@@ -265,6 +356,18 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             providerInvocationSucceeded = true;
+
+            if (creditReservation != null) {
+                personalCreditExecutionService.reconcile(
+                        creditReservation,
+                        aiRequest,
+                        aiResponse);
+                creditReservation = null;
+            }
+
+            if (auth.isPersonalPrincipal()) {
+                personalQuotaService.afterSuccess(auth, aiResponse);
+            }
 
             long providerLatency = elapsedMs(providerInvocationStart);
             performanceLogger.stage("PROVIDER_EXECUTION", requestId, providerLatency, "SUCCESS");
@@ -314,6 +417,15 @@ public class GatewayServiceImpl implements GatewayService {
                             aiRequest.getRoutingStrategy(),
                             aiRequest.getRoutingDecisionMetadata());
 
+            if (auth.isPersonalPrincipal()) {
+                personalRequestHistoryService.recordSuccess(
+                        requestId, auth, aiRequest, aiResponse, maskedPrompt,
+                        latency, providerLatency, estimatedInputTokens,
+                        estimatedOptimizedTokens, estimatedTokensSaved,
+                        contextWindowTokens, false,
+                        request.getRag() != null && request.getRag().isEnabled());
+            }
+
             postProviderPersistenceService.persistSuccess(
                     requestId,
                     auth,
@@ -346,6 +458,15 @@ public class GatewayServiceImpl implements GatewayService {
 
         } catch (Exception ex) {
 
+            if (creditReservation != null) {
+                try {
+                    personalCreditExecutionService.releaseOnFailure(creditReservation);
+                } catch (RuntimeException releaseEx) {
+                    log.error("Failed to release Personal credit reservation requestId={}",
+                            requestId, releaseEx);
+                }
+            }
+
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
                     ? elapsedMs(providerInvocationStart)
@@ -359,6 +480,12 @@ public class GatewayServiceImpl implements GatewayService {
                             aiRequest.getModel(),
                             aiRequest.getRoutingStrategy(),
                             aiRequest.getRoutingDecisionMetadata());
+
+            if (auth.isPersonalPrincipal()) {
+                personalRequestHistoryService.recordFailure(
+                        requestId, auth, aiRequest, maskedPrompt,
+                        latency, providerLatency, ex.getClass().getSimpleName());
+            }
 
             postProviderPersistenceService.persistFailure(
                     requestId,
@@ -388,6 +515,10 @@ public class GatewayServiceImpl implements GatewayService {
                     gatewayOverhead);
 
             throw ex;
+        } finally {
+            if (quotaAcquired) {
+                personalQuotaService.release(auth);
+            }
         }
 
     }
@@ -406,12 +537,19 @@ public class GatewayServiceImpl implements GatewayService {
         performanceLogger.requestStart(requestId, "/api/chat/stream");
 
         AuthenticationContext auth = getAuthenticationContext();
+        validateFeature(auth, Feature.STREAMING);
         AIRequest aiRequest = null;
         String maskedPrompt = request.getPrompt();
         long providerStart = 0L;
         boolean providerInvocationStarted = false;
         boolean providerInvocationSucceeded = false;
         boolean successPersisted = false;
+        PersonalCreditExecutionService.ReservationContext creditReservation = null;
+        boolean quotaAcquired = false;
+        Integer estimatedInputTokens = null;
+        Integer estimatedOptimizedTokens = null;
+        Integer estimatedTokensSaved = null;
+        Integer contextWindowTokens = null;
 
         try {
             multimodalRequestValidator.validate(request);
@@ -419,22 +557,41 @@ public class GatewayServiceImpl implements GatewayService {
 
             long stageStart = System.nanoTime();
             if (request.isExtensiveResearch()) {
-                entitlementService.validateFeature(
-                        auth.getTenantId(),
+                validateFeature(
+                        auth,
                         Feature.EXTENSIVE_RESEARCH);
             }
             performanceLogger.stage(
                     "ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
 
             stageStart = System.nanoTime();
-            validateRequest(request.getPrompt());
+            validateRequest(auth, request.getPrompt());
+            if (auth.isPersonalPrincipal()) {
+                var securityAssessment =
+                        personalSecurityIntelligenceService.assess(request.getPrompt());
+                performanceLogger.stage(
+                        "PERSONAL_SECURITY_INTELLIGENCE",
+                        requestId,
+                        0L,
+                        securityAssessment.risk().name()
+                                + ":"
+                                + securityAssessment.score());
+                if (securityAssessment.risk() == PersonalSecurityRisk.HIGH) {
+                    throw new com.ai.gateway.exception.BusinessException(
+                            "Personal security intelligence rejected the request.");
+                }
+            }
             performanceLogger.stage(
                     "FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
 
+            if (auth.isPersonalPrincipal()) {
+                long estimatedRequestTokens = Math.max(1L, (request.getPrompt() == null ? 0 : request.getPrompt().length() + 3) / 4);
+                personalQuotaService.beforeRequest(auth, estimatedRequestTokens);
+                quotaAcquired = true;
+            }
+
             stageStart = System.nanoTime();
-            MaskingResult maskingResult =
-                    maskPrompt(requestId, request.getPrompt());
-            maskedPrompt = maskingResult.getMaskedPrompt();
+            maskedPrompt = maskContextMessages(requestId, request);
             performanceLogger.stage(
                     "PII_MASKING_AND_TOKEN_VAULT",
                     requestId,
@@ -442,27 +599,53 @@ public class GatewayServiceImpl implements GatewayService {
                     "SUCCESS");
 
             stageStart = System.nanoTime();
+            aiRequest = buildAIRequest(
+                    requestId,
+                    request,
+                    auth,
+                    maskedPrompt);
+            performanceLogger.stage(
+                    "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            stageStart = System.nanoTime();
+            ContextOptimizationResult contextOptimization =
+                    optimizeContext(request, maskedPrompt, aiRequest);
+            if (contextOptimization == null) {
+                contextOptimization = noOpContextOptimization(maskedPrompt);
+            }
+            estimatedInputTokens = contextOptimization.getOriginalTokens();
+            estimatedOptimizedTokens = contextOptimization.getOptimizedTokens();
+            estimatedTokensSaved = contextOptimization.getTokensSaved();
+            contextWindowTokens = resolveContextWindow(aiRequest);
+            String providerPrompt = contextOptimization.getOptimizedContext();
+            performanceLogger.stage(
+                    "CONTEXT_OPTIMIZATION",
+                    requestId,
+                    elapsedMs(stageStart),
+                    "strategy=" + contextOptimization.getStrategy()
+                            + " provider=" + aiRequest.getProvider()
+                            + " model=" + aiRequest.getModel()
+                            + " contextWindowTokens=" + resolveContextWindow(aiRequest)
+                            + " reservedOutputTokens=" + DEFAULT_RESERVED_OUTPUT_TOKENS
+                            + " inputBudgetTokens=" + resolveContextInputBudget(aiRequest)
+                            + " estimatedOriginalTokens=" + contextOptimization.getOriginalTokens()
+                            + " estimatedOptimizedTokens=" + contextOptimization.getOptimizedTokens()
+                            + " estimatedTokensSaved=" + contextOptimization.getTokensSaved());
+
+            stageStart = System.nanoTime();
             RagAugmentationResult ragResult =
                     ragAugmentationService.augment(
                             auth.getTenantId(),
-                            maskedPrompt,
+                            providerPrompt,
                             request.getRag());
-            String providerPrompt = ragResult.getAugmentedPrompt();
+            providerPrompt = ragResult.getAugmentedPrompt();
+            aiRequest.setPrompt(providerPrompt);
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
                     elapsedMs(stageStart),
                     request.getRag() != null && request.getRag().isEnabled()
                             ? "ENABLED" : "DISABLED");
-
-            stageStart = System.nanoTime();
-            aiRequest = buildAIRequest(
-                    requestId,
-                    request,
-                    auth,
-                    providerPrompt);
-            performanceLogger.stage(
-                    "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
 
             if (auth.isPersonalPrincipal()) {
                 aiRequest.setBillingMode(personalBillingModeResolver
@@ -486,6 +669,12 @@ public class GatewayServiceImpl implements GatewayService {
                     .provider(aiRequest.getProvider().name())
                     .model(aiRequest.getModel())
                     .build());
+
+            if (auth.isPersonalPrincipal()
+                    && "CREDIT".equalsIgnoreCase(aiRequest.getBillingMode())) {
+                creditReservation = personalCreditExecutionService.reserve(
+                        auth, aiRequest, "inference:" + requestId);
+            }
 
             var provider = providerFactory.getProvider(aiRequest.getProvider());
             if (!(provider instanceof StreamingAIProvider streamingProvider)) {
@@ -554,6 +743,18 @@ public class GatewayServiceImpl implements GatewayService {
             aiRequest.setProvider(result.getProvider());
             aiRequest.setModel(result.getModel());
 
+            if (creditReservation != null) {
+                personalCreditExecutionService.reconcile(
+                        creditReservation,
+                        aiRequest,
+                        finalResponse);
+                creditReservation = null;
+            }
+
+            if (auth.isPersonalPrincipal()) {
+                personalQuotaService.afterSuccess(auth, finalResponse);
+            }
+
             stageStart = System.nanoTime();
             enforcePostProviderGuardrails(
                     requestId,
@@ -575,6 +776,15 @@ public class GatewayServiceImpl implements GatewayService {
                     "SUCCESS");
 
             long latency = elapsedMs(start);
+            if (auth.isPersonalPrincipal()) {
+                personalRequestHistoryService.recordSuccess(
+                        requestId, auth, aiRequest, finalResponse, maskedPrompt,
+                        latency, providerLatency, estimatedInputTokens,
+                        estimatedOptimizedTokens, estimatedTokensSaved,
+                        contextWindowTokens, false,
+                        request.getRag() != null && request.getRag().isEnabled());
+            }
+
             postProviderPersistenceService.persistSuccess(
                     requestId,
                     auth,
@@ -617,11 +827,20 @@ public class GatewayServiceImpl implements GatewayService {
                     .build());
 
         } catch (StreamClientDisconnectedException ex) {
+            if (creditReservation != null) {
+                personalCreditExecutionService.releaseOnFailure(creditReservation);
+                creditReservation = null;
+            }
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
                     ? elapsedMs(providerStart) : 0L;
 
             if (!successPersisted) {
+                if (auth.isPersonalPrincipal()) {
+                    personalRequestHistoryService.recordFailure(
+                            requestId, auth, aiRequest, maskedPrompt,
+                            latency, providerLatency, "CLIENT_DISCONNECT");
+                }
                 postProviderPersistenceService.persistFailure(
                         requestId,
                         auth,
@@ -658,11 +877,20 @@ public class GatewayServiceImpl implements GatewayService {
             return;
 
         } catch (Exception ex) {
+            if (creditReservation != null) {
+                personalCreditExecutionService.releaseOnFailure(creditReservation);
+                creditReservation = null;
+            }
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
                     ? elapsedMs(providerStart) : 0L;
 
             if (!successPersisted) {
+                if (auth.isPersonalPrincipal()) {
+                    personalRequestHistoryService.recordFailure(
+                            requestId, auth, aiRequest, maskedPrompt,
+                            latency, providerLatency, ex.getClass().getSimpleName());
+                }
                 postProviderPersistenceService.persistFailure(
                         requestId,
                         auth,
@@ -706,6 +934,10 @@ public class GatewayServiceImpl implements GatewayService {
                     .type("error")
                     .error(streamErrorMessage(ex))
                     .build());
+        } finally {
+            if (quotaAcquired) {
+                personalQuotaService.release(auth);
+            }
         }
     }
 
@@ -799,7 +1031,24 @@ public class GatewayServiceImpl implements GatewayService {
                 response);
     }
 
-    private void validateRequest(String prompt) {
+    private void validateRequest(
+            AuthenticationContext auth,
+            String prompt) {
+
+        // Personal Chat is intentionally not governed by the legacy
+        // Business hard-block firewall/policy rules. Those rules are
+        // designed for tenant governance and contain restrictions such as
+        // command execution, filesystem access and code-generation blocks
+        // that are inappropriate for a personal AI workspace.
+        //
+        // Personal Chat uses PersonalSecurityIntelligenceService below as
+        // its adaptive pre-provider security layer. Hard rules remain
+        // available as an explicit opt-in for deployments that require them.
+        if (auth != null
+                && auth.isPersonalPrincipal()
+                && !personalChatSecurityProperties.isHardRulesEnabled()) {
+            return;
+        }
 
         FirewallResult firewall =
                 firewallService.inspect(prompt);
@@ -842,6 +1091,82 @@ public class GatewayServiceImpl implements GatewayService {
 
         return result;
 
+    }
+
+    private String maskContextMessages(
+            UUID requestId,
+            ChatRequest request) {
+
+        if (request.getContextMessages() == null || request.getContextMessages().isEmpty()) {
+            return maskPrompt(requestId, request.getPrompt()).getMaskedPrompt();
+        }
+
+        java.util.List<String> maskedContents = new java.util.ArrayList<>();
+        for (ContextMessage message : request.getContextMessages()) {
+            if (message == null || message.getContent() == null || message.getContent().isBlank()) {
+                continue;
+            }
+            MaskingResult masked = piiDetectionService.mask(message.getContent());
+            tokenVaultService.save(requestId, masked.getDetectedValues());
+            message.setContent(masked.getMaskedPrompt());
+            maskedContents.add(masked.getMaskedPrompt());
+        }
+        return String.join("\n\n", maskedContents);
+    }
+
+    private ContextOptimizationResult noOpContextOptimization(String context) {
+        String value = context == null ? "" : context;
+        int tokens = Math.max(1, (value.length() + 3) / 4);
+        return ContextOptimizationResult.builder()
+                .originalContext(value)
+                .optimizedContext(value)
+                .originalTokens(tokens)
+                .optimizedTokens(tokens)
+                .tokensSaved(0)
+                .duplicateSegmentsRemoved(0)
+                .compressed(false)
+                .strategy("NO_OP_FALLBACK")
+                .build();
+    }
+
+    private ContextOptimizationResult optimizeContext(
+            ChatRequest request,
+            String maskedPrompt,
+            AIRequest aiRequest) {
+
+        int budget = resolveContextInputBudget(aiRequest);
+
+        if (request.getContextMessages() != null && !request.getContextMessages().isEmpty()) {
+            java.util.List<ContextMessage> messages = request.getContextMessages().stream()
+                    .filter(message -> message != null
+                            && message.getContent() != null
+                            && !message.getContent().isBlank())
+                    .toList();
+            if (!messages.isEmpty()) {
+                return contextOptimizationService.optimize(messages, budget);
+            }
+        }
+
+        return contextOptimizationService.optimize(maskedPrompt, budget);
+    }
+
+    private int resolveContextWindow(AIRequest request) {
+        if (request == null || request.getModel() == null) {
+            return 16000;
+        }
+        return modelRegistry.find(request.getProvider(), request.getModel())
+                .map(ModelDefinition::contextWindowTokens)
+                .filter(value -> value > 0)
+                .orElse(16000);
+    }
+
+    private int resolveContextInputBudget(AIRequest request) {
+        if (request == null) {
+            return 15000;
+        }
+        return modelRegistry.find(request.getProvider(), request.getModel())
+                .map(model -> Math.max(256, model.contextWindowTokens() - DEFAULT_RESERVED_OUTPUT_TOKENS))
+                .orElse(Math.max(256, 16000 - DEFAULT_RESERVED_OUTPUT_TOKENS));
     }
 
     private AIRequest buildAIRequest(
@@ -918,6 +1243,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .provider(selectedProvider)
                     .model(selectedModel)
                     .prompt(prompt)
+                    .maximumRequestCost(request.getMaximumRequestCost())
                     .routingDecisionMetadata(routingDecision.metadata())
                     .routingStrategy(routingDecision.strategy())
                     .media(request.getMedia())
@@ -1009,9 +1335,13 @@ public class GatewayServiceImpl implements GatewayService {
             AuthenticationContext auth,
             Feature feature) {
 
-        entitlementService.validateFeature(
-                auth.getTenantId(),
-                feature);
+        if (auth != null && auth.isPersonalPrincipal()) {
+            personalFeatureEntitlementService.validate(auth, feature);
+        } else {
+            entitlementService.validateFeature(
+                    auth.getTenantId(),
+                    feature);
+        }
     }
 
 

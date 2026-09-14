@@ -36,6 +36,19 @@ public class GovernanceGuardrailService {
             return;
         }
 
+        if (auth != null && auth.isPersonalPrincipal()) {
+            // Business quota/budget services are tenant-schema scoped. A
+            // Personal principal deliberately has no tenantId, so never route
+            // Personal execution through those services. Personal CREDIT is
+            // reconciled by PersonalCreditExecutionService before this guard.
+            return;
+        }
+
+        if (auth == null || auth.getTenantId() == null) {
+            throw new IllegalStateException(
+                    "Authenticated tenant context is required for Business governance.");
+        }
+
         long totalTokens = response.getUsage().getTotalTokens();
         if (totalTokens > 0) {
             quotaService.consumeTokens(

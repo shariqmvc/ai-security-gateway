@@ -6,6 +6,8 @@ public enum AuthenticationType {
 
     PERSONAL_SESSION,
 
+    PERSONAL_API_KEY,
+
     JWT,
 
     OAUTH2

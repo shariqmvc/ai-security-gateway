@@ -3,6 +3,7 @@ package com.ai.gateway.config;
 import com.ai.gateway.authentication.AuthenticationFilter;
 import com.ai.gateway.ratelimit.filter.RateLimitFilter;
 import com.ai.gateway.personal.ratelimit.filter.PersonalRateLimitFilter;
+import com.ai.gateway.personal.apikey.filter.PersonalApiKeyScopeFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,7 @@ public class SecurityConfig {
     private final AuthenticationFilter authenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final PersonalRateLimitFilter personalRateLimitFilter;
+    private final PersonalApiKeyScopeFilter personalApiKeyScopeFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
@@ -31,7 +33,17 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/public/**").permitAll()
+                       // .requestMatchers("/actuator/health", "/public/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**")
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/api/health",
+                                "/actuator/health",
+                                "/public/**"
+                        )
+                        .permitAll()
                         /*
                          * /api/chat is authenticated by the mandatory
                          * AuthenticationFilter using X-API-Key. Spring Security
@@ -53,7 +65,10 @@ public class SecurityConfig {
                         AuthenticationFilter.class)
                 .addFilterAfter(
                         personalRateLimitFilter,
-                        RateLimitFilter.class);
+                        RateLimitFilter.class)
+                .addFilterAfter(
+                        personalApiKeyScopeFilter,
+                        PersonalRateLimitFilter.class);
 
         return http.build();
     }

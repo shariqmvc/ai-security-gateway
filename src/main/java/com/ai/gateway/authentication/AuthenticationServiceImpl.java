@@ -5,6 +5,7 @@ import com.ai.gateway.security.ApiKeyService;
 import com.ai.gateway.security.SecurityRole;
 import com.ai.gateway.tenant.Tenant;
 import com.ai.gateway.personal.PersonalAuthService;
+import com.ai.gateway.personal.apikey.service.PersonalApiKeyService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final ApiKeyService apiKeyService;
     private final PersonalAuthService personalAuthService;
+    private final PersonalApiKeyService personalApiKeyService;
 
     /**
      * Optional bootstrap credential for the first platform owner.
@@ -43,6 +45,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
 
             try {
+                if (bearer.startsWith("arpk_")) {
+                    AuthenticationContext context = personalApiKeyService.authenticate(bearer);
+                    return AuthenticationResult.builder()
+                            .authenticated(true)
+                            .context(context)
+                            .build();
+                }
+
                 AuthenticationContext context =
                         personalAuthService.authenticateBearer(bearer);
 
@@ -51,7 +61,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         .context(context)
                         .build();
             } catch (org.springframework.security.access.AccessDeniedException ex) {
-                return unauthenticated("Invalid or expired session");
+                return unauthenticated("Invalid or expired Personal credential");
             }
         }
 

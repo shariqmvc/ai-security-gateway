@@ -19,6 +19,11 @@ import jakarta.validation.constraints.NotBlank;
 @Builder
 public class ChatRequest {
 
+   /** Structured chat messages retained for role-aware context optimization. */
+   @Builder.Default
+   @Valid
+   private java.util.List<ContextMessage> contextMessages = java.util.Collections.emptyList();
+
    @NotBlank(message = "Prompt cannot be empty")
     private String prompt;
     private Provider provider;

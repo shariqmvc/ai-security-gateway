@@ -1,4 +1,5 @@
 package com.ai.gateway.service;
+import com.ai.gateway.personal.apikey.service.PersonalApiKeyService;
 
 import com.ai.gateway.authentication.AuthenticationService;
 import com.ai.gateway.entitlement.enums.Plan;
@@ -52,6 +53,9 @@ class TenantControllerTest {
 
     @MockitoBean
     private AuthorizationService authorizationService;
+
+    @MockitoBean
+    private PersonalApiKeyService personalApiKeyService;
 
     @Test
     void shouldCreateTenant() throws Exception {

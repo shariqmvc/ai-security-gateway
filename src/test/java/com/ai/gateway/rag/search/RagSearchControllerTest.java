@@ -1,4 +1,6 @@
 package com.ai.gateway.rag.search;
+import com.ai.gateway.personal.apikey.service.PersonalApiKeyService;
+import com.ai.gateway.personal.rag.PersonalRagService;
 
 import com.ai.gateway.authentication.AuthenticationFilter;
 import com.ai.gateway.ratelimit.filter.RateLimitFilter;
@@ -29,6 +31,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 class RagSearchControllerTest {
 
+    @MockitoBean
+    private PersonalApiKeyService personalApiKeyService;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -43,6 +48,9 @@ class RagSearchControllerTest {
 
     @MockitoBean
     private TenantAccessGuard tenantAccessGuard;
+
+    @MockitoBean
+    private PersonalRagService personalRagService;
 
     @Test
     void shouldSearchKnowledgeBase() throws Exception {

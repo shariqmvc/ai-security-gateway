@@ -1,6 +1,7 @@
 package com.ai.gateway.service;
 
 import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.personal.apikey.service.PersonalApiKeyService;
 import com.ai.gateway.authentication.AuthenticationResult;
 import com.ai.gateway.authentication.AuthenticationService;
 import com.ai.gateway.authentication.AuthenticationType;
@@ -33,6 +34,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ChatController.class)
 class ChatControllerTest {
+
+    @MockitoBean
+    private PersonalApiKeyService personalApiKeyService;
 
     @Autowired
     private MockMvc mockMvc;

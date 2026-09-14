@@ -19,6 +19,7 @@ public class AIRequest {
 
     /** Opaque execution/billing mode resolved by the application layer. */
     private String billingMode;
+    private java.math.BigDecimal maximumRequestCost;
 
     @Builder.Default
     private List<MediaContent> media = Collections.emptyList();

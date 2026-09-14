@@ -3,6 +3,8 @@ package com.ai.gateway.service;
 import com.ai.gateway.authentication.AuthenticationConstants;
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.core.cache.InferenceCacheService;
+import com.ai.gateway.core.contract.ContextMessage;
+import com.ai.gateway.core.context.ContextOptimizationResult;
 import com.ai.gateway.core.contract.AIRequest;
 import com.ai.gateway.core.contract.AIResponse;
 import com.ai.gateway.core.contract.ChatRequest;
@@ -26,6 +28,8 @@ import com.ai.gateway.core.metrics.GatewayMetricsService;
 import com.ai.gateway.policy.PolicyResult;
 import com.ai.gateway.policy.service.PolicyEngineService;
 import com.ai.gateway.quota.exception.QuotaExceededException;
+import com.ai.gateway.personal.quota.service.PersonalQuotaService;
+import com.ai.gateway.personal.usage.service.PersonalRequestHistoryService;
 import com.ai.gateway.rag.api.RagRequest;
 import com.ai.gateway.rag.augmentation.RagAugmentationResult;
 import com.ai.gateway.rag.augmentation.RagAugmentationService;
@@ -111,6 +115,21 @@ class GatewayServiceImplTest {
     private com.ai.gateway.core.multimodal.MultimodalRequestValidator multimodalRequestValidator;
 
     @Mock
+    private com.ai.gateway.core.context.ContextOptimizationService contextOptimizationService;
+
+    @Mock
+    private com.ai.gateway.core.routing.registry.ModelRegistry modelRegistry;
+
+    @Mock
+    private com.ai.gateway.personal.security.PersonalChatSecurityProperties personalChatSecurityProperties;
+
+    @Mock
+    private PersonalQuotaService personalQuotaService;
+
+    @Mock
+    private PersonalRequestHistoryService personalRequestHistoryService;
+
+    @Mock
     private InferenceCacheService inferenceCacheService;
 
     @Mock
@@ -141,6 +160,23 @@ class GatewayServiceImplTest {
 
     @BeforeEach
     void setUp() {
+
+        lenient().when(contextOptimizationService.optimize(anyString()))
+                .thenAnswer(invocation -> noOpContextOptimization(invocation.getArgument(0)));
+
+        lenient().when(contextOptimizationService.optimize(anyString(), anyInt()))
+                .thenAnswer(invocation -> noOpContextOptimization(invocation.getArgument(0)));
+
+        lenient().when(contextOptimizationService.optimize(anyList(), anyInt()))
+                .thenAnswer(invocation -> {
+                    List<ContextMessage> messages = invocation.getArgument(0);
+                    String value = messages.stream()
+                            .filter(message -> message != null && message.getContent() != null)
+                            .map(ContextMessage::getContent)
+                            .reduce((left, right) -> left + "\n\n" + right)
+                            .orElse("");
+                    return noOpContextOptimization(value);
+                });
 
         tenantId = UUID.randomUUID();
 
@@ -191,6 +227,21 @@ class GatewayServiceImplTest {
     // ============================================================
     // 1. SUCCESSFUL PROVIDER RESPONSE
     // ============================================================
+
+    private ContextOptimizationResult noOpContextOptimization(String value) {
+        String context = value == null ? "" : value;
+        int tokens = Math.max(1, (context.length() + 3) / 4);
+        return ContextOptimizationResult.builder()
+                .originalContext(context)
+                .optimizedContext(context)
+                .originalTokens(tokens)
+                .optimizedTokens(tokens)
+                .tokensSaved(0)
+                .duplicateSegmentsRemoved(0)
+                .compressed(false)
+                .strategy("NO_OP")
+                .build();
+    }
 
     @Test
     void shouldConsumeTokenQuotaAfterSuccessfulProviderResponse() {
@@ -266,7 +317,7 @@ class GatewayServiceImplTest {
         when(providerFactory.getProvider(Provider.OLLAMA))
                 .thenReturn(provider);
 
-        when(restoreService.restore(anyString(), any(UUID.class)))
+        lenient().when(restoreService.restore(anyString(), any(UUID.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         AIStreamResult result = AIStreamResult.builder()
@@ -1078,6 +1129,12 @@ class GatewayServiceImplTest {
                 .validateFeature(
                         tenantId,
                         Feature.OLLAMA);
+
+        doNothing()
+                .when(entitlementService)
+                .validateFeature(
+                        tenantId,
+                        Feature.STREAMING);
     }
 
     /**

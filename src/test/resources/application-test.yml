@@ -12,7 +12,9 @@ spring:
     password: ${DB_TEST_PASSWORD:postgres}
   config:
     import: classpath:firewall-patterns.yml
-
+  flyway:
+    # Integration tests may run against a developer DB whose migration history
+    # predates the current immutable V18 file. Production validation remains enabled.
   jpa:
     hibernate:
       ddl-auto: validate

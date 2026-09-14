@@ -7,6 +7,7 @@ import com.ai.gateway.core.provider.AIProvider;
 import com.ai.gateway.core.provider.AIProviderFactory;
 import com.ai.gateway.core.routing.registry.ModelCapabilities;
 import com.ai.gateway.core.routing.registry.ModelDefinition;
+import com.ai.gateway.core.routing.registry.ModelContextWindowProperties;
 import com.ai.gateway.core.routing.registry.ModelRegistry;
 import com.ai.gateway.core.routing.registry.ModelStatus;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +44,29 @@ public class ModelRegistryImpl implements ModelRegistry {
                 "VISION,AUDIO,TOOLS,REASONING",
                 "VISION,AUDIO,TOOLS,REASONING",
                 "",
-                "VISION,AUDIO,TOOLS,REASONING");
+                "VISION,AUDIO,TOOLS,REASONING",
+                new ModelContextWindowProperties());
+    }
+
+    /**
+     * Backward-compatible constructor retained for existing unit tests and
+     * callers that do not need explicit model context-window configuration.
+     */
+    public ModelRegistryImpl(
+            AIProviderFactory providerFactory,
+            OllamaConfig ollamaConfig,
+            String openAiCapabilities,
+            String geminiCapabilities,
+            String ollamaCapabilities,
+            String claudeCapabilities) {
+        this(
+                providerFactory,
+                ollamaConfig,
+                openAiCapabilities,
+                geminiCapabilities,
+                ollamaCapabilities,
+                claudeCapabilities,
+                new ModelContextWindowProperties());
     }
 
     @Autowired
@@ -53,7 +76,8 @@ public class ModelRegistryImpl implements ModelRegistry {
             @Value("${gateway.routing.model-capabilities.openai:VISION,AUDIO,TOOLS,REASONING}") String openAiCapabilities,
             @Value("${gateway.routing.model-capabilities.gemini:VISION,AUDIO,TOOLS,REASONING}") String geminiCapabilities,
             @Value("${gateway.routing.model-capabilities.ollama:}") String ollamaCapabilities,
-            @Value("${gateway.routing.model-capabilities.claude:VISION,AUDIO,TOOLS,REASONING}") String claudeCapabilities) {
+            @Value("${gateway.routing.model-capabilities.claude:VISION,AUDIO,TOOLS,REASONING}") String claudeCapabilities,
+            ModelContextWindowProperties contextWindowProperties) {
 
         EnumMap<Provider, List<ModelDefinition>> byProvider =
                 new EnumMap<>(Provider.class);
@@ -84,7 +108,10 @@ public class ModelRegistryImpl implements ModelRegistry {
                                     openAiCapabilities,
                                     geminiCapabilities,
                                     ollamaCapabilities,
-                                    claudeCapabilities));
+                                    claudeCapabilities),
+                            contextWindowProperties.resolve(
+                                    provider.name(),
+                                    model));
 
                     definitions.add(definition);
 

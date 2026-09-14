@@ -1,3 +1,7 @@
+personal:
+  security:
+    chat:
+      hard-rules-enabled: ${PERSONAL_CHAT_HARD_RULES_ENABLED:false}
 server:
   port: ${SERVER_PORT:8080}
 
@@ -79,10 +83,23 @@ security:
   encryption:
     aes-key: ${AES_KEY:mysecretkey12345}
 gateway:
+  context:
+    optimization:
+      # Provider-neutral, pre-provider context optimization.
+      # The optimizer is a no-op below the configured threshold and
+      # deterministically prunes duplicate/middle context above the budget.
+      enabled: ${CONTEXT_OPTIMIZATION_ENABLED:true}
+      max-input-tokens: ${CONTEXT_OPTIMIZATION_MAX_INPUT_TOKENS:16000}
+      min-input-tokens: ${CONTEXT_OPTIMIZATION_MIN_INPUT_TOKENS:2000}
+      minimum-savings-tokens: ${CONTEXT_OPTIMIZATION_MINIMUM_SAVINGS_TOKENS:128}
+      prefix-tokens: ${CONTEXT_OPTIMIZATION_PREFIX_TOKENS:2000}
+      suffix-tokens: ${CONTEXT_OPTIMIZATION_SUFFIX_TOKENS:5000}
+      max-segments: ${CONTEXT_OPTIMIZATION_MAX_SEGMENTS:400}
+
   personal:
     quota:
-      # P10.1 policy foundation. Limits remain unconfigured until Personal v1
-      # commercial values are explicitly frozen; enforcement is added later in P10.
+      # Personal quota enforcement. A limit of 0 means unlimited.
+      # Values are environment-overridable so commercial limits can be frozen without code changes.
       enabled: ${GATEWAY_PERSONAL_QUOTA_ENABLED:true}
       requests-per-minute: ${GATEWAY_PERSONAL_REQUESTS_PER_MINUTE:0}
       requests-per-day: ${GATEWAY_PERSONAL_REQUESTS_PER_DAY:0}
@@ -171,6 +188,16 @@ gateway:
       ollama: ${GATEWAY_OLLAMA_MODEL_CAPABILITIES:}
       claude: ${GATEWAY_CLAUDE_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING}
 
+    # Model-aware context budgets. Exact model entries override provider defaults.
+    context-windows:
+      default-tokens: ${GATEWAY_CONTEXT_DEFAULT_TOKENS:16000}
+      providers:
+        OPENAI: ${GATEWAY_OPENAI_CONTEXT_WINDOW:128000}
+        GEMINI: ${GATEWAY_GEMINI_CONTEXT_WINDOW:128000}
+        OLLAMA: ${OLLAMA_NUM_CTX:4096}
+        CLAUDE: ${GATEWAY_CLAUDE_CONTEXT_WINDOW:200000}
+      models: {}
+
     scoring:
       weights:
         cost: 0.30
@@ -248,6 +275,50 @@ alroute:
       # Keep false in production. When enabled, signup returns a one-time
       # verification token to support local dogfooding without email delivery.
       expose-verification-token: ${ALROUTE_PERSONAL_EXPOSE_VERIFICATION_TOKEN:false}
+
+    # Personal feature entitlements are intentionally separate from Business
+    # tenant entitlements. Business tenant authorization continues to use
+    # tenantId/schema. This list does not create a Business tenant.
+    features:
+      enabled:
+        - OPENAI
+        - GEMINI
+        - CLAUDE
+        - OLLAMA
+        - CHAT
+        - STREAMING
+        - EMBEDDING
+        - PROMPT_FIREWALL
+        - POLICY_ENGINE
+        - PII_DETECTION
+        - AUDIT
+        - METRICS
+        - TOKEN_ANALYTICS
+        - COST_ANALYTICS
+        - RATE_LIMITING
+        - QUOTA
+        - RAG
+        - MCP
+        - EXTENSIVE_RESEARCH
+        - DASHBOARD
+
+    billing:
+      # Personal FREE is intentionally limited to locally hosted Ollama models.
+      # Override ALROUTE_PERSONAL_FREE_MODELS per environment when the local
+      # Ollama catalog differs.
+      free-models: ${ALROUTE_PERSONAL_FREE_MODELS:OLLAMA:llama3.1:8b,OLLAMA:llama3.2:3b}
+      reserve-output-tokens: ${ALROUTE_PERSONAL_RESERVE_OUTPUT_TOKENS:1024}
+      reservation-multiplier: ${ALROUTE_PERSONAL_RESERVATION_MULTIPLIER:1.25}
+      minimum-credit-charge: ${ALROUTE_PERSONAL_MINIMUM_CREDIT_CHARGE:0.01}
+
+    payment:
+      provider: ${ALROUTE_PERSONAL_PAYMENT_PROVIDER:EXTERNAL}
+      currency: ${ALROUTE_PERSONAL_PAYMENT_CURRENCY:USD}
+      webhook-secret: ${ALROUTE_PERSONAL_PAYMENT_WEBHOOK_SECRET:change-me-local-only}
+      packages:
+        starter:
+          amount: ${ALROUTE_PERSONAL_STARTER_PACKAGE_AMOUNT:5}
+          credits: ${ALROUTE_PERSONAL_STARTER_PACKAGE_CREDITS:5}
 
     providers:
       # Provider endpoints are system-level infrastructure configuration.

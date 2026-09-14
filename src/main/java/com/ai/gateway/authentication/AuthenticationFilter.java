@@ -83,8 +83,17 @@ public class AuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String servletPath = request.getServletPath();
+
         return servletPath != null
                 && (servletPath.equals("/actuator/health")
-                || servletPath.startsWith("/public/"));
+                || servletPath.equals("/api/health")
+                || servletPath.equals("/swagger-ui.html")
+                || servletPath.startsWith("/swagger-ui/")
+                || servletPath.equals("/v3/api-docs")
+                || servletPath.startsWith("/v3/api-docs/")
+                || servletPath.startsWith("/public/")
+                // Payment webhooks authenticate with their HMAC signature,
+                // not with a customer session/API key.
+                || servletPath.equals("/api/personal/billing/webhooks"));
     }
 }

@@ -4,6 +4,9 @@ import com.ai.gateway.authentication.AuthenticationResult;
 import com.ai.gateway.authentication.AuthenticationServiceImpl;
 import com.ai.gateway.entity.ApiKey;
 import com.ai.gateway.personal.PersonalAuthService;
+import com.ai.gateway.personal.apikey.service.PersonalApiKeyService;
+import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.authentication.AuthenticationType;
 import com.ai.gateway.security.ApiKeyService;
 import com.ai.gateway.tenant.Tenant;
 import com.ai.gateway.tenant.TenantStatus;
@@ -18,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -34,13 +38,40 @@ class AuthenticationServiceImplTest {
     @Mock
     private PersonalAuthService personalAuthService;
 
+    @Mock
+    private PersonalApiKeyService personalApiKeyService;
+
     private AuthenticationServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AuthenticationServiceImpl(
                 apiKeyService,
-                personalAuthService);
+                personalAuthService,
+                personalApiKeyService);
+    }
+
+    @Test
+    void shouldAuthenticatePersonalDeveloperApiKeyFromBearerHeader() {
+        AuthenticationContext context = AuthenticationContext.builder()
+                .authenticationType(AuthenticationType.PERSONAL_API_KEY)
+                .personalPrincipal(true)
+                .personalAccountId(UUID.randomUUID())
+                .build();
+        when(personalApiKeyService.authenticate("arpk_test"))
+                .thenReturn(context);
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("Authorization"))
+                .thenReturn("Bearer arpk_test");
+
+        AuthenticationResult result = service.authenticate(request);
+
+        assertTrue(result.isAuthenticated());
+        assertTrue(result.getContext().isPersonalPrincipal());
+        assertEquals(AuthenticationType.PERSONAL_API_KEY, result.getContext().getAuthenticationType());
+        verify(personalApiKeyService).authenticate("arpk_test");
+        verifyNoInteractions(apiKeyService);
     }
 
     @Test

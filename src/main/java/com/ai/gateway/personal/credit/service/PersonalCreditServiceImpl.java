@@ -63,6 +63,34 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
     @Override
     @Transactional
+    public PersonalCreditLedger debit(UUID personalAccountId, BigDecimal amount,
+                                      String referenceId, String description) {
+        requirePositive(amount);
+        requireReference(referenceId);
+
+        PersonalCreditWallet wallet = getWalletForUpdate(personalAccountId);
+        ensureReferenceUnused(referenceId);
+
+        if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+            throw new PersonalCreditException("Insufficient AIRouter credits for reversal.");
+        }
+
+        wallet.setBalance(wallet.getBalance().subtract(amount));
+        wallet.setUpdatedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
+
+        return ledgerRepository.save(PersonalCreditLedger.builder()
+                .personalAccountId(personalAccountId)
+                .entryType(PersonalCreditLedgerEntryType.REFUND)
+                .amount(amount.negate())
+                .referenceId(referenceId)
+                .description(description)
+                .createdAt(LocalDateTime.now())
+                .build());
+    }
+
+    @Override
+    @Transactional
     public PersonalCreditReservation reserve(UUID personalAccountId, BigDecimal amount,
                                              String referenceId, String description) {
         requirePositive(amount);

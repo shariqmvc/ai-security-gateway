@@ -60,19 +60,24 @@ public class GatewayPostProviderPersistenceService {
                         providerLatency);
             }
 
-            if (response != null && response.getUsage() != null) {
+            if (response != null && response.getUsage() != null
+                    && (auth == null || !auth.isPersonalPrincipal())) {
+                // These persistence services are Business tenant-schema scoped.
+                // Personal billing/usage must not attempt a null tenant lookup.
                 tokenUsageService.save(requestId, request, response);
                 costService.persist(requestId, auth, request, response);
             }
 
-            auditService.save(
-                    requestId,
-                    maskedPrompt,
-                    response == null ? null : response.getResponse(),
-                    totalLatency,
-                    request.getModel(),
-                    request.getProvider().name(),
-                    AuditStatus.SUCCESS);
+            if (auth == null || !auth.isPersonalPrincipal()) {
+                auditService.save(
+                        requestId,
+                        maskedPrompt,
+                        response == null ? null : response.getResponse(),
+                        totalLatency,
+                        request.getModel(),
+                        request.getProvider().name(),
+                        AuditStatus.SUCCESS);
+            }
 
             metricsService.addLatency(totalLatency);
             metricsService.increment(com.ai.gateway.core.metrics.MetricsConstants.SUCCESSFUL_REQUESTS);
@@ -118,16 +123,18 @@ public class GatewayPostProviderPersistenceService {
                 }
             }
 
-            auditService.save(
-                    requestId,
-                    maskedPrompt,
-                    null,
-                    totalLatency,
-                    request == null ? null : request.getModel(),
-                    request == null || request.getProvider() == null
-                            ? null
-                            : request.getProvider().name(),
-                    AuditStatus.FAILED);
+            if (auth == null || !auth.isPersonalPrincipal()) {
+                auditService.save(
+                        requestId,
+                        maskedPrompt,
+                        null,
+                        totalLatency,
+                        request == null ? null : request.getModel(),
+                        request == null || request.getProvider() == null
+                                ? null
+                                : request.getProvider().name(),
+                        AuditStatus.FAILED);
+            }
 
             metricsService.addLatency(totalLatency);
             metricsService.increment(com.ai.gateway.core.metrics.MetricsConstants.FAILED_REQUESTS);

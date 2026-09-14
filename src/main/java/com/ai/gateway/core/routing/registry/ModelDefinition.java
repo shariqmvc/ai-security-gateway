@@ -15,9 +15,20 @@ public record ModelDefinition(
 
         ModelStatus status,
 
-        Set<String> capabilities
+        Set<String> capabilities,
+
+        int contextWindowTokens
 
 ) {
+
+    public ModelDefinition(
+            Provider provider,
+            String modelId,
+            String displayName,
+            ModelStatus status,
+            Set<String> capabilities) {
+        this(provider, modelId, displayName, status, capabilities, 16000);
+    }
 
     public ModelDefinition {
 

@@ -6,6 +6,7 @@ import com.ai.gateway.tenant.TenantType;
 import lombok.*;
 
 import java.util.UUID;
+import java.util.Set;
 
 @Getter
 @Builder
@@ -18,6 +19,9 @@ public class AuthenticationContext {
 
     private final UUID personalUserId;
     private final UUID personalAccountId;
+
+    @Builder.Default
+    private final Set<String> personalApiKeyScopes = Set.of();
 
     private final UUID tenantId;
     private final String tenantCode;

@@ -37,7 +37,19 @@ public class PersonalBillingModeResolver {
             case BYOK -> { requireByok(accountId, provider); yield PersonalBillingMode.BYOK; }
             case CREDIT -> PersonalBillingMode.CREDIT;
             case FREE -> { requireFree(provider, model); yield PersonalBillingMode.FREE; }
-            case AUTO -> hasByok(accountId, provider) ? PersonalBillingMode.BYOK : PersonalBillingMode.CREDIT;
+            case AUTO -> {
+                // Personal AUTO prefers the user's own key, then an explicitly
+                // configured zero-cost local model, and only then paid credits.
+                // This prevents FREE Ollama execution from reaching the credit
+                // reservation path, where its provider price is legitimately 0.
+                if (hasByok(accountId, provider)) {
+                    yield PersonalBillingMode.BYOK;
+                }
+                if (isFree(provider, model)) {
+                    yield PersonalBillingMode.FREE;
+                }
+                yield PersonalBillingMode.CREDIT;
+            }
         };
     }
 
@@ -50,8 +62,13 @@ public class PersonalBillingModeResolver {
             throw new PersonalBillingModeException("No active Personal BYOK connection exists for " + provider + ".");
     }
     private void requireFree(Provider provider, String model) {
-        String key = provider.name() + ":" + model;
-        if (!properties.getFreeModels().contains(key) && !properties.getFreeModels().contains(model))
+        if (!isFree(provider, model))
             throw new PersonalBillingModeException("Selected model is not configured as a Personal free model.");
+    }
+
+    private boolean isFree(Provider provider, String model) {
+        String key = provider.name() + ":" + model;
+        return properties.getFreeModels().contains(key)
+                || properties.getFreeModels().contains(model);
     }
 }

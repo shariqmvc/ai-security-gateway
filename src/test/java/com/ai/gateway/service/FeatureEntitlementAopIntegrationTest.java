@@ -41,6 +41,9 @@ class FeatureEntitlementAopIntegrationTest {
     @MockitoBean
     private AuthenticationContextResolver contextResolver;
 
+    @MockitoBean
+    private com.ai.gateway.personal.PersonalFeatureEntitlementService personalFeatureEntitlementService;
+
     @Test
     void shouldInterceptAnnotatedMethod()
             throws Exception {

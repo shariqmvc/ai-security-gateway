@@ -24,7 +24,7 @@ public class CommandExecution implements PromptRule {
 
     @Override
     public String name() {
-        return "File System Access Rule";
+        return "Command Execution Rule";
     }
 
     @Override
