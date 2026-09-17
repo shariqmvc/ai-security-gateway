@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: aigateway
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d aigateway"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Maven project
+        run: ./mvnw -version
+        continue-on-error: true
+
+      - name: Build and test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/aigateway
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_PROFILES_ACTIVE: test
+        run: mvn -B clean verify
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/**
+            target/failsafe-reports/**
+          if-no-files-found: ignore
+
+      - name: Upload build artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-security-gateway-jar
+          path: target/*.jar
+          if-no-files-found: error
