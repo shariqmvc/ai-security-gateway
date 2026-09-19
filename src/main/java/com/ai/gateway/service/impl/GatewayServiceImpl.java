@@ -49,6 +49,8 @@ import com.ai.gateway.personal.intelligence.PersonalSecurityRisk;
 import com.ai.gateway.personal.security.PersonalChatSecurityProperties;
 import com.ai.gateway.personal.quota.service.PersonalQuotaService;
 import com.ai.gateway.personal.usage.service.PersonalRequestHistoryService;
+import com.ai.gateway.personal.inference.PersonalInferencePersistenceService;
+import com.ai.gateway.personal.inference.PersonalTokenVaultService;
 import com.ai.gateway.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -117,6 +119,9 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final PersonalRequestHistoryService personalRequestHistoryService;
 
+    private final PersonalInferencePersistenceService personalInferencePersistenceService;
+    private final PersonalTokenVaultService personalTokenVaultService;
+
     private final ModelRegistry modelRegistry;
 
     @Override
@@ -139,6 +144,11 @@ public class GatewayServiceImpl implements GatewayService {
         long stageStart = System.nanoTime();
         AuthenticationContext auth = getAuthenticationContext();
         performanceLogger.stage("AUTHENTICATION", requestId, elapsedMs(stageStart), "SUCCESS");
+
+        UUID inferenceId = personalInferencePersistenceService == null ? null
+                : personalInferencePersistenceService.start(
+                        auth, requestId, "/api/chat", "CHAT", null);
+
         AIRequest aiRequest = null;
         boolean providerInvocationStarted = false;
         boolean providerInvocationSucceeded = false;
@@ -172,6 +182,14 @@ public class GatewayServiceImpl implements GatewayService {
             if (auth.isPersonalPrincipal()) {
                 var securityAssessment =
                         personalSecurityIntelligenceService.assess(originalPrompt);
+                if (personalInferencePersistenceService != null) {
+                    personalInferencePersistenceService.security(inferenceId, securityAssessment);
+                    personalInferencePersistenceService.event(
+                            inferenceId, "SECURITY_CHECK", "SECURITY",
+                            java.util.Map.of(
+                                    "risk", securityAssessment.risk().name(),
+                                    "score", securityAssessment.score()));
+                }
                 performanceLogger.stage(
                         "PERSONAL_SECURITY_INTELLIGENCE",
                         requestId,
@@ -179,9 +197,21 @@ public class GatewayServiceImpl implements GatewayService {
                         securityAssessment.risk().name()
                                 + ":"
                                 + securityAssessment.score());
-                if (securityAssessment.risk() == PersonalSecurityRisk.HIGH) {
+                if (securityAssessment.shouldBlock()) {
+                    if (personalInferencePersistenceService != null) {
+                        personalInferencePersistenceService.event(
+                                inferenceId, "SECURITY_BLOCK", "SECURITY",
+                                java.util.Map.of(
+                                        "risk", securityAssessment.risk().name(),
+                                        "score", securityAssessment.score(),
+                                        "reason", securityAssessment.promptInjectionDetected()
+                                                ? "PROMPT_INJECTION_DETECTED"
+                                                : "HIGH_RISK"));
+                    }
                     throw new com.ai.gateway.exception.BusinessException(
-                            "Personal security intelligence rejected the request.");
+                            securityAssessment.promptInjectionDetected()
+                                    ? "Personal security intelligence blocked a prompt-injection request."
+                                    : "Personal security intelligence rejected the request.");
                 }
             }
             performanceLogger.stage("FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
@@ -196,8 +226,14 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             stageStart = System.nanoTime();
-            maskedPrompt = maskContextMessages(requestId, request);
+            maskedPrompt = maskContextMessages(requestId, inferenceId, request, auth);
             performanceLogger.stage("PII_MASKING_AND_TOKEN_VAULT", requestId, elapsedMs(stageStart), "SUCCESS");
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.addUserPrompt(inferenceId, maskedPrompt);
+                personalInferencePersistenceService.event(
+                        inferenceId, "PII_MASKING_COMPLETED", "SECURITY",
+                        java.util.Map.of("completed", true));
+            }
 
             stageStart = System.nanoTime();
             aiRequest =
@@ -207,6 +243,14 @@ public class GatewayServiceImpl implements GatewayService {
                             auth,
                             maskedPrompt);
             performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.updateTarget(inferenceId, aiRequest);
+                personalInferencePersistenceService.event(
+                        inferenceId, "MODEL_SELECTED", "ROUTING",
+                        java.util.Map.of(
+                                "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
+                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
+            }
 
             stageStart = System.nanoTime();
             ContextOptimizationResult contextOptimization =
@@ -232,11 +276,22 @@ public class GatewayServiceImpl implements GatewayService {
                             + " estimatedOriginalTokens=" + contextOptimization.getOriginalTokens()
                             + " estimatedOptimizedTokens=" + contextOptimization.getOptimizedTokens()
                             + " estimatedTokensSaved=" + contextOptimization.getTokensSaved());
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.addContext(
+                        inferenceId, providerPrompt, estimatedOptimizedTokens);
+                personalInferencePersistenceService.event(
+                        inferenceId, "CONTEXT_OPTIMIZATION", "CONTEXT",
+                        java.util.Map.of(
+                                "strategy", contextOptimization.getStrategy(),
+                                "originalTokens", contextOptimization.getOriginalTokens(),
+                                "optimizedTokens", contextOptimization.getOptimizedTokens(),
+                                "tokensSaved", contextOptimization.getTokensSaved()));
+            }
 
             stageStart = System.nanoTime();
             RagAugmentationResult ragResult =
                     ragAugmentationService.augment(
-                            auth.getTenantId(),
+                            auth,
                             providerPrompt,
                             request.getRag());
             providerPrompt = ragResult.getAugmentedPrompt();
@@ -248,6 +303,15 @@ public class GatewayServiceImpl implements GatewayService {
                     request.getRag() != null && request.getRag().isEnabled()
                             ? "ENABLED"
                             : "DISABLED");
+            if (personalInferencePersistenceService != null && request.getRag() != null && request.getRag().isEnabled()) {
+                personalInferencePersistenceService.retrievals(inferenceId, ragResult);
+                personalInferencePersistenceService.event(
+                        inferenceId, "RAG_RETRIEVAL", "RAG",
+                        java.util.Map.of(
+                                "retrievedCount", ragResult.getRetrievedCount(),
+                                "selectedCount", ragResult.getSelectedCount(),
+                                "estimatedContextTokens", ragResult.getEstimatedContextTokens()));
+            }
 
             if (auth.isPersonalPrincipal()) {
                 aiRequest.setBillingMode(personalBillingModeResolver
@@ -282,6 +346,11 @@ public class GatewayServiceImpl implements GatewayService {
                             requestId,
                             cacheLookupLatency,
                             "HIT");
+                    if (personalInferencePersistenceService != null) {
+                        personalInferencePersistenceService.event(
+                                inferenceId, "CACHE_HIT", "CACHE",
+                                java.util.Map.of("lookupLatencyMs", cacheLookupLatency));
+                    }
 
                     AIResponse cachedResponse = AIResponse.builder()
                             .response(cached.response())
@@ -327,6 +396,11 @@ public class GatewayServiceImpl implements GatewayService {
                         requestId,
                         cacheLookupLatency,
                         "MISS");
+                if (personalInferencePersistenceService != null) {
+                    personalInferencePersistenceService.event(
+                            inferenceId, "CACHE_MISS", "CACHE",
+                            java.util.Map.of("lookupLatencyMs", cacheLookupLatency));
+                }
             }
 
             // -------------------------------
@@ -341,6 +415,13 @@ public class GatewayServiceImpl implements GatewayService {
 
             providerInvocationStarted = true;
             providerInvocationStart = System.nanoTime();
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.event(
+                        inferenceId, "PROVIDER_REQUEST_STARTED", "PROVIDER",
+                        java.util.Map.of(
+                                "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
+                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
+            }
 
             AIResponse aiResponse =
                     invokeProvider(aiRequest);
@@ -356,6 +437,18 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             providerInvocationSucceeded = true;
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.providerAttempt(
+                        inferenceId, 1,
+                        aiRequest.getProvider() == null ? null : aiRequest.getProvider().name(),
+                        aiRequest.getModel(), "SUCCESS",
+                        providerInvocationStart, System.nanoTime(), aiResponse, null);
+                personalInferencePersistenceService.event(
+                        inferenceId, "PROVIDER_RESPONSE_RECEIVED", "PROVIDER",
+                        java.util.Map.of(
+                                "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
+                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
+            }
 
             if (creditReservation != null) {
                 personalCreditExecutionService.reconcile(
@@ -416,6 +509,14 @@ public class GatewayServiceImpl implements GatewayService {
                             aiRequest.getModel(),
                             aiRequest.getRoutingStrategy(),
                             aiRequest.getRoutingDecisionMetadata());
+
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.completeSuccess(
+                        inferenceId, aiRequest, aiResponse, latency,
+                        estimatedInputTokens, estimatedOptimizedTokens,
+                        estimatedTokensSaved, contextWindowTokens, false,
+                        request.getRag() != null && request.getRag().isEnabled());
+            }
 
             if (auth.isPersonalPrincipal()) {
                 personalRequestHistoryService.recordSuccess(
@@ -481,6 +582,19 @@ public class GatewayServiceImpl implements GatewayService {
                             aiRequest.getRoutingStrategy(),
                             aiRequest.getRoutingDecisionMetadata());
 
+            if (personalInferencePersistenceService != null) {
+                if (providerInvocationStarted) {
+                    personalInferencePersistenceService.providerAttempt(
+                            inferenceId, 1,
+                            aiRequest == null || aiRequest.getProvider() == null ? null : aiRequest.getProvider().name(),
+                            aiRequest == null ? null : aiRequest.getModel(),
+                            "FAILED", providerInvocationStart, System.nanoTime(), null, ex);
+                }
+                personalInferencePersistenceService.completeFailure(
+                        inferenceId, aiRequest, latency,
+                        ex.getClass().getSimpleName(), ex.getMessage());
+            }
+
             if (auth.isPersonalPrincipal()) {
                 personalRequestHistoryService.recordFailure(
                         requestId, auth, aiRequest, maskedPrompt,
@@ -538,6 +652,11 @@ public class GatewayServiceImpl implements GatewayService {
 
         AuthenticationContext auth = getAuthenticationContext();
         validateFeature(auth, Feature.STREAMING);
+
+        UUID inferenceId = personalInferencePersistenceService == null ? null
+                : personalInferencePersistenceService.start(
+                        auth, requestId, "/api/chat/stream", "STREAM", null);
+
         AIRequest aiRequest = null;
         String maskedPrompt = request.getPrompt();
         long providerStart = 0L;
@@ -569,6 +688,14 @@ public class GatewayServiceImpl implements GatewayService {
             if (auth.isPersonalPrincipal()) {
                 var securityAssessment =
                         personalSecurityIntelligenceService.assess(request.getPrompt());
+                if (personalInferencePersistenceService != null) {
+                    personalInferencePersistenceService.security(inferenceId, securityAssessment);
+                    personalInferencePersistenceService.event(
+                            inferenceId, "SECURITY_CHECK", "SECURITY",
+                            java.util.Map.of(
+                                    "risk", securityAssessment.risk().name(),
+                                    "score", securityAssessment.score()));
+                }
                 performanceLogger.stage(
                         "PERSONAL_SECURITY_INTELLIGENCE",
                         requestId,
@@ -576,9 +703,21 @@ public class GatewayServiceImpl implements GatewayService {
                         securityAssessment.risk().name()
                                 + ":"
                                 + securityAssessment.score());
-                if (securityAssessment.risk() == PersonalSecurityRisk.HIGH) {
+                if (securityAssessment.shouldBlock()) {
+                    if (personalInferencePersistenceService != null) {
+                        personalInferencePersistenceService.event(
+                                inferenceId, "SECURITY_BLOCK", "SECURITY",
+                                java.util.Map.of(
+                                        "risk", securityAssessment.risk().name(),
+                                        "score", securityAssessment.score(),
+                                        "reason", securityAssessment.promptInjectionDetected()
+                                                ? "PROMPT_INJECTION_DETECTED"
+                                                : "HIGH_RISK"));
+                    }
                     throw new com.ai.gateway.exception.BusinessException(
-                            "Personal security intelligence rejected the request.");
+                            securityAssessment.promptInjectionDetected()
+                                    ? "Personal security intelligence blocked a prompt-injection request."
+                                    : "Personal security intelligence rejected the request.");
                 }
             }
             performanceLogger.stage(
@@ -591,12 +730,18 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             stageStart = System.nanoTime();
-            maskedPrompt = maskContextMessages(requestId, request);
+            maskedPrompt = maskContextMessages(requestId, inferenceId, request, auth);
             performanceLogger.stage(
                     "PII_MASKING_AND_TOKEN_VAULT",
                     requestId,
                     elapsedMs(stageStart),
                     "SUCCESS");
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.addUserPrompt(inferenceId, maskedPrompt);
+                personalInferencePersistenceService.event(
+                        inferenceId, "PII_MASKING_COMPLETED", "SECURITY",
+                        java.util.Map.of("completed", true));
+            }
 
             stageStart = System.nanoTime();
             aiRequest = buildAIRequest(
@@ -606,6 +751,14 @@ public class GatewayServiceImpl implements GatewayService {
                     maskedPrompt);
             performanceLogger.stage(
                     "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.updateTarget(inferenceId, aiRequest);
+                personalInferencePersistenceService.event(
+                        inferenceId, "MODEL_SELECTED", "ROUTING",
+                        java.util.Map.of(
+                                "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
+                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
+            }
 
             stageStart = System.nanoTime();
             ContextOptimizationResult contextOptimization =
@@ -635,7 +788,7 @@ public class GatewayServiceImpl implements GatewayService {
             stageStart = System.nanoTime();
             RagAugmentationResult ragResult =
                     ragAugmentationService.augment(
-                            auth.getTenantId(),
+                            auth,
                             providerPrompt,
                             request.getRag());
             providerPrompt = ragResult.getAugmentedPrompt();
@@ -687,6 +840,13 @@ public class GatewayServiceImpl implements GatewayService {
 
             providerStart = System.nanoTime();
             providerInvocationStarted = true;
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.event(
+                        inferenceId, "PROVIDER_REQUEST_STARTED", "PROVIDER",
+                        java.util.Map.of(
+                                "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
+                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
+            }
             StringBuilder restoredSoFar = new StringBuilder();
             String[] lastEmitted = {""};
 
@@ -727,6 +887,26 @@ public class GatewayServiceImpl implements GatewayService {
             providerInvocationSucceeded = true;
 
             long providerLatency = elapsedMs(providerStart);
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.providerAttempt(
+                        inferenceId, 1,
+                        result.getProvider() == null ? null : result.getProvider().name(),
+                        result.getModel(), "SUCCESS",
+                        providerStart, System.nanoTime(), AIResponse.builder()
+                                .response(result.getResponse())
+                                .provider(result.getProvider())
+                                .model(result.getModel())
+                                .usage(Usage.builder()
+                                        .inputTokens(result.getInputTokens())
+                                        .outputTokens(result.getOutputTokens())
+                                        .totalTokens(result.getTotalTokens())
+                                        .build())
+                                .build(), null);
+                personalInferencePersistenceService.event(
+                        inferenceId, "PROVIDER_RESPONSE_RECEIVED", "PROVIDER",
+                        java.util.Map.of("provider", result.getProvider() == null ? "" : result.getProvider().name(),
+                                "model", result.getModel() == null ? "" : result.getModel()));
+            }
 
             AIResponse finalResponse = AIResponse.builder()
                     .response(result.getResponse())
@@ -776,6 +956,14 @@ public class GatewayServiceImpl implements GatewayService {
                     "SUCCESS");
 
             long latency = elapsedMs(start);
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.completeSuccess(
+                        inferenceId, aiRequest, finalResponse, latency,
+                        estimatedInputTokens, estimatedOptimizedTokens,
+                        estimatedTokensSaved, contextWindowTokens, false,
+                        request.getRag() != null && request.getRag().isEnabled());
+            }
+
             if (auth.isPersonalPrincipal()) {
                 personalRequestHistoryService.recordSuccess(
                         requestId, auth, aiRequest, finalResponse, maskedPrompt,
@@ -886,6 +1074,18 @@ public class GatewayServiceImpl implements GatewayService {
                     ? elapsedMs(providerStart) : 0L;
 
             if (!successPersisted) {
+                if (personalInferencePersistenceService != null) {
+                    if (providerInvocationStarted) {
+                        personalInferencePersistenceService.providerAttempt(
+                                inferenceId, 1,
+                                aiRequest == null || aiRequest.getProvider() == null ? null : aiRequest.getProvider().name(),
+                                aiRequest == null ? null : aiRequest.getModel(),
+                                "FAILED", providerStart, System.nanoTime(), null, ex);
+                    }
+                    personalInferencePersistenceService.completeFailure(
+                            inferenceId, aiRequest, latency,
+                            ex.getClass().getSimpleName(), ex.getMessage());
+                }
                 if (auth.isPersonalPrincipal()) {
                     personalRequestHistoryService.recordFailure(
                             requestId, auth, aiRequest, maskedPrompt,
@@ -1080,14 +1280,17 @@ public class GatewayServiceImpl implements GatewayService {
 
     private MaskingResult maskPrompt(
             UUID requestId,
-            String prompt) {
+            String prompt,
+            AuthenticationContext auth) {
 
         MaskingResult result =
                 piiDetectionService.mask(prompt);
 
-        tokenVaultService.save(
-                requestId,
-                result.getDetectedValues());
+        if (auth != null && auth.isPersonalPrincipal()) {
+            personalTokenVaultService.save(auth, requestId, result.getDetectedValues());
+        } else {
+            tokenVaultService.save(requestId, result.getDetectedValues());
+        }
 
         return result;
 
@@ -1095,10 +1298,14 @@ public class GatewayServiceImpl implements GatewayService {
 
     private String maskContextMessages(
             UUID requestId,
-            ChatRequest request) {
+            UUID inferenceId,
+            ChatRequest request,
+            AuthenticationContext auth) {
 
         if (request.getContextMessages() == null || request.getContextMessages().isEmpty()) {
-            return maskPrompt(requestId, request.getPrompt()).getMaskedPrompt();
+            MaskingResult masked = maskPrompt(requestId, request.getPrompt(), auth);
+            recordPiiTelemetry(inferenceId, masked);
+            return masked.getMaskedPrompt();
         }
 
         java.util.List<String> maskedContents = new java.util.ArrayList<>();
@@ -1107,11 +1314,31 @@ public class GatewayServiceImpl implements GatewayService {
                 continue;
             }
             MaskingResult masked = piiDetectionService.mask(message.getContent());
-            tokenVaultService.save(requestId, masked.getDetectedValues());
+            if (auth != null && auth.isPersonalPrincipal()) {
+                personalTokenVaultService.save(auth, requestId, masked.getDetectedValues());
+            } else {
+                tokenVaultService.save(requestId, masked.getDetectedValues());
+            }
+            recordPiiTelemetry(inferenceId, masked);
             message.setContent(masked.getMaskedPrompt());
             maskedContents.add(masked.getMaskedPrompt());
         }
         return String.join("\n\n", maskedContents);
+    }
+
+    private void recordPiiTelemetry(UUID inferenceId, MaskingResult result) {
+        if (personalInferencePersistenceService == null || inferenceId == null || result == null) {
+            return;
+        }
+        java.util.List<String> categories = result.getDetectedValues() == null
+                ? java.util.List.of()
+                : result.getDetectedValues().stream()
+                    .map(value -> value.getPiiType() == null ? "UNKNOWN" : value.getPiiType().name())
+                    .distinct()
+                    .toList();
+        int count = result.getDetectedValues() == null ? 0 : result.getDetectedValues().size();
+        personalInferencePersistenceService.pii(
+                inferenceId, categories, count, count > 0);
     }
 
     private ContextOptimizationResult noOpContextOptimization(String context) {

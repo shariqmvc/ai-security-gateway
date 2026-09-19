@@ -1,6 +1,8 @@
 package com.ai.gateway.rag.augmentation;
 
 import com.ai.gateway.exception.BusinessException;
+import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.personal.rag.PersonalRagService;
 import com.ai.gateway.rag.api.RagRequest;
 import com.ai.gateway.rag.search.RagSearchService;
 import com.ai.gateway.rag.search.dto.RagSearchRequest;
@@ -21,27 +23,64 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
     private final RagSearchService ragSearchService;
     private final RagContextAssembler contextAssembler;
     private final RagContextOptimizer contextOptimizer;
+    private final PersonalRagService personalRagService;
 
     @Autowired
     public RagAugmentationServiceImpl(
             RagSearchService ragSearchService,
             RagContextAssembler contextAssembler,
-            RagContextOptimizer contextOptimizer) {
+            RagContextOptimizer contextOptimizer,
+            PersonalRagService personalRagService) {
         this.ragSearchService = ragSearchService;
         this.contextAssembler = contextAssembler;
         this.contextOptimizer = contextOptimizer;
+        this.personalRagService = personalRagService;
     }
 
     /** Backward-compatible constructor for existing Phase 4 tests. */
     public RagAugmentationServiceImpl(
             RagSearchService ragSearchService,
             RagContextAssembler contextAssembler) {
-        this(ragSearchService, contextAssembler, new RagContextOptimizer());
+        this(ragSearchService, contextAssembler, new RagContextOptimizer(), null);
+    }
+
+    /** Backward-compatible constructor for existing tests that inject the optimizer. */
+    public RagAugmentationServiceImpl(
+            RagSearchService ragSearchService,
+            RagContextAssembler contextAssembler,
+            RagContextOptimizer contextOptimizer) {
+        this(ragSearchService, contextAssembler, contextOptimizer, null);
+    }
+
+    @Override
+    public RagAugmentationResult augment(
+            AuthenticationContext authentication,
+            String query,
+            RagRequest request) {
+        if (authentication != null && authentication.isPersonalPrincipal()) {
+            return augmentInternal(authentication, query, request);
+        }
+        return augment(authentication == null ? null : authentication.getTenantId(), query, request);
     }
 
     @Override
     public RagAugmentationResult augment(
             UUID tenantId,
+            String query,
+            RagRequest request) {
+        return augmentInternal(tenantId, null, query, request);
+    }
+
+    private RagAugmentationResult augmentInternal(
+            AuthenticationContext authentication,
+            String query,
+            RagRequest request) {
+        return augmentInternal(authentication == null ? null : authentication.getTenantId(), authentication, query, request);
+    }
+
+    private RagAugmentationResult augmentInternal(
+            UUID tenantId,
+            AuthenticationContext authentication,
             String query,
             RagRequest request) {
 
@@ -60,7 +99,7 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                     .build();
         }
 
-        validate(tenantId, query, request);
+        validate(tenantId, authentication, query, request);
 
         List<RagContextChunk> candidates = new ArrayList<>();
         Set<UUID> knowledgeBaseIds = new LinkedHashSet<>();
@@ -70,17 +109,26 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
 
         for (UUID kbId : knowledgeBaseIds) {
 
-            RagSearchResponse response = ragSearchService.search(
-                    tenantId,
-                    kbId,
-                    RagSearchRequest.builder()
-                            .query(query.trim())
-                            .topK(request.getTopK())
-                            .minScore(request.getMinScore())
-                            .retrievalStrategy(request.getRetrievalStrategy())
-                            .queryTransformation(request.isQueryTransformation())
-                            .candidateLimit(request.getCandidateLimit())
-                            .build());
+            RagSearchRequest searchRequest = RagSearchRequest.builder()
+                    .query(query.trim())
+                    .topK(request.getTopK())
+                    .minScore(request.getMinScore())
+                    .retrievalStrategy(request.getRetrievalStrategy())
+                    .queryTransformation(request.isQueryTransformation())
+                    .candidateLimit(request.getCandidateLimit())
+                    .build();
+
+            RagSearchResponse response;
+            if (authentication != null && authentication.isPersonalPrincipal()) {
+                if (personalRagService == null) {
+                    throw new BusinessException("Personal RAG service is not available.");
+                }
+                // Personal RAG is account-scoped. PersonalRagService authorizes
+                // the account and constrains the KB/chunks by personal_account_id.
+                response = personalRagService.search(authentication, kbId, searchRequest);
+            } else {
+                response = ragSearchService.search(tenantId, kbId, searchRequest);
+            }
 
             for (RagSearchResult result : response.getResults()) {
                 candidates.add(RagContextChunk.builder()
@@ -159,9 +207,13 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
         }
     }
 
-    private void validate(UUID tenantId, String query, RagRequest request) {
-        if (tenantId == null) {
-            throw new BusinessException("Tenant ID is required for RAG augmentation.");
+    private void validate(UUID tenantId, AuthenticationContext authentication, String query, RagRequest request) {
+        boolean personal = authentication != null && authentication.isPersonalPrincipal();
+        if (!personal && tenantId == null) {
+            throw new BusinessException("Tenant ID is required for Business RAG augmentation.");
+        }
+        if (personal && authentication.getPersonalAccountId() == null) {
+            throw new BusinessException("Personal account context is required for RAG augmentation.");
         }
         if (query == null || query.isBlank()) {
             throw new BusinessException("RAG query is required when RAG is enabled.");

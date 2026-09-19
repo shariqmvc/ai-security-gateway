@@ -83,6 +83,25 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         String supplied = apiKeys.get(0).trim();
 
+        // Personal API keys are intentionally supported through X-API-Key as
+        // well as Authorization: Bearer arpk_... . The Personal API contract
+        // uses X-API-Key for client/API-key authentication. Route the arpk_
+        // credential to the Personal key service before attempting the legacy
+        // tenant-key lookup; otherwise a valid Personal key is never promoted
+        // to a PERSONAL_API_KEY AuthenticationContext and downstream scope
+        // enforcement returns 403.
+        if (supplied.startsWith("arpk_")) {
+            try {
+                AuthenticationContext context = personalApiKeyService.authenticate(supplied);
+                return AuthenticationResult.builder()
+                        .authenticated(true)
+                        .context(context)
+                        .build();
+            } catch (org.springframework.security.access.AccessDeniedException ex) {
+                return unauthenticated("Invalid or expired Personal API key");
+            }
+        }
+
         // Tenant credentials are checked first.
         Optional<ApiKey> tenantKey = apiKeyService.authenticate(supplied);
         if (tenantKey.isPresent()) {

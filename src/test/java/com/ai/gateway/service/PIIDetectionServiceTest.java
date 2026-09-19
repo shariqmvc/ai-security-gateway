@@ -47,4 +47,17 @@ class PIIDetectionServiceTest {
                 result.getDetectedValues().size());
         assertEquals(2, result.getDetectedValues().size());
     }
+    @Test
+    void shouldMaskIndianPhoneWithCountryCode() {
+        String prompt = "Contact me at +91-9876543210 or +91 9876543210";
+
+        MaskingResult result = service.mask(prompt);
+
+        assertEquals(2, result.getDetectedValues().stream()
+                .filter(value -> value.getPiiType() == com.ai.gateway.enums.PIIType.PHONE)
+                .count());
+        assertFalse(result.getMaskedPrompt().contains("+91-9876543210"));
+        assertFalse(result.getMaskedPrompt().contains("+91 9876543210"));
+    }
+
 }

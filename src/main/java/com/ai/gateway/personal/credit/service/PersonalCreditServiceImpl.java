@@ -2,6 +2,7 @@ package com.ai.gateway.personal.credit.service;
 
 import com.ai.gateway.personal.credit.entity.*;
 import com.ai.gateway.personal.credit.exception.PersonalCreditException;
+import com.ai.gateway.personal.credit.exception.PersonalInsufficientCreditsException;
 import com.ai.gateway.personal.credit.repository.PersonalCreditLedgerRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditWalletRepository;
@@ -100,7 +101,7 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
         ensureReferenceUnused(referenceId);
 
         if (wallet.getAvailableBalance().compareTo(amount) < 0) {
-            throw new PersonalCreditException("Insufficient AIRouter credits.");
+            throw new PersonalInsufficientCreditsException("Insufficient AIRouter credits.");
         }
 
         PersonalCreditReservation reservation = reservationRepository.save(

@@ -2,6 +2,7 @@ package com.ai.gateway.service;
 
 import com.ai.gateway.service.impl.RestoreServiceImpl;
 import com.ai.gateway.util.EncryptionUtil;
+import com.ai.gateway.personal.inference.PersonalTokenVaultService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -21,10 +22,13 @@ class RestoreServiceImplTest {
     @Mock
     private EncryptionUtil encryptionUtil;
 
+    @Mock
+    private PersonalTokenVaultService personalTokenVaultService;
+
     @Test
     void skipsTenantDatabaseLookupWhenResponseHasNoPiiToken() {
         RestoreServiceImpl service =
-                new RestoreServiceImpl(tokenVaultService, encryptionUtil);
+                new RestoreServiceImpl(tokenVaultService, encryptionUtil, personalTokenVaultService);
 
         String response = "Hello from Gemini.";
 
@@ -32,6 +36,6 @@ class RestoreServiceImplTest {
                 response,
                 service.restore(response, UUID.randomUUID()));
 
-        verifyNoInteractions(tokenVaultService, encryptionUtil);
+        verifyNoInteractions(tokenVaultService, encryptionUtil, personalTokenVaultService);
     }
 }

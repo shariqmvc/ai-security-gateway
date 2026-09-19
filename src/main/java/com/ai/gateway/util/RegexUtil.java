@@ -17,7 +17,7 @@ public class RegexUtil {
      * Indian mobile numbers
      */
     public static final Pattern PHONE_PATTERN = Pattern.compile(
-            "\\b(?:\\+91[-\\s]?)?[6-9]\\d{9}\\b"
+            "(?:\\+91[-\\s]?)?[6-9]\\d{9}\\b"
     );
 
     /**

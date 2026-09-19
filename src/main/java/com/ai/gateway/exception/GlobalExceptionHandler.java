@@ -225,6 +225,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
+    @ExceptionHandler(com.ai.gateway.personal.credit.exception.PersonalInsufficientCreditsException.class)
+    public ResponseEntity<ErrorResponse> handlePersonalInsufficientCredits(
+            com.ai.gateway.personal.credit.exception.PersonalInsufficientCreditsException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.PAYMENT_REQUIRED.value())
+                .error(HttpStatus.PAYMENT_REQUIRED.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(response);
+    }
+
     @ExceptionHandler(com.ai.gateway.personal.quota.exception.PersonalQuotaExceededException.class)
     public ResponseEntity<ErrorResponse> handlePersonalQuotaExceeded(
             com.ai.gateway.personal.quota.exception.PersonalQuotaExceededException ex,

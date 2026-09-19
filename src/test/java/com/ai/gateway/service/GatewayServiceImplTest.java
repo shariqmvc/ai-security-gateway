@@ -197,7 +197,7 @@ class GatewayServiceImplTest {
                 .thenReturn(authenticationContext);
 
         lenient().when(ragAugmentationService.augment(
-                        any(UUID.class),
+                        any(AuthenticationContext.class),
                         anyString(),
                         any(RagRequest.class)))
                 .thenAnswer(invocation -> RagAugmentationResult.builder()
@@ -516,7 +516,7 @@ class GatewayServiceImplTest {
                         .build();
 
         when(ragAugmentationService.augment(
-                eq(tenantId),
+                eq(authenticationContext),
                 eq("hello"),
                 eq(ragRequest)))
                 .thenReturn(augmentation);
@@ -546,7 +546,7 @@ class GatewayServiceImplTest {
                 aiRequestCaptor.getValue().getPrompt());
 
         verify(ragAugmentationService).augment(
-                tenantId, "hello", ragRequest);
+                authenticationContext, "hello", ragRequest);
     }
 
     @Test
@@ -570,7 +570,7 @@ class GatewayServiceImplTest {
 
         assertEquals("hello", aiRequestCaptor.getValue().getPrompt());
         verify(ragAugmentationService).augment(
-                tenantId, "hello", request.getRag());
+                authenticationContext, "hello", request.getRag());
     }
 
 

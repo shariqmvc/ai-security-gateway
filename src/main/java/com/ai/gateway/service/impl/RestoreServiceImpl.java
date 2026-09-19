@@ -3,6 +3,7 @@ package com.ai.gateway.service.impl;
 import com.ai.gateway.entity.TokenVault;
 import com.ai.gateway.service.RestoreService;
 import com.ai.gateway.service.TokenVaultService;
+import com.ai.gateway.personal.inference.PersonalTokenVaultService;
 import com.ai.gateway.util.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class RestoreServiceImpl implements RestoreService {
 
     private final TokenVaultService tokenVaultService;
     private final EncryptionUtil encryptionUtil;
+    private final PersonalTokenVaultService personalTokenVaultService;
 
     private static final Pattern TOKEN_PATTERN =
             Pattern.compile("<PII_[A-Z]+_[^>]+>");
@@ -39,23 +41,32 @@ public class RestoreServiceImpl implements RestoreService {
                 return response;
             }
 
-            List<TokenVault> vaultEntries =
-                    tokenVaultService.getTokens(requestId);
-
-            if (vaultEntries.isEmpty()) {
-                return response;
-            }
-
             Map<String, String> tokenMap = new HashMap<>();
 
-            for (TokenVault vault : vaultEntries) {
-
+            // Personal AIRouter requests are account-scoped and must not
+            // require TenantContext merely to restore masked PII.
+            List<PersonalTokenVaultService.PersonalToken> personalEntries =
+                    personalTokenVaultService.getTokens(requestId);
+            for (PersonalTokenVaultService.PersonalToken vault : personalEntries) {
                 tokenMap.put(
-                        vault.getToken(),
-                        encryptionUtil.decrypt(
-                                vault.getEncryptedValue()
-                        )
+                        vault.token(),
+                        encryptionUtil.decrypt(vault.encryptedValue())
                 );
+            }
+
+            // Business/tenant requests continue using the authoritative tenant vault.
+            if (tokenMap.isEmpty()) {
+                List<TokenVault> vaultEntries = tokenVaultService.getTokens(requestId);
+                for (TokenVault vault : vaultEntries) {
+                    tokenMap.put(
+                            vault.getToken(),
+                            encryptionUtil.decrypt(vault.getEncryptedValue())
+                    );
+                }
+            }
+
+            if (tokenMap.isEmpty()) {
+                return response;
             }
 
             Matcher matcher = TOKEN_PATTERN.matcher(response);

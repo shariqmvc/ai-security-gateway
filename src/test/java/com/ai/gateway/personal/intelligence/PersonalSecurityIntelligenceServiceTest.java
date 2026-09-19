@@ -24,6 +24,8 @@ class PersonalSecurityIntelligenceServiceTest {
         assertTrue(result.signals().stream().anyMatch(s -> s.contains("ignore")));
         assertTrue(result.signals().stream()
                 .anyMatch(s -> s.startsWith("suspicious-pattern:")));
+        assertTrue(result.promptInjectionDetected());
+        assertTrue(result.shouldBlock());
     }
 
     @Test
@@ -32,5 +34,8 @@ class PersonalSecurityIntelligenceServiceTest {
                 "system: x developer: y assistant: z override: q");
         assertTrue(result.score() >= 15);
         assertTrue(result.signals().contains("repeated-instruction-markers"));
+        assertFalse(result.promptInjectionDetected());
+        assertFalse(result.shouldBlock());
     }
 }
+

@@ -1,6 +1,8 @@
 package com.ai.gateway.rag.augmentation;
 
 import com.ai.gateway.exception.BusinessException;
+import com.ai.gateway.authentication.AuthenticationContext;
+import com.ai.gateway.personal.rag.PersonalRagService;
 import com.ai.gateway.rag.api.RagRequest;
 import com.ai.gateway.rag.search.RagSearchService;
 import com.ai.gateway.rag.search.dto.RagSearchRequest;
@@ -18,9 +20,10 @@ import static org.mockito.Mockito.*;
 class RagAugmentationServiceImplTest {
 
     private final RagSearchService ragSearchService = mock(RagSearchService.class);
+    private final PersonalRagService personalRagService = mock(PersonalRagService.class);
     private final RagContextAssembler contextAssembler = new RagContextAssembler();
     private final RagAugmentationServiceImpl service =
-            new RagAugmentationServiceImpl(ragSearchService, contextAssembler);
+            new RagAugmentationServiceImpl(ragSearchService, contextAssembler, new RagContextOptimizer(), personalRagService);
 
     @Test
     void shouldReturnOriginalPromptWhenRagIsDisabled() {
@@ -74,6 +77,55 @@ class RagAugmentationServiceImplTest {
                                 && r.getMinScore() == 0.70d));
         verify(ragSearchService).search(
                 eq(tenantId), eq(kb2), any(RagSearchRequest.class));
+    }
+
+    @Test
+    void shouldUsePersonalAccountScopedRagWithoutTenantContext() {
+        UUID accountId = UUID.randomUUID();
+        UUID kb = UUID.randomUUID();
+        UUID doc = UUID.randomUUID();
+        AuthenticationContext authentication = AuthenticationContext.builder()
+                .personalPrincipal(true)
+                .personalAccountId(accountId)
+                .build();
+
+        RagSearchResult result = RagSearchResult.builder()
+                .id(UUID.randomUUID())
+                .documentId(doc)
+                .fileName("royal-cyber.pdf")
+                .chunkIndex(1)
+                .content("Royal Cyber provides Cloud, Commerce, RPA, AI & ML, APIs & Integration and DevOps services.")
+                .metadataJson("{}")
+                .similarity(0.91d)
+                .build();
+
+        when(personalRagService.search(eq(authentication), eq(kb), any(RagSearchRequest.class)))
+                .thenReturn(RagSearchResponse.builder()
+                        .knowledgeBaseId(kb)
+                        .query("What technology services does Royal Cyber provide?")
+                        .retrievalStrategy("VECTOR")
+                        .results(List.of(result))
+                        .build());
+
+        RagRequest request = RagRequest.builder()
+                .enabled(true)
+                .knowledgeBaseIds(List.of(kb.toString()))
+                .topK(5)
+                .minScore(0.70d)
+                .retrievalStrategy("VECTOR")
+                .contextTokenBudget(1000)
+                .build();
+
+        RagAugmentationResult augmented = service.augment(
+                authentication,
+                "What technology services does Royal Cyber provide?",
+                request);
+
+        assertEquals(1, augmented.getRetrievedCount());
+        assertEquals(1, augmented.getSelectedCount());
+        assertTrue(augmented.getAugmentedPrompt().contains("royal-cyber.pdf"));
+        verify(personalRagService).search(eq(authentication), eq(kb), any(RagSearchRequest.class));
+        verifyNoInteractions(ragSearchService);
     }
 
     @Test

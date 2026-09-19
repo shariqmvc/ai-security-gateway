@@ -75,6 +75,47 @@ class AuthenticationServiceImplTest {
     }
 
     @Test
+    void shouldAuthenticatePersonalDeveloperApiKeyFromXApiKeyHeader() {
+        AuthenticationContext context = AuthenticationContext.builder()
+                .authenticationType(AuthenticationType.PERSONAL_API_KEY)
+                .personalPrincipal(true)
+                .personalAccountId(UUID.randomUUID())
+                .personalApiKeyScopes(java.util.Set.of("chat", "models"))
+                .build();
+        when(personalApiKeyService.authenticate("arpk_test"))
+                .thenReturn(context);
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeaders("X-API-Key"))
+                .thenReturn(java.util.Collections.enumeration(List.of("arpk_test")));
+
+        AuthenticationResult result = service.authenticate(request);
+
+        assertTrue(result.isAuthenticated());
+        assertTrue(result.getContext().isPersonalPrincipal());
+        assertEquals(AuthenticationType.PERSONAL_API_KEY, result.getContext().getAuthenticationType());
+        assertTrue(result.getContext().getPersonalApiKeyScopes().contains("models"));
+        verify(personalApiKeyService).authenticate("arpk_test");
+        verifyNoInteractions(apiKeyService);
+    }
+
+    @Test
+    void shouldRejectInvalidPersonalDeveloperApiKeyFromXApiKeyHeader() {
+        when(personalApiKeyService.authenticate("arpk_invalid"))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("invalid"));
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeaders("X-API-Key"))
+                .thenReturn(java.util.Collections.enumeration(List.of("arpk_invalid")));
+
+        AuthenticationResult result = service.authenticate(request);
+
+        assertFalse(result.isAuthenticated());
+        verify(personalApiKeyService).authenticate("arpk_invalid");
+        verifyNoInteractions(apiKeyService);
+    }
+
+    @Test
     void shouldRejectDuplicateApiKeyHeaders() {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getHeaders("X-API-Key"))
