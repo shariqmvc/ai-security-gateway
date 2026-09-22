@@ -41,7 +41,8 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/api/health",
                                 "/actuator/health",
-                                "/public/**"
+                                "/public/**",
+                                "/api/personal/billing/webhooks"
                         )
                         .permitAll()
                         /*

@@ -134,15 +134,43 @@ public class PersonalInferencePersistenceService {
                 INSERT INTO PERSONAL_INFERENCE_SECURITY_EVENTS
                 (id, inference_id, check_type, decision, risk_score, categories,
                  detected_items, details, created_at)
-                VALUES (?, ?, 'PERSONAL_SECURITY_INTELLIGENCE', ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?)
+                VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?)
                 """,
                 UUID.randomUUID(), inferenceId,
+                assessment.model() != null && assessment.model().startsWith("deberta")
+                        ? "PERSONAL_FIREWALL_ML"
+                        : "PERSONAL_SECURITY_INTELLIGENCE",
                 assessment.shouldBlock() ? "BLOCK" : "ALLOW",
                 assessment.score(),
+                json(assessment.labels()),
                 json(assessment.signals()),
-                json(assessment.signals()),
-                json(Map.of("risk", assessment.risk().name())),
+                json(Map.of(
+                        "risk", assessment.risk().name(),
+                        "decision", assessment.decision(),
+                        "model", assessment.model() == null ? "" : assessment.model(),
+                        "modelVersion", assessment.modelVersion() == null ? "" : assessment.modelVersion(),
+                        "latencyMs", assessment.latencyMs())),
                 LocalDateTime.now()));
+
+        event(inferenceId, "FIREWALL_ML_DETECTION", "SECURITY", Map.of(
+                "decision", assessment.decision(),
+                "risk", assessment.risk().name(),
+                "score", assessment.score(),
+                "labels", assessment.labels(),
+                "model", assessment.model() == null ? "" : assessment.model(),
+                "modelVersion", assessment.modelVersion() == null ? "" : assessment.modelVersion(),
+                "latencyMs", assessment.latencyMs()));
+    }
+
+    public void securityDecision(
+            UUID inferenceId,
+            PersonalSecurityAssessment assessment) {
+        if (inferenceId == null || assessment == null) return;
+        event(inferenceId, "SECURITY_DECISION", "SECURITY", Map.of(
+                "decision", assessment.decision(),
+                "risk", assessment.risk().name(),
+                "score", assessment.score(),
+                "labels", assessment.labels()));
     }
 
     public void pii(
@@ -284,6 +312,40 @@ public class PersonalInferencePersistenceService {
             event(inferenceId, "REQUEST_COMPLETED", "REQUEST",
                     Map.of("status", "SUCCESS", "latencyMs", latencyMs,
                             "cacheHit", cacheHit, "ragEnabled", ragEnabled));
+        });
+    }
+
+    public void completeBlocked(
+            UUID inferenceId,
+            AIRequest request,
+            long latencyMs,
+            String errorCode,
+            String errorMessage) {
+        if (inferenceId == null) return;
+
+        execute(() -> {
+            LocalDateTime now = LocalDateTime.now();
+            jdbc.update("""
+                    UPDATE PERSONAL_INFERENCE_RUNS
+                       SET status='BLOCKED',
+                           selected_model=?,
+                           selected_provider=?,
+                           billing_mode=?,
+                           completed_at=?,
+                           duration_ms=?,
+                           error_code=?,
+                           error_message=?,
+                           updated_at=?
+                     WHERE id=?
+                    """,
+                    request == null ? null : request.getModel(),
+                    request == null || request.getProvider() == null ? null : request.getProvider().name(),
+                    request == null ? null : request.getBillingMode(),
+                    now, latencyMs, errorCode, truncate(errorMessage, 2000), now, inferenceId);
+
+            event(inferenceId, "REQUEST_BLOCKED", "REQUEST",
+                    Map.of("errorCode", errorCode == null ? "SECURITY_BLOCKED" : errorCode,
+                            "latencyMs", latencyMs));
         });
     }
 

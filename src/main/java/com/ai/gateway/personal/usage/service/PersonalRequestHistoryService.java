@@ -11,6 +11,8 @@ public interface PersonalRequestHistoryService {
    boolean cacheHit,boolean ragEnabled);
  void recordFailure(UUID requestId,AuthenticationContext auth,AIRequest request,String maskedPrompt,
    long latencyMs,long providerLatencyMs,String errorCategory);
+ void recordBlocked(UUID requestId,AuthenticationContext auth,AIRequest request,String maskedPrompt,
+   long latencyMs,long providerLatencyMs,String errorCategory);
  Page<PersonalRequestHistoryResponse> list(UUID accountId,Pageable pageable);
  PersonalRequestHistoryResponse get(UUID accountId,UUID requestId);
  PersonalUsageSummaryResponse summary(UUID accountId);

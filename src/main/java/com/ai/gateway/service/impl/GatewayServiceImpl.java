@@ -179,41 +179,7 @@ public class GatewayServiceImpl implements GatewayService {
             // Policy Engine
             // -------------------------------
             validateRequest(auth, originalPrompt);
-            if (auth.isPersonalPrincipal()) {
-                var securityAssessment =
-                        personalSecurityIntelligenceService.assess(originalPrompt);
-                if (personalInferencePersistenceService != null) {
-                    personalInferencePersistenceService.security(inferenceId, securityAssessment);
-                    personalInferencePersistenceService.event(
-                            inferenceId, "SECURITY_CHECK", "SECURITY",
-                            java.util.Map.of(
-                                    "risk", securityAssessment.risk().name(),
-                                    "score", securityAssessment.score()));
-                }
-                performanceLogger.stage(
-                        "PERSONAL_SECURITY_INTELLIGENCE",
-                        requestId,
-                        0L,
-                        securityAssessment.risk().name()
-                                + ":"
-                                + securityAssessment.score());
-                if (securityAssessment.shouldBlock()) {
-                    if (personalInferencePersistenceService != null) {
-                        personalInferencePersistenceService.event(
-                                inferenceId, "SECURITY_BLOCK", "SECURITY",
-                                java.util.Map.of(
-                                        "risk", securityAssessment.risk().name(),
-                                        "score", securityAssessment.score(),
-                                        "reason", securityAssessment.promptInjectionDetected()
-                                                ? "PROMPT_INJECTION_DETECTED"
-                                                : "HIGH_RISK"));
-                    }
-                    throw new com.ai.gateway.exception.BusinessException(
-                            securityAssessment.promptInjectionDetected()
-                                    ? "Personal security intelligence blocked a prompt-injection request."
-                                    : "Personal security intelligence rejected the request.");
-                }
-            }
+            enforcePersonalSecurity(inferenceId, requestId, auth, originalPrompt);
             performanceLogger.stage("FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
 
             // Personal quota enforcement is account-scoped and independent of
@@ -590,33 +556,47 @@ public class GatewayServiceImpl implements GatewayService {
                             aiRequest == null ? null : aiRequest.getModel(),
                             "FAILED", providerInvocationStart, System.nanoTime(), null, ex);
                 }
-                personalInferencePersistenceService.completeFailure(
-                        inferenceId, aiRequest, latency,
-                        ex.getClass().getSimpleName(), ex.getMessage());
+                if (ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException) {
+                    personalInferencePersistenceService.completeBlocked(
+                            inferenceId, aiRequest, latency,
+                            "PERSONAL_SECURITY_BLOCKED", ex.getMessage());
+                } else {
+                    personalInferencePersistenceService.completeFailure(
+                            inferenceId, aiRequest, latency,
+                            ex.getClass().getSimpleName(), ex.getMessage());
+                }
             }
 
             if (auth.isPersonalPrincipal()) {
-                personalRequestHistoryService.recordFailure(
-                        requestId, auth, aiRequest, maskedPrompt,
-                        latency, providerLatency, ex.getClass().getSimpleName());
+                if (ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException) {
+                    personalRequestHistoryService.recordBlocked(
+                            requestId, auth, aiRequest, maskedPrompt,
+                            latency, providerLatency, "PERSONAL_SECURITY_BLOCKED");
+                } else {
+                    personalRequestHistoryService.recordFailure(
+                            requestId, auth, aiRequest, maskedPrompt,
+                            latency, providerLatency, ex.getClass().getSimpleName());
+                }
             }
 
-            postProviderPersistenceService.persistFailure(
-                    requestId,
-                    auth,
-                    aiRequest,
-                    routingDecision,
-                    providerLatency,
-                    maskedPrompt,
-                    latency,
-                    providerInvocationStarted && !providerInvocationSucceeded,
-                    ex.getClass().getSimpleName());
+            if (!(ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException)) {
+                postProviderPersistenceService.persistFailure(
+                        requestId,
+                        auth,
+                        aiRequest,
+                        routingDecision,
+                        providerLatency,
+                        maskedPrompt,
+                        latency,
+                        providerInvocationStarted && !providerInvocationSucceeded,
+                        ex.getClass().getSimpleName());
 
-            performanceLogger.stage(
-                    "POST_PROVIDER_PERSISTENCE_ASYNC",
-                    requestId,
-                    0L,
-                    "QUEUED");
+                performanceLogger.stage(
+                        "POST_PROVIDER_PERSISTENCE_ASYNC",
+                        requestId,
+                        0L,
+                        "QUEUED");
+            }
             performanceLogger.requestCompleted(
                     requestId,
                     latency,
@@ -685,41 +665,7 @@ public class GatewayServiceImpl implements GatewayService {
 
             stageStart = System.nanoTime();
             validateRequest(auth, request.getPrompt());
-            if (auth.isPersonalPrincipal()) {
-                var securityAssessment =
-                        personalSecurityIntelligenceService.assess(request.getPrompt());
-                if (personalInferencePersistenceService != null) {
-                    personalInferencePersistenceService.security(inferenceId, securityAssessment);
-                    personalInferencePersistenceService.event(
-                            inferenceId, "SECURITY_CHECK", "SECURITY",
-                            java.util.Map.of(
-                                    "risk", securityAssessment.risk().name(),
-                                    "score", securityAssessment.score()));
-                }
-                performanceLogger.stage(
-                        "PERSONAL_SECURITY_INTELLIGENCE",
-                        requestId,
-                        0L,
-                        securityAssessment.risk().name()
-                                + ":"
-                                + securityAssessment.score());
-                if (securityAssessment.shouldBlock()) {
-                    if (personalInferencePersistenceService != null) {
-                        personalInferencePersistenceService.event(
-                                inferenceId, "SECURITY_BLOCK", "SECURITY",
-                                java.util.Map.of(
-                                        "risk", securityAssessment.risk().name(),
-                                        "score", securityAssessment.score(),
-                                        "reason", securityAssessment.promptInjectionDetected()
-                                                ? "PROMPT_INJECTION_DETECTED"
-                                                : "HIGH_RISK"));
-                    }
-                    throw new com.ai.gateway.exception.BusinessException(
-                            securityAssessment.promptInjectionDetected()
-                                    ? "Personal security intelligence blocked a prompt-injection request."
-                                    : "Personal security intelligence rejected the request.");
-                }
-            }
+            enforcePersonalSecurity(inferenceId, requestId, auth, request.getPrompt());
             performanceLogger.stage(
                     "FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
 
@@ -1082,36 +1028,50 @@ public class GatewayServiceImpl implements GatewayService {
                                 aiRequest == null ? null : aiRequest.getModel(),
                                 "FAILED", providerStart, System.nanoTime(), null, ex);
                     }
-                    personalInferencePersistenceService.completeFailure(
-                            inferenceId, aiRequest, latency,
-                            ex.getClass().getSimpleName(), ex.getMessage());
+                    if (ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException) {
+                        personalInferencePersistenceService.completeBlocked(
+                                inferenceId, aiRequest, latency,
+                                "PERSONAL_SECURITY_BLOCKED", ex.getMessage());
+                    } else {
+                        personalInferencePersistenceService.completeFailure(
+                                inferenceId, aiRequest, latency,
+                                ex.getClass().getSimpleName(), ex.getMessage());
+                    }
                 }
                 if (auth.isPersonalPrincipal()) {
-                    personalRequestHistoryService.recordFailure(
-                            requestId, auth, aiRequest, maskedPrompt,
-                            latency, providerLatency, ex.getClass().getSimpleName());
+                    if (ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException) {
+                        personalRequestHistoryService.recordBlocked(
+                                requestId, auth, aiRequest, maskedPrompt,
+                                latency, providerLatency, "PERSONAL_SECURITY_BLOCKED");
+                    } else {
+                        personalRequestHistoryService.recordFailure(
+                                requestId, auth, aiRequest, maskedPrompt,
+                                latency, providerLatency, ex.getClass().getSimpleName());
+                    }
                 }
-                postProviderPersistenceService.persistFailure(
-                        requestId,
-                        auth,
-                        aiRequest,
-                        aiRequest == null ? null :
-                                new RoutingDecision(
-                                        aiRequest.getProvider(),
-                                        aiRequest.getModel(),
-                                        aiRequest.getRoutingStrategy(),
-                                        aiRequest.getRoutingDecisionMetadata()),
-                        providerLatency,
-                        maskedPrompt,
-                        latency,
-                        providerInvocationStarted && !providerInvocationSucceeded,
-                        ex.getClass().getSimpleName());
+                if (!(ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException)) {
+                    postProviderPersistenceService.persistFailure(
+                            requestId,
+                            auth,
+                            aiRequest,
+                            aiRequest == null ? null :
+                                    new RoutingDecision(
+                                            aiRequest.getProvider(),
+                                            aiRequest.getModel(),
+                                            aiRequest.getRoutingStrategy(),
+                                            aiRequest.getRoutingDecisionMetadata()),
+                            providerLatency,
+                            maskedPrompt,
+                            latency,
+                            providerInvocationStarted && !providerInvocationSucceeded,
+                            ex.getClass().getSimpleName());
 
-                performanceLogger.stage(
-                        "POST_PROVIDER_PERSISTENCE_ASYNC",
-                        requestId,
-                        0L,
-                        "QUEUED");
+                    performanceLogger.stage(
+                            "POST_PROVIDER_PERSISTENCE_ASYNC",
+                            requestId,
+                            0L,
+                            "QUEUED");
+                }
             }
 
             performanceLogger.requestCompleted(
@@ -1229,6 +1189,45 @@ public class GatewayServiceImpl implements GatewayService {
                 auth,
                 request,
                 response);
+    }
+
+    private void enforcePersonalSecurity(
+            UUID inferenceId,
+            UUID requestId,
+            AuthenticationContext auth,
+            String prompt) {
+
+        if (auth == null || !auth.isPersonalPrincipal()) {
+            return;
+        }
+
+        long securityStart = System.nanoTime();
+        if (personalInferencePersistenceService != null) {
+            personalInferencePersistenceService.event(
+                    inferenceId, "SECURITY_CHECK_STARTED", "SECURITY",
+                    java.util.Map.of("requestId", requestId.toString()));
+        }
+
+        var securityAssessment =
+                personalSecurityIntelligenceService.assess(requestId, prompt);
+
+        if (personalInferencePersistenceService != null) {
+            personalInferencePersistenceService.security(inferenceId, securityAssessment);
+            personalInferencePersistenceService.securityDecision(inferenceId, securityAssessment);
+        }
+
+        long securityLatency = elapsedMs(securityStart);
+        performanceLogger.stage(
+                "PERSONAL_SECURITY_FIREWALL",
+                requestId,
+                securityLatency,
+                securityAssessment.decision() + ":"
+                        + securityAssessment.risk().name());
+
+        if (securityAssessment.shouldBlock()) {
+            throw new com.ai.gateway.personal.security.PersonalSecurityBlockedException(
+                    securityAssessment);
+        }
     }
 
     private void validateRequest(

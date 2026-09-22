@@ -7,6 +7,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+import org.slf4j.MDC;
+import com.ai.gateway.core.observability.RequestCorrelationFilter;
+
 @RestController
 @RequestMapping("/api/personal/security")
 @RequiredArgsConstructor
@@ -28,7 +32,23 @@ public class PersonalSecurityIntelligenceController {
                     "Personal authentication is required.");
         }
 
-        return service.assess(body == null ? null : body.prompt());
+        UUID requestId = resolveRequestId(request);
+        return service.assess(requestId, body == null ? null : body.prompt());
+    }
+
+    private UUID resolveRequestId(HttpServletRequest request) {
+        String value = request.getHeader("X-Request-ID");
+        if (value == null) {
+            value = MDC.get(RequestCorrelationFilter.REQUEST_ID);
+        }
+        if (value != null) {
+            try {
+                return UUID.fromString(value);
+            } catch (IllegalArgumentException ignored) {
+                // The request correlation filter normally supplies a valid id.
+            }
+        }
+        return UUID.randomUUID();
     }
 
     public record SecurityAssessmentRequest(String prompt) {}

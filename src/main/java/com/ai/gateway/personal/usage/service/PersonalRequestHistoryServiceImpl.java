@@ -46,6 +46,15 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
    .routingStrategy(req==null||req.getRoutingStrategy()==null?null:req.getRoutingStrategy().name())
    .maskedPrompt(prompt).latencyMs(latency).providerLatencyMs(providerLatency).errorCategory(category).build());
  }
+ @Override @Transactional
+ public void recordBlocked(UUID id,AuthenticationContext auth,AIRequest req,String prompt,long latency,long providerLatency,String category){
+  if(!personal(auth))return;
+  repository.save(PersonalRequestHistory.builder().requestId(id).personalAccountId(auth.getPersonalAccountId())
+   .status(PersonalRequestStatus.BLOCKED).provider(req==null?null:req.getProvider()).model(req==null?null:req.getModel())
+   .billingMode(req==null?null:req.getBillingMode())
+   .routingStrategy(req==null||req.getRoutingStrategy()==null?null:req.getRoutingStrategy().name())
+   .maskedPrompt(prompt).latencyMs(latency).providerLatencyMs(providerLatency).errorCategory(category).build());
+ }
  @Override @Transactional(readOnly=true)
  public Page<PersonalRequestHistoryResponse> list(UUID accountId,Pageable pageable){
   return repository.findByPersonalAccountIdOrderByCreatedAtDesc(accountId,pageable).map(this::toResponse);

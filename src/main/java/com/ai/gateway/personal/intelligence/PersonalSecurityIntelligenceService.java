@@ -1,17 +1,24 @@
 package com.ai.gateway.personal.intelligence;
 
+import com.ai.gateway.personal.security.PersonalFirewallProperties;
+import com.ai.gateway.personal.security.firewall.PersonalFirewallClient;
+import com.ai.gateway.personal.security.firewall.PersonalFirewallDetection;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Lightweight, deterministic Personal security intelligence.
+ * Personal pre-provider security intelligence.
  *
- * This is a pre-provider signal layer. It does not replace the firewall,
- * PII masking, quota, rate limiting, or abuse guard. It produces an explainable
- * score and can deny clearly high-risk prompts before provider invocation.
+ * <p>When the external ML firewall is enabled, this service delegates
+ * detection to the standalone AIRouter Firewall service. The legacy
+ * deterministic detector remains available when the external firewall is
+ * explicitly disabled, which keeps local/unit-test behavior deterministic
+ * without loading ML models into the Spring Boot JVM.</p>
  */
 @Service
 public class PersonalSecurityIntelligenceService {
@@ -25,10 +32,64 @@ public class PersonalSecurityIntelligenceService {
             Pattern.compile("exfiltrat(e|ion)", Pattern.CASE_INSENSITIVE)
     };
 
+    private final PersonalFirewallClient firewallClient;
+    private final PersonalFirewallProperties firewallProperties;
+
+    public PersonalSecurityIntelligenceService(
+            PersonalFirewallClient firewallClient,
+            PersonalFirewallProperties firewallProperties) {
+        this.firewallClient = firewallClient;
+        this.firewallProperties = firewallProperties;
+    }
+
     public PersonalSecurityAssessment assess(String prompt) {
+        return assess(UUID.randomUUID(), prompt);
+    }
+
+    public PersonalSecurityAssessment assess(UUID requestId, String prompt) {
+        if (firewallProperties.isEnabled()) {
+            PersonalFirewallDetection detection = firewallClient.detect(requestId, prompt);
+            return fromFirewall(detection);
+        }
+
+        return assessLegacy(prompt);
+    }
+
+    private PersonalSecurityAssessment fromFirewall(PersonalFirewallDetection detection) {
+        PersonalSecurityRisk risk = parseRisk(detection.risk());
+        boolean maliciousLabel = detection.labels().stream()
+                .anyMatch(label -> label != null && !"BENIGN".equalsIgnoreCase(label));
+        int score = maliciousLabel
+                ? (int) Math.round(Math.max(0.0d, Math.min(1.0d, detection.score())) * 100.0d)
+                : 0;
+
+        return new PersonalSecurityAssessment(
+                score,
+                risk,
+                detection.signals(),
+                detection.labels(),
+                detection.decision(),
+                detection.model(),
+                detection.modelVersion(),
+                Math.round(Math.max(0.0d, detection.latencyMs()))
+        );
+    }
+
+    private PersonalSecurityRisk parseRisk(String value) {
+        if (value == null) {
+            return PersonalSecurityRisk.HIGH;
+        }
+        try {
+            return PersonalSecurityRisk.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return PersonalSecurityRisk.HIGH;
+        }
+    }
+
+    private PersonalSecurityAssessment assessLegacy(String prompt) {
         String value = prompt == null ? "" : prompt;
         int score = 0;
-        List<String> signals = new java.util.ArrayList<>();
+        List<String> signals = new ArrayList<>();
 
         if (value.length() > 20_000) {
             score += 15;
