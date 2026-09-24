@@ -1,0 +1,4 @@
+import {Navigate,Route,Routes} from "react-router-dom";import {AuthProvider,useAuth} from "./state/AuthContext";import {AppShell} from "./components/AppShell";import {DashboardPage} from "./pages/DashboardPage";import {LoginPage} from "./pages/LoginPage";import {SignupPage} from "./pages/SignupPage";
+function Protected(){const{user,loading}=useAuth();if(loading)return <div className="boot">Loading AIRouter…</div>;if(!user)return <Navigate to="/login" replace/>;return <AppShell><Routes><Route path="/" element={<DashboardPage/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></AppShell>}
+function RoutesRoot(){return <Routes><Route path="/login" element={<LoginPage/>}/><Route path="/signup" element={<SignupPage/>}/><Route path="/*" element={<Protected/>}/></Routes>}
+export default function App(){return <AuthProvider><RoutesRoot/></AuthProvider>}
