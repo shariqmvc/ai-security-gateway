@@ -2,6 +2,7 @@ package com.ai.gateway.controller;
 
 import com.ai.gateway.core.contract.ChatResponse;
 import com.ai.gateway.service.GatewayService;
+import com.ai.gateway.service.StreamAdmission;
 import com.ai.gateway.service.GatewayStreamEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -59,14 +61,18 @@ class OpenAiCompatibleChatControllerTest {
 
     @Test
     void returnsOpenAiCompatibleSseForStreaming() throws Exception {
+        when(gatewayService.preflightStream(any(), anyString(), anyString()))
+                .thenReturn(new StreamAdmission(
+                        UUID.randomUUID(), null, null, System.nanoTime()));
+
         doAnswer(invocation -> {
             @SuppressWarnings("unchecked")
-            java.util.function.Consumer<GatewayStreamEvent> consumer = invocation.getArgument(1);
+            java.util.function.Consumer<GatewayStreamEvent> consumer = invocation.getArgument(2);
             consumer.accept(GatewayStreamEvent.builder().type("start").build());
             consumer.accept(GatewayStreamEvent.builder().type("delta").content("Hello").build());
             consumer.accept(GatewayStreamEvent.builder().type("done").build());
             return null;
-        }).when(gatewayService).stream(any(), any());
+        }).when(gatewayService).stream(any(), any(StreamAdmission.class), any());
 
         var result = mockMvc.perform(post("/v1/chat/completions")
                         .contentType(APPLICATION_JSON)

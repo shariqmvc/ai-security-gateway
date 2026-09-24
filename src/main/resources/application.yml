@@ -6,7 +6,7 @@ personal:
       enabled: ${PERSONAL_SECURITY_FIREWALL_ENABLED:true}
       base-url: ${PERSONAL_SECURITY_FIREWALL_URL:http://localhost:8090}
       connect-timeout-ms: ${PERSONAL_SECURITY_FIREWALL_CONNECT_TIMEOUT_MS:500}
-      read-timeout-ms: ${PERSONAL_SECURITY_FIREWALL_READ_TIMEOUT_MS:1500}
+      read-timeout-ms: ${PERSONAL_SECURITY_FIREWALL_READ_TIMEOUT_MS:5000}
       fail-open: ${PERSONAL_SECURITY_FIREWALL_FAIL_OPEN:false}
       max-text-length: ${PERSONAL_SECURITY_FIREWALL_MAX_TEXT_LENGTH:20000}
 server:

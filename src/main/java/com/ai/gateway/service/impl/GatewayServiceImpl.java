@@ -620,22 +620,95 @@ public class GatewayServiceImpl implements GatewayService {
 
     @Override
     @RequiresFeature(Feature.CHAT)
-    public void stream(
-            ChatRequest request,
-            Consumer<GatewayStreamEvent> eventConsumer) {
+    public StreamAdmission preflightStream(ChatRequest request) {
+        return preflightStream(request, "/api/chat/stream", "STREAM");
+    }
 
+    @Override
+    @RequiresFeature(Feature.CHAT)
+    public StreamAdmission preflightStream(ChatRequest request, String endpoint, String operation) {
         metricsService.increment(MetricsConstants.TOTAL_REQUESTS);
 
         UUID requestId = resolveRequestId();
         long start = System.nanoTime();
-        performanceLogger.requestStart(requestId, "/api/chat/stream");
+        performanceLogger.requestStart(requestId, endpoint);
 
         AuthenticationContext auth = getAuthenticationContext();
         validateFeature(auth, Feature.STREAMING);
 
         UUID inferenceId = personalInferencePersistenceService == null ? null
                 : personalInferencePersistenceService.start(
-                        auth, requestId, "/api/chat/stream", "STREAM", null);
+                        auth, requestId, endpoint, operation, null);
+
+        try {
+            multimodalRequestValidator.validate(request);
+            addMultimodalCapabilities(request);
+
+            long stageStart = System.nanoTime();
+            if (request.isExtensiveResearch()) {
+                validateFeature(auth, Feature.EXTENSIVE_RESEARCH);
+            }
+            performanceLogger.stage(
+                    "ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            stageStart = System.nanoTime();
+            validateRequest(auth, request.getPrompt());
+            enforcePersonalSecurity(inferenceId, requestId, auth, request.getPrompt());
+            performanceLogger.stage(
+                    "FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
+
+            return new StreamAdmission(requestId, inferenceId, auth, start);
+        } catch (Exception ex) {
+            long latency = elapsedMs(start);
+            if (personalInferencePersistenceService != null && inferenceId != null) {
+                if (ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException) {
+                    personalInferencePersistenceService.completeBlocked(
+                            inferenceId, null, latency,
+                            "PERSONAL_SECURITY_BLOCKED", ex.getMessage());
+                } else {
+                    personalInferencePersistenceService.completeFailure(
+                            inferenceId, null, latency,
+                            ex.getClass().getSimpleName(), ex.getMessage());
+                }
+            }
+            if (auth.isPersonalPrincipal()) {
+                if (ex instanceof com.ai.gateway.personal.security.PersonalSecurityBlockedException) {
+                    personalRequestHistoryService.recordBlocked(
+                            requestId, auth, null, request.getPrompt(),
+                            latency, 0L, "PERSONAL_SECURITY_BLOCKED");
+                } else {
+                    personalRequestHistoryService.recordFailure(
+                            requestId, auth, null, request.getPrompt(),
+                            latency, 0L, ex.getClass().getSimpleName());
+                }
+            }
+            performanceLogger.requestCompleted(
+                    requestId, latency, null, null, "STREAM_ADMISSION_FAILED", 0L, latency);
+            throw ex;
+        }
+    }
+
+    @Override
+    @RequiresFeature(Feature.CHAT)
+    public void stream(
+            ChatRequest request,
+            Consumer<GatewayStreamEvent> eventConsumer) {
+        StreamAdmission admission = preflightStream(request);
+        stream(request, admission, eventConsumer);
+    }
+
+    @Override
+    @RequiresFeature(Feature.CHAT)
+    public void stream(
+            ChatRequest request,
+            StreamAdmission admission,
+            Consumer<GatewayStreamEvent> eventConsumer) {
+
+        UUID requestId = admission.requestId();
+        long start = admission.startedAtNanos();
+
+        AuthenticationContext auth = admission.authenticationContext();
+        UUID inferenceId = admission.inferenceId();
 
         AIRequest aiRequest = null;
         String maskedPrompt = request.getPrompt();
@@ -649,26 +722,13 @@ public class GatewayServiceImpl implements GatewayService {
         Integer estimatedOptimizedTokens = null;
         Integer estimatedTokensSaved = null;
         Integer contextWindowTokens = null;
+        long stageStart;
 
         try {
-            multimodalRequestValidator.validate(request);
-            addMultimodalCapabilities(request);
-
-            long stageStart = System.nanoTime();
-            if (request.isExtensiveResearch()) {
-                validateFeature(
-                        auth,
-                        Feature.EXTENSIVE_RESEARCH);
-            }
-            performanceLogger.stage(
-                    "ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
-
-            stageStart = System.nanoTime();
-            validateRequest(auth, request.getPrompt());
-            enforcePersonalSecurity(inferenceId, requestId, auth, request.getPrompt());
-            performanceLogger.stage(
-                    "FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
-
+            // Request admission, including the Personal Firewall, is performed
+            // before StreamingResponseBody is returned by the controller. Do not
+            // repeat it here: once SSE starts, an exception can no longer change
+            // the HTTP status to 403/503.
             if (auth.isPersonalPrincipal()) {
                 long estimatedRequestTokens = Math.max(1L, (request.getPrompt() == null ? 0 : request.getPrompt().length() + 3) / 4);
                 personalQuotaService.beforeRequest(auth, estimatedRequestTokens);

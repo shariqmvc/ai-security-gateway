@@ -4,6 +4,7 @@ import com.ai.gateway.common.APIResponse;
 import com.ai.gateway.core.contract.ChatRequest;
 import com.ai.gateway.core.contract.ChatResponse;
 import com.ai.gateway.service.GatewayService;
+import com.ai.gateway.service.StreamAdmission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,10 +32,16 @@ public class ChatController {
     public ResponseEntity<StreamingResponseBody> stream(
             @Valid @RequestBody ChatRequest request) {
 
+        // Run admission before returning StreamingResponseBody so Personal
+        // Firewall failures can still become HTTP 403/503 responses.
+        StreamAdmission admission = gatewayService.preflightStream(request);
+
         StreamingResponseBody body = outputStream -> {
-            gatewayService.stream(
-                    request,
-                    event -> {
+            try {
+                gatewayService.stream(
+                        request,
+                        admission,
+                        event -> {
                         try {
                             String payload =
                                     objectMapper.writeValueAsString(event);
@@ -47,7 +54,18 @@ public class ChatController {
                         } catch (java.io.IOException ex) {
                             throw new com.ai.gateway.service.StreamClientDisconnectedException(ex);
                         }
-                    });
+                        });
+                outputStream.flush();
+            } finally {
+                // Do not close the servlet-managed response stream here.
+                // Spring/Tomcat owns the stream lifecycle and will finalize
+                // the HTTP chunked/SSE response correctly.
+                try {
+                    outputStream.flush();
+                } catch (java.io.IOException ignored) {
+                    // Response may already be closed by the container/client.
+                }
+            }
         };
 
         return ResponseEntity.ok()

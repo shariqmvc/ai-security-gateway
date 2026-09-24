@@ -5,6 +5,7 @@ import com.ai.gateway.core.contract.ChatResponse;
 import com.ai.gateway.core.contract.ContextMessage;
 import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.service.GatewayService;
+import com.ai.gateway.service.StreamAdmission;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -72,10 +73,15 @@ public class OpenAiCompatibleChatController {
             OpenAiChatCompletionRequest request) {
 
         ChatRequest core = toCoreRequest(request);
+        // Preflight must run before StreamingResponseBody starts. Otherwise a
+        // firewall exception occurs after HTTP 200/SSE headers are committed.
+        StreamAdmission admission = gatewayService.preflightStream(core, "/v1/chat/completions", "STREAM");
         String completionId = "chatcmpl-" + UUID.randomUUID();
         long created = Instant.now().getEpochSecond();
 
-        StreamingResponseBody body = outputStream -> gatewayService.stream(core, event -> {
+        StreamingResponseBody body = outputStream -> {
+            try {
+                gatewayService.stream(core, admission, event -> {
             try {
                 if ("delta".equals(event.getType()) || "replace".equals(event.getType())) {
                     OpenAiChatCompletionChunk chunk = OpenAiChatCompletionChunk.builder()
@@ -124,7 +130,19 @@ public class OpenAiCompatibleChatController {
             } catch (java.io.IOException ex) {
                 throw new RuntimeException(ex);
             }
-        });
+                });
+                outputStream.flush();
+            } finally {
+                // Do not close the servlet-managed response stream here.
+                // Spring/Tomcat owns the stream lifecycle and will finalize
+                // the HTTP chunked/SSE response correctly.
+                try {
+                    outputStream.flush();
+                } catch (java.io.IOException ignored) {
+                    // Response may already be closed by the container/client.
+                }
+            }
+        };
 
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
