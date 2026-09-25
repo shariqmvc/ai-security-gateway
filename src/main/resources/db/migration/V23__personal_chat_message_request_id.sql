@@ -1,0 +1,2 @@
+ALTER TABLE PERSONAL_CHAT_MESSAGES ADD COLUMN request_id UUID;
+CREATE INDEX idx_chat_message_request_id ON PERSONAL_CHAT_MESSAGES(request_id);
