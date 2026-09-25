@@ -28,6 +28,9 @@ public class PersonalChatMessage {
     @Column(name="request_id")
     private UUID requestId;
 
+    @Column(name="attachments_json", columnDefinition="TEXT")
+    private String attachmentsJson;
+
     @Column(name="sequence_no", nullable=false)
     private Integer sequenceNo;
 
