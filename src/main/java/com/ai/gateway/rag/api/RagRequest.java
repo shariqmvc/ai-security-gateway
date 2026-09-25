@@ -40,7 +40,7 @@ public class RagRequest {
     @DecimalMin(value = "-1.0", message = "RAG minScore must be at least -1.0.")
     @DecimalMax(value = "1.0", message = "RAG minScore must not exceed 1.0.")
     @Builder.Default
-    private double minScore = 0.70d;
+    private double minScore = 0.35d;
 
     @Builder.Default
     private boolean queryTransformation = false;
