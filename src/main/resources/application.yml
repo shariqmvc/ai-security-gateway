@@ -13,6 +13,10 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 16MB
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
@@ -336,10 +340,3 @@ alroute:
         base-url: ${ALROUTE_PERSONAL_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
       anthropic:
         base-url: ${ALROUTE_PERSONAL_ANTHROPIC_BASE_URL:https://api.anthropic.com}
-
-
-spring:
-  servlet:
-    multipart:
-      max-file-size: 15MB
-      max-request-size: 16MB
