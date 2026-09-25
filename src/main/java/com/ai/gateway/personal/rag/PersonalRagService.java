@@ -172,11 +172,15 @@ public class PersonalRagService {
         if(!KnowledgeBaseStatus.ACTIVE.name().equals(k.get("status"))) throw new BusinessException("Cannot search an archived knowledge base: "+kbId);
         if(!"PGVECTOR".equalsIgnoreCase(String.valueOf(k.get("vector_store")))) throw new BusinessException("RAG retrieval requires vectorStore=PGVECTOR.");
         if(req==null||blank(req.getQuery())) throw new BusinessException("Search query is required.");
+        List<UUID> documentIds=parseDocumentIds(req.getDocumentIds());
+        validateDocumentScope(account,kbId,documentIds);
+        if(req.isDocumentSummarization()) {
+            if(documentIds.isEmpty()) throw new BusinessException("Document summarization requires at least one document ID.");
+            return searchCompleteDocuments(account,kbId,documentIds,req);
+        }
         String providerName=blank((String)k.get("embedding_provider"))?embeddingProperties.getDefaultProvider():((String)k.get("embedding_provider")).trim().toUpperCase();
         EmbeddingProvider provider=providerFactory.get(providerName); String model=blank((String)k.get("embedding_model"))?provider.defaultModel():((String)k.get("embedding_model")).trim();
         EmbeddingVector q=provider.embed(List.of(req.getQuery().trim()),model).getFirst(); String vector=EmbeddingVectorFormatter.toPgVector(q);
-        List<UUID> documentIds=parseDocumentIds(req.getDocumentIds());
-        validateDocumentScope(account,kbId,documentIds);
         int limit=Math.max(req.getCandidateLimit(),req.getTopK());
         StringBuilder sql=new StringBuilder("""
             SELECT c.id,c.document_id,d.file_name,c.chunk_index,c.record_id,c.section_id,c.chunk_id,c.content,c.metadata_json,
@@ -202,6 +206,41 @@ public class PersonalRagService {
             args.toArray());
         results=results.stream().filter(r->r.getSimilarity()>=req.getMinScore()).limit(req.getTopK()).toList();
         return RagSearchResponse.builder().knowledgeBaseId(kbId).query(req.getQuery().trim()).retrievalStrategy("VECTOR").embeddingProvider(providerName).embeddingModel(model).queryEmbeddingDimension(q.dimension()).topK(req.getTopK()).results(results).build();
+    }
+
+    private RagSearchResponse searchCompleteDocuments(UUID account, UUID kbId, List<UUID> documentIds, RagSearchRequest req) {
+        String placeholders=String.join(",",Collections.nCopies(documentIds.size(),"?"));
+        List<Object> args=new ArrayList<>();
+        args.add(account);
+        args.add(account);
+        args.add(kbId);
+        args.addAll(documentIds);
+        String sql="SELECT c.id,c.document_id,d.file_name,c.chunk_index,c.record_id,c.section_id,c.chunk_id,c.content,c.metadata_json " +
+                "FROM PERSONAL_RAG_DOCUMENT_CHUNKS c " +
+                "JOIN PERSONAL_RAG_DOCUMENTS d ON d.id=c.document_id " +
+                "WHERE c.personal_account_id=? AND d.personal_account_id=? AND d.knowledge_base_id=? AND d.status='INDEXED' " +
+                "AND d.id IN ("+placeholders+") ORDER BY d.id,c.chunk_index,c.id";
+        List<RagSearchResult> results=jdbc.query(sql,
+                (rs,n)->RagSearchResult.builder()
+                        .id(rs.getObject("id",UUID.class))
+                        .documentId(rs.getObject("document_id",UUID.class))
+                        .fileName(rs.getString("file_name"))
+                        .chunkIndex(rs.getInt("chunk_index"))
+                        .recordId(rs.getString("record_id"))
+                        .sectionId(rs.getString("section_id"))
+                        .chunkId(rs.getString("chunk_id"))
+                        .content(rs.getString("content"))
+                        .metadataJson(rs.getString("metadata_json"))
+                        .similarity(1.0d)
+                        .build(),
+                args.toArray());
+        return RagSearchResponse.builder()
+                .knowledgeBaseId(kbId)
+                .query(req.getQuery().trim())
+                .retrievalStrategy("DOCUMENT")
+                .topK(results.size())
+                .results(results)
+                .build();
     }
 
     private List<UUID> parseDocumentIds(List<String> values) {
