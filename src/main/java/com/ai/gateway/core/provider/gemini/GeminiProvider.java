@@ -7,6 +7,8 @@ import com.ai.gateway.core.contract.Usage;
 import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.core.observability.PerformanceLogger;
 import com.ai.gateway.core.provider.AIProvider;
+import com.ai.gateway.core.provider.AIStreamResult;
+import com.ai.gateway.core.provider.StreamingAIProvider;
 import com.ai.gateway.core.provider.gemini.dto.GeminiContent;
 import com.ai.gateway.core.provider.gemini.dto.GeminiPart;
 import com.ai.gateway.core.provider.gemini.dto.GeminiRequest;
@@ -16,6 +18,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.function.Consumer;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -26,13 +33,14 @@ import com.ai.gateway.core.multimodal.MediaUrlFetcher;
 import com.ai.gateway.core.multimodal.MediaInputException;
 
 @Service
-public class GeminiProvider implements AIProvider {
+public class GeminiProvider implements AIProvider, StreamingAIProvider {
 
     public GeminiProvider(
             @Qualifier("geminiRestTemplate") RestTemplate restTemplate,
             GeminiConfig geminiConfig,
             PerformanceLogger performanceLogger,
-            MediaUrlFetcher mediaUrlFetcher) {
+            MediaUrlFetcher mediaUrlFetcher,
+            ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.geminiConfig = geminiConfig;
         this.performanceLogger = performanceLogger;
@@ -43,6 +51,7 @@ public class GeminiProvider implements AIProvider {
     private final GeminiConfig geminiConfig;
     private final PerformanceLogger performanceLogger;
     private final MediaUrlFetcher mediaUrlFetcher;
+    private final ObjectMapper objectMapper;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -156,6 +165,137 @@ public class GeminiProvider implements AIProvider {
                 .usage(
                         usage
                 )
+                .build();
+    }
+
+    @Override
+    public AIStreamResult stream(AIRequest request, Consumer<String> deltaConsumer) {
+        String requestIdValue = org.slf4j.MDC.get("requestId");
+        java.util.UUID requestId = parseRequestId(requestIdValue);
+        long started = System.nanoTime();
+
+        String selectedModel = request.getModel() != null && !request.getModel().isBlank()
+                ? request.getModel()
+                : model;
+
+        String url = baseUrl
+                + "/v1beta/models/"
+                + selectedModel
+                + ":streamGenerateContent?alt=sse&key="
+                + apiKey;
+
+        GeminiRequest geminiRequest = GeminiRequest.builder()
+                .contents(List.of(GeminiContent.builder().parts(buildParts(request)).build()))
+                .build();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON));
+
+        HttpEntity<GeminiRequest> entity = new HttpEntity<>(geminiRequest, headers);
+        StringBuilder full = new StringBuilder();
+        final int[] inputTokens = {0};
+        final int[] outputTokens = {0};
+        final int[] totalTokens = {0};
+
+        try {
+            performanceLogger.providerStart(
+                    requestId, provider().name(), selectedModel, providerAttempt());
+
+            restTemplate.execute(
+                    url,
+                    HttpMethod.POST,
+                    outputStreamRequest -> {
+                        outputStreamRequest.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+                        outputStreamRequest.getHeaders().setAccept(
+                                List.of(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON));
+                        outputStreamRequest.getBody().write(
+                                objectMapper.writeValueAsBytes(geminiRequest));
+                    },
+                    response -> {
+                        try (BufferedReader reader = new BufferedReader(
+                                new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                if (line.isBlank() || !line.startsWith("data:")) {
+                                    continue;
+                                }
+
+                                String json = line.substring("data:".length()).trim();
+                                if (json.isEmpty() || "[DONE]".equals(json)) {
+                                    continue;
+                                }
+
+                                GeminiResponse chunk = objectMapper.readValue(json, GeminiResponse.class);
+                                if (chunk.getCandidates() != null && !chunk.getCandidates().isEmpty()
+                                        && chunk.getCandidates().getFirst().getContent() != null
+                                        && chunk.getCandidates().getFirst().getContent().getParts() != null) {
+                                    for (GeminiPart part : chunk.getCandidates().getFirst().getContent().getParts()) {
+                                        if (part.getText() != null && !part.getText().isEmpty()) {
+                                            full.append(part.getText());
+                                            deltaConsumer.accept(part.getText());
+                                        }
+                                    }
+                                }
+
+                                if (chunk.getUsageMetadata() != null) {
+                                    if (chunk.getUsageMetadata().getPromptTokenCount() != null) {
+                                        inputTokens[0] = chunk.getUsageMetadata().getPromptTokenCount();
+                                    }
+                                    if (chunk.getUsageMetadata().getCandidatesTokenCount() != null) {
+                                        outputTokens[0] = chunk.getUsageMetadata().getCandidatesTokenCount();
+                                    }
+                                    if (chunk.getUsageMetadata().getTotalTokenCount() != null) {
+                                        totalTokens[0] = chunk.getUsageMetadata().getTotalTokenCount();
+                                    }
+                                }
+                            }
+                        }
+                        return null;
+                    });
+        } catch (RuntimeException ex) {
+            performanceLogger.providerCompleted(
+                    requestId,
+                    provider().name(),
+                    selectedModel,
+                    providerAttempt(),
+                    elapsedMs(started),
+                    "FAILED:" + ex.getClass().getSimpleName());
+            throw ex;
+        }
+
+        if (full.isEmpty()) {
+            throw new IllegalStateException("Gemini returned an empty streaming response.");
+        }
+
+        long latencyMs = elapsedMs(started);
+        performanceLogger.providerCompleted(
+                requestId,
+                provider().name(),
+                selectedModel,
+                providerAttempt(),
+                latencyMs,
+                "HTTP_200");
+        performanceLogger.providerTelemetry(
+                requestId,
+                provider().name(),
+                selectedModel,
+                providerAttempt(),
+                inputTokens[0],
+                outputTokens[0],
+                null,
+                null,
+                null,
+                null);
+
+        return AIStreamResult.builder()
+                .response(full.toString())
+                .provider(provider())
+                .model(selectedModel)
+                .inputTokens(inputTokens[0])
+                .outputTokens(outputTokens[0])
+                .totalTokens(totalTokens[0] == 0 ? inputTokens[0] + outputTokens[0] : totalTokens[0])
+                .latencyMs(latencyMs)
                 .build();
     }
 
