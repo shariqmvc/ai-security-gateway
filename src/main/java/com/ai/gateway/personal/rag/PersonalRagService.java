@@ -175,22 +175,61 @@ public class PersonalRagService {
         String providerName=blank((String)k.get("embedding_provider"))?embeddingProperties.getDefaultProvider():((String)k.get("embedding_provider")).trim().toUpperCase();
         EmbeddingProvider provider=providerFactory.get(providerName); String model=blank((String)k.get("embedding_model"))?provider.defaultModel():((String)k.get("embedding_model")).trim();
         EmbeddingVector q=provider.embed(List.of(req.getQuery().trim()),model).getFirst(); String vector=EmbeddingVectorFormatter.toPgVector(q);
+        List<UUID> documentIds=parseDocumentIds(req.getDocumentIds());
+        validateDocumentScope(account,kbId,documentIds);
         int limit=Math.max(req.getCandidateLimit(),req.getTopK());
-        List<RagSearchResult> results=jdbc.query("""
+        StringBuilder sql=new StringBuilder("""
             SELECT c.id,c.document_id,d.file_name,c.chunk_index,c.record_id,c.section_id,c.chunk_id,c.content,c.metadata_json,
                    1-(c.embedding OPERATOR(public.<=>) query_vector) similarity
             FROM PERSONAL_RAG_DOCUMENT_CHUNKS c
             JOIN PERSONAL_RAG_DOCUMENTS d ON d.id=c.document_id
             CROSS JOIN (SELECT ?::public.vector AS query_vector) qv
             WHERE c.personal_account_id=? AND d.personal_account_id=? AND d.knowledge_base_id=? AND d.status='INDEXED'
-              AND c.embedding IS NOT NULL AND c.embedding_provider=? AND c.embedding_model=? AND c.embedding_dimension=?
-            ORDER BY c.embedding OPERATOR(public.<=>) query_vector ASC,c.document_id,c.chunk_index,c.id LIMIT ?""",
+              AND c.embedding IS NOT NULL AND c.embedding_provider=? AND c.embedding_model=? AND c.embedding_dimension=?""");
+        List<Object> args=new ArrayList<>(List.of(vector,account,account,kbId,providerName,model,q.dimension()));
+        if(!documentIds.isEmpty()){
+            sql.append(" AND d.id IN (");
+            sql.append(String.join(",",Collections.nCopies(documentIds.size(),"?")));
+            sql.append(")");
+            args.addAll(documentIds);
+        }
+        sql.append(" ORDER BY c.embedding OPERATOR(public.<=>) query_vector ASC,c.document_id,c.chunk_index,c.id LIMIT ?");
+        args.add(limit);
+        List<RagSearchResult> results=jdbc.query(sql.toString(),
             (rs,n)->RagSearchResult.builder().id(rs.getObject("id",UUID.class)).documentId(rs.getObject("document_id",UUID.class)).fileName(rs.getString("file_name"))
                     .chunkIndex(rs.getInt("chunk_index")).recordId(rs.getString("record_id")).sectionId(rs.getString("section_id")).chunkId(rs.getString("chunk_id"))
                     .content(rs.getString("content")).metadataJson(rs.getString("metadata_json")).similarity(rs.getDouble("similarity")).build(),
-            vector,account,account,kbId,providerName,model,q.dimension(),limit);
+            args.toArray());
         results=results.stream().filter(r->r.getSimilarity()>=req.getMinScore()).limit(req.getTopK()).toList();
         return RagSearchResponse.builder().knowledgeBaseId(kbId).query(req.getQuery().trim()).retrievalStrategy("VECTOR").embeddingProvider(providerName).embeddingModel(model).queryEmbeddingDimension(q.dimension()).topK(req.getTopK()).results(results).build();
+    }
+
+    private List<UUID> parseDocumentIds(List<String> values) {
+        if (values == null || values.isEmpty()) return List.of();
+        List<UUID> ids = new ArrayList<>();
+        for (String value : values) {
+            if (blank(value)) throw new BusinessException("Document ID cannot be blank.");
+            try {
+                ids.add(UUID.fromString(value.trim()));
+            } catch (IllegalArgumentException ex) {
+                throw new BusinessException("Invalid document ID: " + value);
+            }
+        }
+        return ids.stream().distinct().toList();
+    }
+
+    private void validateDocumentScope(UUID account, UUID kbId, List<UUID> documentIds) {
+        if (documentIds.isEmpty()) return;
+        String placeholders=String.join(",",Collections.nCopies(documentIds.size(),"?"));
+        List<Object> args=new ArrayList<>();
+        args.add(account);
+        args.add(kbId);
+        args.addAll(documentIds);
+        String sql="SELECT id FROM PERSONAL_RAG_DOCUMENTS WHERE personal_account_id=? AND knowledge_base_id=? AND id IN ("+placeholders+")";
+        List<UUID> found=jdbc.query(sql,(rs,n)->rs.getObject(1,UUID.class),args.toArray());
+        if(found.size()!=documentIds.size()){
+            throw new BusinessException("One or more document IDs are not accessible in the selected knowledge base.");
+        }
     }
 
     private void ingestAndEmbed(UUID account,UUID kbId,UUID docId,String text,String contentType){
