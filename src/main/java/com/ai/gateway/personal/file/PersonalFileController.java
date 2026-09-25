@@ -1,10 +1,10 @@
 package com.ai.gateway.personal.file;
-import com.ai.gateway.authentication.*; import com.ai.gateway.personal.file.entity.PersonalFile; import com.ai.gateway.personal.file.repository.PersonalFileRepository;
+import com.ai.gateway.authentication.*; import com.ai.gateway.personal.file.entity.PersonalFile; import com.ai.gateway.rag.ingestion.DocumentParser; import com.ai.gateway.rag.ingestion.ParsedDocument; import com.ai.gateway.personal.file.repository.PersonalFileRepository;
 import jakarta.servlet.http.HttpServletRequest; import lombok.RequiredArgsConstructor; import org.springframework.beans.factory.annotation.Value; import org.springframework.core.io.*; import org.springframework.http.*; import org.springframework.security.access.AccessDeniedException; import org.springframework.web.bind.annotation.*; import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException; import java.nio.file.*; import java.security.MessageDigest; import java.util.*;
 @RestController @RequestMapping("/api/personal/files") @RequiredArgsConstructor
 public class PersonalFileController {
- private static final long MAX_SIZE=20_971_520L; private final PersonalFileRepository repository;
+ private static final long MAX_SIZE=20_971_520L; private final PersonalFileRepository repository; private final DocumentParser documentParser;
  @Value("${airouter.personal.files.storage-path:./data/personal-files}") private String storagePath;
  @PostMapping(consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
  public FileResponse upload(HttpServletRequest request,@RequestPart("file") MultipartFile file)throws IOException{
@@ -29,6 +29,21 @@ public class PersonalFileController {
   }
   return response(saved);
  }
+ @GetMapping("/{fileId}/text")
+ public TextResponse text(HttpServletRequest request,@PathVariable UUID fileId){
+  UUID accountId=context(request).getPersonalAccountId();
+  PersonalFile file=repository.findByIdAndPersonalAccountId(fileId,accountId)
+    .orElseThrow(()->new AccessDeniedException("File not found."));
+  Path root=Paths.get(storagePath).toAbsolutePath().normalize();
+  Path target=root.resolve(file.getStorageName()).normalize();
+  if(!target.startsWith(root)||!Files.exists(target))throw new AccessDeniedException("File content is unavailable.");
+  if(!documentParser.supports(file.getOriginalName(),file.getContentType()))
+    throw new IllegalArgumentException("This file type cannot be read as text: "+file.getOriginalName());
+  ParsedDocument parsed=documentParser.parse(target,file.getOriginalName(),file.getContentType());
+  String extracted=parsed.text();
+  if(extracted.length()>120_000) extracted=extracted.substring(0,120_000)+"\n\n[Document text truncated to fit a direct chat attachment.]";
+  return new TextResponse(file.getId(),file.getOriginalName(),parsed.detectedContentType(),extracted);
+ }
  @GetMapping("/{fileId}/content")
  public ResponseEntity<Resource> content(HttpServletRequest request,@PathVariable UUID fileId){
   UUID accountId=context(request).getPersonalAccountId(); PersonalFile file=repository.findByIdAndPersonalAccountId(fileId,accountId).orElseThrow(()->new AccessDeniedException("File not found."));
@@ -39,4 +54,5 @@ public class PersonalFileController {
  private AuthenticationContext context(HttpServletRequest request){AuthenticationContext c=(AuthenticationContext)request.getAttribute(AuthenticationConstants.AUTH_CONTEXT);if(c==null||!c.isPersonalPrincipal()||c.getPersonalAccountId()==null||c.getAuthenticationType()!=AuthenticationType.PERSONAL_SESSION)throw new AccessDeniedException("Personal session authentication is required.");return c;}
  private static String sha256(Path path)throws Exception{MessageDigest d=MessageDigest.getInstance("SHA-256");try(var in=Files.newInputStream(path)){byte[] b=new byte[8192];int n;while((n=in.read(b))>0)d.update(b,0,n);}StringBuilder s=new StringBuilder(64);for(byte b:d.digest())s.append(String.format("%02x",b));return s.toString();}
  public record FileResponse(UUID id,String name,String contentType,long size,String sha256,String url,java.time.LocalDateTime createdAt){}
+ public record TextResponse(UUID id,String name,String contentType,String text){}
 }
