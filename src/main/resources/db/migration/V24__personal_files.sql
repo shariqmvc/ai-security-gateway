@@ -1,0 +1,2 @@
+CREATE TABLE PERSONAL_FILES ( id UUID PRIMARY KEY DEFAULT gen_random_uuid(), personal_account_id UUID NOT NULL, original_name VARCHAR(255) NOT NULL, storage_name VARCHAR(100) NOT NULL, content_type VARCHAR(100) NOT NULL, size BIGINT NOT NULL, sha256 VARCHAR(64) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT fk_personal_file_account FOREIGN KEY(personal_account_id) REFERENCES PERSONAL_ACCOUNTS(id) ON DELETE CASCADE );
+CREATE INDEX idx_personal_file_account_created ON PERSONAL_FILES(personal_account_id,created_at DESC);
