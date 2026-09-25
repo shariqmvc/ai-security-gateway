@@ -255,10 +255,13 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             stageStart = System.nanoTime();
+            // RAG retrieval must use the current masked user query, not the
+            // fully assembled multi-turn provider context. Historical turns can
+            // be unrelated to the document the user is asking about.
             RagAugmentationResult ragResult =
                     ragAugmentationService.augment(
                             auth,
-                            providerPrompt,
+                            maskedPrompt,
                             request.getRag());
             providerPrompt = ragResult.getAugmentedPrompt();
             aiRequest.setPrompt(providerPrompt);
@@ -792,10 +795,13 @@ public class GatewayServiceImpl implements GatewayService {
                             + " estimatedTokensSaved=" + contextOptimization.getTokensSaved());
 
             stageStart = System.nanoTime();
+            // RAG retrieval must use the current masked user query, not the
+            // fully assembled multi-turn provider context. Historical turns can
+            // be unrelated to the document the user is asking about.
             RagAugmentationResult ragResult =
                     ragAugmentationService.augment(
                             auth,
-                            providerPrompt,
+                            maskedPrompt,
                             request.getRag());
             providerPrompt = ragResult.getAugmentedPrompt();
             aiRequest.setPrompt(providerPrompt);
