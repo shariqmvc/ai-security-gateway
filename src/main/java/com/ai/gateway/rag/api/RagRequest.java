@@ -24,6 +24,14 @@ public class RagRequest {
     @Builder.Default
     private List<String> knowledgeBaseIds = Collections.emptyList();
 
+    /**
+     * Optional document-level scope. When supplied, RAG retrieval is restricted
+     * to these documents within the selected knowledge bases.
+     */
+    @Size(max = 50, message = "A maximum of 50 documents may be used per request.")
+    @Builder.Default
+    private List<String> documentIds = Collections.emptyList();
+
     @Min(1)
     @Max(100)
     @Builder.Default
