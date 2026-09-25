@@ -51,12 +51,7 @@ public class ContextOptimizationService {
                 .filter(m -> m != null && m.getContent() != null && !m.getContent().isBlank())
                 .toList();
 
-        String original = safeMessages.stream()
-                .map(ContextMessage::getContent)
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .reduce((a, b) -> a + "\n\n" + b)
-                .orElse("");
+        String original = joinMessages(safeMessages);
 
         int originalTokens = estimateTokens(original);
         if (!properties.isEnabled() || original.isBlank()
@@ -189,7 +184,7 @@ public class ContextOptimizationService {
     private String joinSelected(List<ContextMessage> messages, Set<Integer> indexes) {
         List<String> values = new ArrayList<>();
         for (int i = 0; i < messages.size(); i++) {
-            if (indexes.contains(i)) values.add(messages.get(i).getContent().trim());
+            if (indexes.contains(i)) values.add(formatMessage(messages.get(i)));
         }
         return String.join("\n\n", values);
     }
@@ -256,8 +251,39 @@ public class ContextOptimizationService {
 
     private String joinSegments(List<String> segments) { return String.join("\n\n", segments); }
     private String joinMessages(List<ContextMessage> messages) {
-        return messages.stream().map(ContextMessage::getContent).map(String::trim)
-                .filter(s -> !s.isEmpty()).reduce((a, b) -> a + "\n\n" + b).orElse("");
+        return messages.stream()
+                .map(this::formatMessage)
+                .filter(s -> !s.isBlank())
+                .reduce((a, b) -> a + "\n\n" + b)
+                .orElse("");
+    }
+
+    /**
+     * AIRouter currently flattens multi-turn context into a single provider
+     * user message for providers such as Ollama. Preserve the semantic role
+     * explicitly so the model can distinguish prior user turns from assistant
+     * answers instead of treating the entire conversation as one undifferentiated
+     * block of user text.
+     */
+    private String formatMessage(ContextMessage message) {
+        if (message == null || message.getContent() == null || message.getContent().isBlank()) {
+            return "";
+        }
+
+        String role = message.getRole() == null || message.getRole().isBlank()
+                ? "message"
+                : message.getRole().trim().toLowerCase(Locale.ROOT);
+
+        String label = switch (role) {
+            case "user" -> "User";
+            case "assistant" -> "Assistant";
+            case "system" -> "System";
+            case "developer" -> "Developer";
+            case "tool" -> "Tool";
+            default -> "Role: " + role;
+        };
+
+        return label + ":\n" + message.getContent().trim();
     }
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
