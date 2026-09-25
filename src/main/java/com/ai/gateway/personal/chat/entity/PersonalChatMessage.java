@@ -25,6 +25,9 @@ public class PersonalChatMessage {
     @Column(nullable=false, columnDefinition="TEXT")
     private String content;
 
+    @Column(name="request_id")
+    private UUID requestId;
+
     @Column(name="sequence_no", nullable=false)
     private Integer sequenceNo;
 
