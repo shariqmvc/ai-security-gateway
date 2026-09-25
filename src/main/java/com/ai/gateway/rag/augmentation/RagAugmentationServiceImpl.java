@@ -117,6 +117,7 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                     .queryTransformation(request.isQueryTransformation())
                     .candidateLimit(request.getCandidateLimit())
                     .documentIds(request.getDocumentIds())
+                    .documentSummarization(request.isDocumentSummarization())
                     .build();
 
             RagSearchResponse response;
@@ -164,8 +165,8 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
         long optimizationStart = System.nanoTime();
         RagContextOptimizationResult optimization = contextOptimizer.optimizeDetailed(
                 candidates,
-                request.getContextTokenBudget(),
-                request.getTopK());
+                request.isDocumentSummarization() ? 32768 : request.getContextTokenBudget(),
+                request.isDocumentSummarization() ? 100 : request.getTopK());
         logStage("RAG_CONTEXT_OPTIMIZATION", requestId, optimizationStart,
                 "selected=" + optimization.getSelectedChunks().size()
                         + " estimatedTokens=" + optimization.getEstimatedContextTokens());
