@@ -4,12 +4,12 @@ import jakarta.servlet.http.HttpServletRequest; import lombok.RequiredArgsConstr
 import java.io.IOException; import java.nio.file.*; import java.security.MessageDigest; import java.util.*;
 @RestController @RequestMapping("/api/personal/files") @RequiredArgsConstructor
 public class PersonalFileController {
- private static final long MAX_SIZE=15_000_000L; private final PersonalFileRepository repository;
+ private static final long MAX_SIZE=20_971_520L; private final PersonalFileRepository repository;
  @Value("${airouter.personal.files.storage-path:./data/personal-files}") private String storagePath;
  @PostMapping(consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
  public FileResponse upload(HttpServletRequest request,@RequestPart("file") MultipartFile file)throws IOException{
   UUID accountId=context(request).getPersonalAccountId(); if(file==null||file.isEmpty())throw new IllegalArgumentException("File is empty.");
-  if(file.getSize()>MAX_SIZE)throw new IllegalArgumentException("File exceeds the 15 MB limit.");
+  if(file.getSize()>MAX_SIZE)throw new IllegalArgumentException("File exceeds the 20 MB limit.");
   String original=Optional.ofNullable(file.getOriginalFilename()).orElse("upload").replaceAll("[\\/\\r\\n]","_").trim(); if(original.isBlank())original="upload"; if(original.length()>255)original=original.substring(0,255);
   String storageName=UUID.randomUUID()+".bin"; Path root=Paths.get(storagePath).toAbsolutePath().normalize(); Files.createDirectories(root); Path target=root.resolve(storageName); file.transferTo(target);
   String sha256; try{sha256=sha256(target);}catch(Exception ex){Files.deleteIfExists(target);throw new IOException("Unable to hash uploaded file.",ex);}
