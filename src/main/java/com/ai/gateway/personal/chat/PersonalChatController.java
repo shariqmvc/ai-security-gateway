@@ -71,6 +71,7 @@ public class PersonalChatController {
                 .sessionId(sessionId)
                 .role(role)
                 .content(item.content())
+                .requestId(item.requestId())
                 .sequenceNo(sequence++)
                 .createdAt(item.createdAt()==null?LocalDateTime.now():item.createdAt())
                 .build());
@@ -108,7 +109,7 @@ public class PersonalChatController {
     }
 
     private MessageResponse message(PersonalChatMessage m) {
-        return new MessageResponse(m.getId(),m.getRole(),m.getContent(),m.getSequenceNo(),m.getCreatedAt());
+        return new MessageResponse(m.getId(),m.getRole(),m.getContent(),m.getSequenceNo(),m.getCreatedAt(),m.getRequestId());
     }
 
     private String normalizeTitle(String title) {
@@ -118,7 +119,7 @@ public class PersonalChatController {
     }
 
     public record CreateSessionRequest(String title) {}
-    public record SaveMessageRequest(String role,String content,LocalDateTime createdAt) {}
+    public record SaveMessageRequest(String role,String content,LocalDateTime createdAt,UUID requestId) {}
     public record SessionResponse(UUID id,String title,LocalDateTime createdAt,LocalDateTime updatedAt) {}
-    public record MessageResponse(UUID id,String role,String content,Integer sequenceNo,LocalDateTime createdAt) {}
+    public record MessageResponse(UUID id,String role,String content,Integer sequenceNo,LocalDateTime createdAt,UUID requestId) {}
 }
