@@ -4,6 +4,7 @@ import com.ai.gateway.authentication.AuthenticationFilter;
 import com.ai.gateway.ratelimit.filter.RateLimitFilter;
 import com.ai.gateway.personal.ratelimit.filter.PersonalRateLimitFilter;
 import com.ai.gateway.personal.apikey.filter.PersonalApiKeyScopeFilter;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -45,6 +46,20 @@ public class SecurityConfig {
                                 "/api/personal/billing/webhooks"
                         )
                         .permitAll()
+                        /*
+                         * StreamingResponseBody uses an ASYNC servlet dispatch
+                         * after the authenticated REQUEST dispatch has returned.
+                         * AuthenticationFilter intentionally does not run again
+                         * for that dispatch, so the SecurityContext is empty by
+                         * the time Spring Security evaluates authorization.
+                         *
+                         * The original request was already authenticated by
+                         * AuthenticationFilter before /api/chat was permitted.
+                         * Allowing only the internal ASYNC continuation prevents
+                         * Spring Security from rejecting the completed SSE stream
+                         * as anonymous after the response has been committed.
+                         */
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         /*
                          * /api/chat is authenticated by the mandatory
                          * AuthenticationFilter using X-API-Key. Spring Security
