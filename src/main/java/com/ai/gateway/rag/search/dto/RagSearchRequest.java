@@ -47,4 +47,7 @@ public class RagSearchRequest {
     @Size(max = 50, message = "A maximum of 50 documents may be used per search.")
     @Builder.Default
     private java.util.List<String> documentIds = java.util.Collections.emptyList();
+
+    @Builder.Default
+    private boolean documentSummarization = false;
 }
