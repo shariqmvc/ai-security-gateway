@@ -21,6 +21,7 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
  private final PersonalRequestHistoryRepository repository;
  private final PersonalQuotaProperties quotaProperties;
  private final PersonalQuotaUsageRepository quotaRepository;
+ private final com.ai.gateway.personal.usage.repository.PersonalRequestFeedbackRepository feedbackRepository;
 
  @Override @Transactional
  public void recordSuccess(UUID id,AuthenticationContext auth,AIRequest req,AIResponse resp,String prompt,
@@ -57,11 +58,12 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
  }
  @Override @Transactional(readOnly=true)
  public Page<PersonalRequestHistoryResponse> list(UUID accountId,Pageable pageable){
-  return repository.findByPersonalAccountIdOrderByCreatedAtDesc(accountId,pageable).map(this::toResponse);
+  return repository.findByPersonalAccountIdOrderByCreatedAtDesc(accountId,pageable).map(h->toResponse(h,feedbackRepository.findByRequestIdAndPersonalAccountId(h.getRequestId(),accountId).map(PersonalRequestFeedback::getRating).orElse(null)));
  }
  @Override @Transactional(readOnly=true)
  public PersonalRequestHistoryResponse get(UUID accountId,UUID requestId){
-  return repository.findByRequestIdAndPersonalAccountId(requestId,accountId).map(this::toResponse)
+  return repository.findByRequestIdAndPersonalAccountId(requestId,accountId)
+   .map(h->toResponse(h,feedbackRepository.findByRequestIdAndPersonalAccountId(requestId,accountId).map(PersonalRequestFeedback::getRating).orElse(null)))
    .orElseThrow(()->new BusinessException("Personal request not found."));
  }
  @Override @Transactional(readOnly=true)
@@ -114,7 +116,7 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
   catch(NumberFormatException ex){return BigDecimal.ZERO;}
  }
  private boolean personal(AuthenticationContext a){return a!=null&&a.isPersonalPrincipal()&&a.getPersonalAccountId()!=null;}
- private PersonalRequestHistoryResponse toResponse(PersonalRequestHistory h){
+ private PersonalRequestHistoryResponse toResponse(PersonalRequestHistory h, PersonalResponseRating responseRating){
   return PersonalRequestHistoryResponse.builder().requestId(h.getRequestId()).status(h.getStatus())
    .provider(h.getProvider()).model(h.getModel()).billingMode(h.getBillingMode()).routingStrategy(h.getRoutingStrategy())
    .maskedPrompt(h.getMaskedPrompt()).maskedResponse(h.getMaskedResponse()).inputTokens(h.getInputTokens())
@@ -122,6 +124,6 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
    .estimatedOptimizedTokens(h.getEstimatedOptimizedTokens()).estimatedTokensSaved(h.getEstimatedTokensSaved())
    .contextWindowTokens(h.getContextWindowTokens()).latencyMs(h.getLatencyMs()).providerLatencyMs(h.getProviderLatencyMs())
    .cost(h.getCost()).cacheHit(h.isCacheHit()).ragEnabled(h.isRagEnabled()).errorCategory(h.getErrorCategory())
-   .createdAt(h.getCreatedAt()).build();
+   .createdAt(h.getCreatedAt()).responseRating(responseRating).build();
  }
 }
