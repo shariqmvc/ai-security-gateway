@@ -55,6 +55,8 @@ public class PersonalChatController {
     public List<MessageResponse> replaceMessages(HttpServletRequest request,@PathVariable UUID sessionId,@RequestBody List<SaveMessageRequest> body) {
         PersonalChatSession session=requireSession(request,sessionId);
         messageRepository.deleteBySessionId(sessionId);
+        // Flush the delete before reusing sequence numbers under the unique constraint.
+        messageRepository.flush();
 
         List<SaveMessageRequest> input=body==null?List.of():body;
         List<PersonalChatMessage> saved=new ArrayList<>();
@@ -73,7 +75,7 @@ public class PersonalChatController {
                 .createdAt(item.createdAt()==null?LocalDateTime.now():item.createdAt())
                 .build());
         }
-        messageRepository.saveAll(saved);
+        messageRepository.saveAllAndFlush(saved);
         session.setUpdatedAt(LocalDateTime.now());
         sessionRepository.save(session);
         return saved.stream().map(this::message).toList();
