@@ -1286,7 +1286,7 @@ public class GatewayServiceImpl implements GatewayService {
 
         if (securityAssessment.shouldBlock()) {
             throw new com.ai.gateway.personal.security.PersonalSecurityBlockedException(
-                    securityAssessment);
+                    requestId, securityAssessment);
         }
     }
 
