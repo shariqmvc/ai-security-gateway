@@ -39,4 +39,12 @@ public class RagSearchRequest {
     @Max(200)
     @Builder.Default
     private int candidateLimit = 50;
+
+    /**
+     * Optional document-level scope. When supplied, retrieval is restricted
+     * to these documents.
+     */
+    @Size(max = 50, message = "A maximum of 50 documents may be used per search.")
+    @Builder.Default
+    private java.util.List<String> documentIds = java.util.Collections.emptyList();
 }
