@@ -26,7 +26,8 @@ public class TikaDocumentParser implements DocumentParser {
     @Override
     public boolean supports(String fileName, String contentType) {
         String extension = extension(fileName);
-        if (extension != null && properties.getAllowedExtensions().contains(extension)) {
+        if (extension != null && (properties.getAllowedExtensions().contains(extension)
+                || java.util.Set.of("doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp").contains(extension))) {
             return true;
         }
 
@@ -36,7 +37,12 @@ public class TikaDocumentParser implements DocumentParser {
 
         String normalized = contentType.toLowerCase(Locale.ROOT);
         return normalized.equals("application/pdf")
+                || normalized.equals("application/msword")
                 || normalized.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                || normalized.equals("application/vnd.ms-excel")
+                || normalized.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                || normalized.equals("application/vnd.ms-powerpoint")
+                || normalized.equals("application/vnd.openxmlformats-officedocument.presentationml.presentation")
                 || normalized.equals("text/plain")
                 || normalized.equals("text/markdown")
                 || normalized.equals("text/html")
