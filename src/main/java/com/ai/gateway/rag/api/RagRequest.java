@@ -32,6 +32,10 @@ public class RagRequest {
     @Builder.Default
     private List<String> documentIds = Collections.emptyList();
 
+    /** When enabled, retrieve the complete scoped document context for document-level summarization. */
+    @Builder.Default
+    private boolean documentSummarization = false;
+
     @Min(1)
     @Max(100)
     @Builder.Default
