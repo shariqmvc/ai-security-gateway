@@ -1361,28 +1361,36 @@ public class GatewayServiceImpl implements GatewayService {
             ChatRequest request,
             AuthenticationContext auth) {
 
-        if (request.getContextMessages() == null || request.getContextMessages().isEmpty()) {
-            MaskingResult masked = maskPrompt(requestId, request.getPrompt(), auth);
-            recordPiiTelemetry(inferenceId, masked);
-            return masked.getMaskedPrompt();
+        /*
+         * Context messages are historical turns. The current prompt is a
+         * separate request field and must always be masked independently.
+         *
+         * Previously, when contextMessages was non-empty, this method returned
+         * only the masked historical messages and never masked/returned the
+         * current prompt. That made the downstream context optimizer select
+         * only the previous conversation, effectively making every response
+         * one turn behind.
+         */
+        if (request.getContextMessages() != null) {
+            for (ContextMessage message : request.getContextMessages()) {
+                if (message == null || message.getContent() == null || message.getContent().isBlank()) {
+                    continue;
+                }
+
+                MaskingResult masked = piiDetectionService.mask(message.getContent());
+                if (auth != null && auth.isPersonalPrincipal()) {
+                    personalTokenVaultService.save(auth, requestId, masked.getDetectedValues());
+                } else {
+                    tokenVaultService.save(requestId, masked.getDetectedValues());
+                }
+                recordPiiTelemetry(inferenceId, masked);
+                message.setContent(masked.getMaskedPrompt());
+            }
         }
 
-        java.util.List<String> maskedContents = new java.util.ArrayList<>();
-        for (ContextMessage message : request.getContextMessages()) {
-            if (message == null || message.getContent() == null || message.getContent().isBlank()) {
-                continue;
-            }
-            MaskingResult masked = piiDetectionService.mask(message.getContent());
-            if (auth != null && auth.isPersonalPrincipal()) {
-                personalTokenVaultService.save(auth, requestId, masked.getDetectedValues());
-            } else {
-                tokenVaultService.save(requestId, masked.getDetectedValues());
-            }
-            recordPiiTelemetry(inferenceId, masked);
-            message.setContent(masked.getMaskedPrompt());
-            maskedContents.add(masked.getMaskedPrompt());
-        }
-        return String.join("\n\n", maskedContents);
+        MaskingResult currentPrompt = maskPrompt(requestId, request.getPrompt(), auth);
+        recordPiiTelemetry(inferenceId, currentPrompt);
+        return currentPrompt.getMaskedPrompt();
     }
 
     private void recordPiiTelemetry(UUID inferenceId, MaskingResult result) {
@@ -1422,15 +1430,32 @@ public class GatewayServiceImpl implements GatewayService {
 
         int budget = resolveContextInputBudget(aiRequest);
 
-        if (request.getContextMessages() != null && !request.getContextMessages().isEmpty()) {
-            java.util.List<ContextMessage> messages = request.getContextMessages().stream()
-                    .filter(message -> message != null
-                            && message.getContent() != null
-                            && !message.getContent().isBlank())
-                    .toList();
-            if (!messages.isEmpty()) {
-                return contextOptimizationService.optimize(messages, budget);
-            }
+        java.util.List<ContextMessage> messages = new java.util.ArrayList<>();
+
+        if (request.getContextMessages() != null) {
+            messages.addAll(
+                    request.getContextMessages().stream()
+                            .filter(message -> message != null
+                                    && message.getContent() != null
+                                    && !message.getContent().isBlank())
+                            .toList());
+        }
+
+        /*
+         * ChatRequest.prompt is the current user turn. It is not part of
+         * contextMessages by contract, so append it explicitly as the latest
+         * user message before optimization. Without this, any multi-turn
+         * conversation sends only the previous turns to the provider.
+         */
+        if (maskedPrompt != null && !maskedPrompt.isBlank()) {
+            messages.add(ContextMessage.builder()
+                    .role("user")
+                    .content(maskedPrompt)
+                    .build());
+        }
+
+        if (!messages.isEmpty()) {
+            return contextOptimizationService.optimize(messages, budget);
         }
 
         return contextOptimizationService.optimize(maskedPrompt, budget);
