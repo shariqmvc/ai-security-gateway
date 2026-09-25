@@ -5,6 +5,7 @@ import com.ai.gateway.core.contract.ChatRequest;
 import com.ai.gateway.core.contract.ChatResponse;
 import com.ai.gateway.service.GatewayService;
 import com.ai.gateway.service.StreamAdmission;
+import com.ai.gateway.personal.security.PersonalSecurityBlockedException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -72,6 +74,28 @@ public class ChatController {
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .header("Cache-Control", "no-cache")
                 .header("X-Accel-Buffering", "no")
+                .body(body);
+    }
+
+    @ExceptionHandler(PersonalSecurityBlockedException.class)
+    public ResponseEntity<java.util.Map<String, Object>> handlePersonalSecurityBlocked(
+            PersonalSecurityBlockedException exception) {
+
+        var assessment = exception.assessment();
+        var body = new java.util.LinkedHashMap<String, Object>();
+        body.put("code", "PERSONAL_SECURITY_BLOCKED");
+        body.put("title", "Request blocked by security firewall");
+        body.put("message", exception.getMessage());
+        body.put("requestId", exception.requestId());
+        if (assessment != null) {
+            body.put("category", assessment.labels().isEmpty()
+                    ? "SECURITY_POLICY"
+                    : assessment.labels().get(0));
+            body.put("risk", assessment.risk().name());
+            body.put("decision", assessment.decision());
+        }
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(body);
     }
 
