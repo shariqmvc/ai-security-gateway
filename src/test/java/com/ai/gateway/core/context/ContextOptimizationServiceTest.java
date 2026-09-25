@@ -92,6 +92,28 @@ class ContextOptimizationServiceTest {
 	}
 
 	@Test
+	void preservesRolesWhenFlatteningStructuredConversation() {
+		ContextOptimizationProperties properties = new ContextOptimizationProperties();
+		properties.setEnabled(true);
+		properties.setMinInputTokens(0);
+		properties.setMinimumSavingsTokens(0);
+
+		ContextOptimizationService service = new ContextOptimizationService(properties);
+
+		ContextOptimizationResult result = service.optimize(
+				java.util.List.of(
+						ContextMessage.builder().role("user").content("What are the seven heavens?").build(),
+						ContextMessage.builder().role("assistant").content("They are described as seven heavens.").build(),
+						ContextMessage.builder().role("user").content("Explain the second one.").build()),
+				4000);
+
+		assertTrue(result.getOptimizedContext().contains("User:\nWhat are the seven heavens?"));
+		assertTrue(result.getOptimizedContext().contains("Assistant:\nThey are described as seven heavens."));
+		assertTrue(result.getOptimizedContext().contains("User:\nExplain the second one."));
+	}
+
+
+	@Test
 	void usesModelSpecificBudget() {
 		ContextOptimizationProperties properties = new ContextOptimizationProperties();
 		properties.setMinInputTokens(1);
