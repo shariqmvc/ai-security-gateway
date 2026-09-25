@@ -128,7 +128,14 @@ public class PersonalRagService {
         try {
             byte[] bytes=file.getBytes(); String checksum=sha256(bytes);
             Integer count=jdbc.queryForObject("SELECT COUNT(*) FROM PERSONAL_RAG_DOCUMENTS WHERE personal_account_id=? AND knowledge_base_id=? AND checksum_sha256=?",Integer.class,account,kbId,checksum);
-            if(count!=null&&count>0) throw new BusinessException("Document already exists: "+checksum);
+            if(count!=null&&count>0) {
+                return jdbc.query(
+                        "SELECT * FROM PERSONAL_RAG_DOCUMENTS WHERE personal_account_id=? AND knowledge_base_id=? AND checksum_sha256=?",
+                        (rs,n)->mapDoc(rs), account, kbId, checksum)
+                    .stream()
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException("Document already exists: " + checksum));
+            }
             UUID id=UUID.randomUUID(); LocalDateTime now=LocalDateTime.now();
             jdbc.update("INSERT INTO PERSONAL_RAG_DOCUMENTS (id,personal_account_id,knowledge_base_id,file_name,content_type,file_size_bytes,checksum_sha256,status,chunk_count,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     id,account,kbId,name,file.getContentType(),(long)bytes.length,checksum,DocumentStatus.REGISTERED.name(),0,now,now);
