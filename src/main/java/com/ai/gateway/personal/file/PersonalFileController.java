@@ -11,9 +11,22 @@ public class PersonalFileController {
   UUID accountId=context(request).getPersonalAccountId(); if(file==null||file.isEmpty())throw new IllegalArgumentException("File is empty.");
   if(file.getSize()>MAX_SIZE)throw new IllegalArgumentException("File exceeds the 15 MB limit.");
   String original=Optional.ofNullable(file.getOriginalFilename()).orElse("upload").replaceAll("[\\/\\r\\n]","_").trim(); if(original.isBlank())original="upload"; if(original.length()>255)original=original.substring(0,255);
-  UUID id=UUID.randomUUID(); String storageName=id+".bin"; Path root=Paths.get(storagePath).toAbsolutePath().normalize(); Files.createDirectories(root); Path target=root.resolve(storageName); file.transferTo(target);
+  String storageName=UUID.randomUUID()+".bin"; Path root=Paths.get(storagePath).toAbsolutePath().normalize(); Files.createDirectories(root); Path target=root.resolve(storageName); file.transferTo(target);
   String sha256; try{sha256=sha256(target);}catch(Exception ex){Files.deleteIfExists(target);throw new IOException("Unable to hash uploaded file.",ex);}
-  PersonalFile saved=repository.save(PersonalFile.builder().id(id).personalAccountId(accountId).originalName(original).storageName(storageName).contentType(Optional.ofNullable(file.getContentType()).filter(v->!v.isBlank()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE)).size(file.getSize()).sha256(sha256).build());
+  PersonalFile saved;
+  try{
+   saved=repository.saveAndFlush(PersonalFile.builder()
+    .personalAccountId(accountId)
+    .originalName(original)
+    .storageName(storageName)
+    .contentType(Optional.ofNullable(file.getContentType()).filter(v->!v.isBlank()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE))
+    .size(file.getSize())
+    .sha256(sha256)
+    .build());
+  }catch(RuntimeException ex){
+   Files.deleteIfExists(target);
+   throw ex;
+  }
   return response(saved);
  }
  @GetMapping("/{fileId}/content")
