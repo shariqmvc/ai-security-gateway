@@ -116,6 +116,7 @@ public class RagAugmentationServiceImpl implements RagAugmentationService {
                     .retrievalStrategy(request.getRetrievalStrategy())
                     .queryTransformation(request.isQueryTransformation())
                     .candidateLimit(request.getCandidateLimit())
+                    .documentIds(request.getDocumentIds())
                     .build();
 
             RagSearchResponse response;
