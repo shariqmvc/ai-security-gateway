@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/personal/chat/sessions")
@@ -36,6 +35,41 @@ public class PersonalChatController {
         return session(saved);
     }
 
+    @PostMapping("/{sessionId}/branch")
+    @Transactional
+    public BranchResponse branch(HttpServletRequest request,@PathVariable UUID sessionId,@RequestBody BranchRequest body) {
+        PersonalChatSession sourceSession=requireSession(request,sessionId);
+        if(body==null||body.messageId()==null) throw new IllegalArgumentException("messageId is required.");
+        PersonalChatMessage branchMessage=messageRepository.findById(body.messageId())
+            .filter(m->sessionId.equals(m.getSessionId()))
+            .orElseThrow(()->new IllegalArgumentException("Branch message not found in this session."));
+
+        List<PersonalChatMessage> sourceMessages=messageRepository.findBySessionIdAndSequenceNoLessThanEqualOrderBySequenceNoAsc(
+            sessionId,branchMessage.getSequenceNo());
+        PersonalChatSession branch=sessionRepository.save(PersonalChatSession.builder()
+            .personalAccountId(sourceSession.getPersonalAccountId())
+            .title(normalizeTitle(body.title()==null||body.title().isBlank()?"Branch: "+sourceSession.getTitle():body.title()))
+            .parentSessionId(sourceSession.getId())
+            .branchMessageId(branchMessage.getId())
+            .build());
+
+        List<PersonalChatMessage> copies=new ArrayList<>(sourceMessages.size());
+        int sequence=0;
+        for(PersonalChatMessage source:sourceMessages){
+            copies.add(PersonalChatMessage.builder()
+                .sessionId(branch.getId())
+                .role(source.getRole())
+                .content(source.getContent())
+                .requestId(source.getRequestId())
+                .attachmentsJson(source.getAttachmentsJson())
+                .sequenceNo(sequence++)
+                .createdAt(source.getCreatedAt())
+                .build());
+        }
+        List<PersonalChatMessage> savedMessages=messageRepository.saveAllAndFlush(copies);
+        return new BranchResponse(session(branch),savedMessages.stream().map(this::message).toList());
+    }
+
     @GetMapping("/{sessionId}/messages")
     public List<MessageResponse> messages(HttpServletRequest request,@PathVariable UUID sessionId) {
         requireSession(request,sessionId);
@@ -55,7 +89,6 @@ public class PersonalChatController {
     public List<MessageResponse> replaceMessages(HttpServletRequest request,@PathVariable UUID sessionId,@RequestBody List<SaveMessageRequest> body) {
         PersonalChatSession session=requireSession(request,sessionId);
         messageRepository.deleteBySessionId(sessionId);
-        // Flush the delete before reusing sequence numbers under the unique constraint.
         messageRepository.flush();
 
         List<SaveMessageRequest> input=body==null?List.of():body;
@@ -105,7 +138,7 @@ public class PersonalChatController {
     }
 
     private SessionResponse session(PersonalChatSession s) {
-        return new SessionResponse(s.getId(),s.getTitle(),s.getCreatedAt(),s.getUpdatedAt());
+        return new SessionResponse(s.getId(),s.getTitle(),s.getCreatedAt(),s.getUpdatedAt(),s.getParentSessionId(),s.getBranchMessageId());
     }
 
     private MessageResponse message(PersonalChatMessage m) {
@@ -119,7 +152,9 @@ public class PersonalChatController {
     }
 
     public record CreateSessionRequest(String title) {}
+    public record BranchRequest(UUID messageId,String title) {}
     public record SaveMessageRequest(String role,String content,LocalDateTime createdAt,UUID requestId) {}
-    public record SessionResponse(UUID id,String title,LocalDateTime createdAt,LocalDateTime updatedAt) {}
+    public record SessionResponse(UUID id,String title,LocalDateTime createdAt,LocalDateTime updatedAt,UUID parentSessionId,UUID branchMessageId) {}
     public record MessageResponse(UUID id,String role,String content,Integer sequenceNo,LocalDateTime createdAt,UUID requestId) {}
+    public record BranchResponse(SessionResponse session,List<MessageResponse> messages) {}
 }
