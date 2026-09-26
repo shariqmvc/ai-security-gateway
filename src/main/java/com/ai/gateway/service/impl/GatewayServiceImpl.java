@@ -835,6 +835,66 @@ public class GatewayServiceImpl implements GatewayService {
                     .model(aiRequest.getModel())
                     .build());
 
+            // Phase 10 exact-response cache for streaming requests. Security,
+            // policy, PII, RAG, routing and entitlement checks have already run.
+            if (!request.isExtensiveResearch()) {
+                stageStart = System.nanoTime();
+                CachedInferenceResponse cached = inferenceCacheService.get(auth, aiRequest);
+                long cacheLookupLatency = elapsedMs(stageStart);
+                if (cached != null) {
+                    metricsService.increment(MetricsConstants.INFERENCE_CACHE_HITS);
+                    performanceLogger.stage("INFERENCE_CACHE", requestId, cacheLookupLatency, "HIT");
+                    if (personalInferencePersistenceService != null) {
+                        personalInferencePersistenceService.event(
+                                inferenceId, "CACHE_HIT", "CACHE",
+                                java.util.Map.of("lookupLatencyMs", cacheLookupLatency));
+                    }
+                    AIResponse cachedResponse = AIResponse.builder()
+                            .response(cached.response())
+                            .provider(cached.provider())
+                            .model(cached.model())
+                            .usage(Usage.builder().inputTokens(0).outputTokens(0).totalTokens(0)
+                                    .latencyMs(cacheLookupLatency).build())
+                            .build();
+                    String restored = restoreResponse(requestId, cachedResponse);
+                    eventConsumer.accept(GatewayStreamEvent.builder()
+                            .requestId(requestId).type("delta").content(restored).build());
+                    long latency = elapsedMs(start);
+                    if (personalInferencePersistenceService != null) {
+                        personalInferencePersistenceService.completeSuccess(
+                                inferenceId, aiRequest, cachedResponse, latency,
+                                estimatedInputTokens, estimatedOptimizedTokens,
+                                estimatedTokensSaved, contextWindowTokens, true,
+                                request.getRag() != null && request.getRag().isEnabled());
+                    }
+                    if (auth.isPersonalPrincipal()) {
+                        personalRequestHistoryService.recordSuccess(
+                                requestId, auth, aiRequest, cachedResponse, maskedPrompt,
+                                latency, 0L, estimatedInputTokens, estimatedOptimizedTokens,
+                                estimatedTokensSaved, contextWindowTokens, true,
+                                request.getRag() != null && request.getRag().isEnabled());
+                    }
+                    performanceLogger.requestCompleted(
+                            requestId, latency,
+                            cached.provider() == null ? null : cached.provider().name(),
+                            cached.model(), "CACHE_HIT", 0L, latency);
+                    eventConsumer.accept(GatewayStreamEvent.builder()
+                            .requestId(requestId).type("done")
+                            .provider(cached.provider() == null ? null : cached.provider().name())
+                            .model(cached.model()).inputTokens(0).outputTokens(0).totalTokens(0)
+                            .latencyMs(latency).build());
+                    successPersisted = true;
+                    return;
+                }
+                metricsService.increment(MetricsConstants.INFERENCE_CACHE_MISSES);
+                performanceLogger.stage("INFERENCE_CACHE", requestId, cacheLookupLatency, "MISS");
+                if (personalInferencePersistenceService != null) {
+                    personalInferencePersistenceService.event(
+                            inferenceId, "CACHE_MISS", "CACHE",
+                            java.util.Map.of("lookupLatencyMs", cacheLookupLatency));
+                }
+            }
+
             if (auth.isPersonalPrincipal()
                     && "CREDIT".equalsIgnoreCase(aiRequest.getBillingMode())) {
                 creditReservation = personalCreditExecutionService.reserve(
@@ -968,6 +1028,16 @@ public class GatewayServiceImpl implements GatewayService {
                     "SUCCESS");
 
             long latency = elapsedMs(start);
+            if (!request.isExtensiveResearch()) {
+                inferenceCacheService.put(
+                        auth,
+                        aiRequest,
+                        new CachedInferenceResponse(
+                                finalResponse.getResponse(),
+                                finalResponse.getProvider(),
+                                finalResponse.getModel()));
+            }
+
             if (personalInferencePersistenceService != null) {
                 personalInferencePersistenceService.completeSuccess(
                         inferenceId, aiRequest, finalResponse, latency,
