@@ -14,6 +14,7 @@ public class KnowledgeBaseResponse {
     private UUID id;
     private String name;
     private String description;
+    private String providerScope;
     private KnowledgeBaseStatus status;
     private String embeddingProvider;
     private String embeddingModel;
