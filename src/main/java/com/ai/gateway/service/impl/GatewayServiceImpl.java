@@ -931,6 +931,8 @@ public class GatewayServiceImpl implements GatewayService {
                                 "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
                                 "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
             }
+            final Provider currentProvider = aiRequest.getProvider();
+            final String currentModel = aiRequest.getModel();
             StringBuilder restoredSoFar = new StringBuilder();
             String[] lastEmitted = {""};
             boolean[] firstDelta = {true};
@@ -949,8 +951,8 @@ public class GatewayServiceImpl implements GatewayService {
                                     .requestId(requestId)
                                     .type("status")
                                     .phase("PROVIDER_GENERATING")
-                                    .provider(aiRequest.getProvider().name())
-                                    .model(aiRequest.getModel())
+                                    .provider(currentProvider.name())
+                                    .model(currentModel)
                                     .content(providerLabel(aiRequest.getProvider()) + " is generating…")
                                     .build());
                         }
@@ -1315,7 +1317,7 @@ public class GatewayServiceImpl implements GatewayService {
         if (provider == null) return "AI provider";
         return switch (provider) {
             case OPENAI -> "OpenAI";
-            case ANTHROPIC -> "Anthropic";
+            case CLAUDE -> "Anthropic";
             case GEMINI -> "Gemini";
             case OLLAMA -> "Ollama";
         };
