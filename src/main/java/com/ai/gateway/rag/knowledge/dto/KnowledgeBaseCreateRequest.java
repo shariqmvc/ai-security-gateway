@@ -19,6 +19,10 @@ public class KnowledgeBaseCreateRequest {
     @Size(max = 2000)
     private String description;
 
+    /** Library scope: GLOBAL or a provider name such as OPENAI/GEMINI/OLLAMA. */
+    @Size(max = 32)
+    private String providerScope;
+
     @Size(max = 64)
     private String embeddingProvider;
 
