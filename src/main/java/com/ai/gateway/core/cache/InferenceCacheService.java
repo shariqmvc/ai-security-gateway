@@ -64,7 +64,7 @@ public class InferenceCacheService {
         }
 
         try {
-            String key = buildKey(auth.getTenantId(), request);
+            String key = buildKey(auth, request);
             CachedInferenceResponse value = cache.getIfPresent(key);
             if (value == null) {
                 misses.incrementAndGet();
@@ -155,7 +155,7 @@ public class InferenceCacheService {
     private boolean isCacheable(AuthenticationContext auth, AIRequest request) {
         return enabled
                 && auth != null
-                && auth.getTenantId() != null
+                && (auth.getTenantId() != null || auth.getPersonalAccountId() != null)
                 && request != null
                 && request.getProvider() != null
                 && request.getModel() != null
@@ -176,7 +176,7 @@ public class InferenceCacheService {
         return true;
     }
 
-    private String buildKey(UUID tenantId, AIRequest request) {
+    private String buildKey(AuthenticationContext auth, AIRequest request) {
         try {
             Map<String, Object> canonical = new LinkedHashMap<>();
             canonical.put("provider", providerName(request.getProvider()));
@@ -185,8 +185,11 @@ public class InferenceCacheService {
             canonical.put("media", request.getMedia());
 
             byte[] payload = objectMapper.writeValueAsBytes(canonical);
+            String owner = auth.getTenantId() != null
+                    ? "tenant:" + auth.getTenantId()
+                    : "personal:" + auth.getPersonalAccountId();
             return "aegis:cache:" + KEY_VERSION
-                    + ":tenant:" + tenantId
+                    + ":" + owner
                     + ":exact:" + sha256(payload);
         } catch (Exception ex) {
             throw new IllegalStateException("Unable to build inference cache key", ex);
