@@ -179,7 +179,7 @@ public class GatewayServiceImpl implements GatewayService {
             // Policy Engine
             // -------------------------------
             validateRequest(auth, originalPrompt);
-            enforcePersonalSecurity(inferenceId, requestId, auth, originalPrompt);
+            enforcePersonalSecurity(inferenceId, requestId, auth, originalPrompt, request.getSecurityMode());
             performanceLogger.stage("FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
 
             // Personal quota enforcement is account-scoped and independent of
@@ -657,7 +657,7 @@ public class GatewayServiceImpl implements GatewayService {
 
             stageStart = System.nanoTime();
             validateRequest(auth, request.getPrompt());
-            enforcePersonalSecurity(inferenceId, requestId, auth, request.getPrompt());
+            enforcePersonalSecurity(inferenceId, requestId, auth, request.getPrompt(), request.getSecurityMode());
             performanceLogger.stage(
                     "FIREWALL_POLICY", requestId, elapsedMs(stageStart), "SUCCESS");
 
@@ -1369,9 +1369,26 @@ public class GatewayServiceImpl implements GatewayService {
             UUID inferenceId,
             UUID requestId,
             AuthenticationContext auth,
-            String prompt) {
+            String prompt,
+            String securityMode) {
 
         if (auth == null || !auth.isPersonalPrincipal()) {
+            return;
+        }
+
+        String mode = securityMode == null || securityMode.isBlank()
+                ? "PROTECTED"
+                : securityMode.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!java.util.Set.of("PROTECTED", "RELAXED", "OFF").contains(mode)) {
+            throw new BusinessException("Unsupported Personal security mode: " + mode);
+        }
+        if ("OFF".equals(mode)) {
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.event(
+                        inferenceId, "SECURITY_CHECK_SKIPPED", "SECURITY",
+                        java.util.Map.of("mode", mode));
+            }
+            performanceLogger.stage("PERSONAL_SECURITY_FIREWALL", requestId, 0L, "DISABLED");
             return;
         }
 
@@ -1395,7 +1412,7 @@ public class GatewayServiceImpl implements GatewayService {
                 "PERSONAL_SECURITY_FIREWALL",
                 requestId,
                 securityLatency,
-                securityAssessment.decision() + ":"
+                mode + ":" + securityAssessment.decision() + ":"
                         + securityAssessment.risk().name());
 
         if (securityAssessment.shouldBlock()) {
