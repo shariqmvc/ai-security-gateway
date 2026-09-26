@@ -91,7 +91,7 @@ public class InferenceCacheService {
         }
 
         try {
-            cache.put(buildKey(auth.getTenantId(), request), response);
+            cache.put(buildKey(auth, request), response);
         } catch (RuntimeException ex) {
             // Cache write failure must never fail a successful provider request.
             log.warn("Inference cache write failed; continuing without cache: {}", ex.getMessage());
