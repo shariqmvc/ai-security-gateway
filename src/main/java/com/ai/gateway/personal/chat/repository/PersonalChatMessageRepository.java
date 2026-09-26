@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public interface PersonalChatMessageRepository extends JpaRepository<PersonalChatMessage, UUID> {
     List<PersonalChatMessage> findBySessionIdOrderBySequenceNoAsc(UUID sessionId);
+    List<PersonalChatMessage> findBySessionIdAndSequenceNoLessThanEqualOrderBySequenceNoAsc(UUID sessionId, Integer sequenceNo);
 
     @Transactional
     void deleteBySessionId(UUID sessionId);
