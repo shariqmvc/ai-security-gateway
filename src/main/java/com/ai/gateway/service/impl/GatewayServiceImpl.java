@@ -1241,6 +1241,10 @@ public class GatewayServiceImpl implements GatewayService {
         Throwable current = ex;
 
         while (current != null) {
+            if (current instanceof com.ai.gateway.personal.credit.exception.PersonalInsufficientCreditsException) {
+                return "Insufficient AIRouter credits. Add credits to your wallet or switch Billing mode from CREDIT.";
+            }
+
             if (current instanceof java.net.SocketTimeoutException
                     || current instanceof java.util.concurrent.TimeoutException
                     || current.getClass().getSimpleName().contains("Timeout")) {
