@@ -20,6 +20,10 @@ public class RagRequest {
     @Builder.Default
     private boolean enabled = false;
 
+    /** Provider whose scoped library may participate alongside GLOBAL libraries. */
+    @Builder.Default
+    private String providerScope = "GLOBAL";
+
     @Size(max = 10, message = "A maximum of 10 knowledge bases may be used per request.")
     @Builder.Default
     private List<String> knowledgeBaseIds = Collections.emptyList();
