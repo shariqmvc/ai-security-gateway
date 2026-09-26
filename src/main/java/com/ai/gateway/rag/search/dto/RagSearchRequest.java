@@ -19,6 +19,9 @@ public class RagSearchRequest {
     @Size(max = 10000, message = "Search query must not exceed 10000 characters.")
     private String query;
 
+    @Builder.Default
+    private String providerScope = "GLOBAL";
+
     @Min(value = 1, message = "topK must be at least 1.")
     @Max(value = 100, message = "topK must not exceed 100.")
     @Builder.Default
