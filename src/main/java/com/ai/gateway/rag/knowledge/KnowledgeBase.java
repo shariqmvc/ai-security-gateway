@@ -24,10 +24,6 @@ public class KnowledgeBase {
     @Column(length = 2000)
     private String description;
 
-    @Column(name = "provider_scope", nullable = false, length = 32)
-    @Builder.Default
-    private String providerScope = "GLOBAL";
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private KnowledgeBaseStatus status;
