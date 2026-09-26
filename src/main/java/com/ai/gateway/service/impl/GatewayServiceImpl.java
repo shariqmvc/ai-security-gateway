@@ -298,10 +298,17 @@ public class GatewayServiceImpl implements GatewayService {
                     feature);
             performanceLogger.stage("PROVIDER_ENTITLEMENT", requestId, elapsedMs(stageStart), "SUCCESS");
 
+            if (auth.isPersonalPrincipal()
+                    && "CREDIT".equalsIgnoreCase(aiRequest.getBillingMode())) {
+                creditReservation = personalCreditExecutionService.reserve(
+                        auth, aiRequest, "inference:" + requestId);
+            }
+
             // Phase 10 exact-response cache. Security, firewall/policy, PII
             // masking, RAG augmentation, routing and entitlement checks have
             // already completed, so a cache hit cannot bypass those controls.
-            // Extensive research is deliberately excluded from exact caching.
+            // CREDIT reservation happens before cache lookup so a zero-credit
+            // account cannot receive a cached response for free.
             if (!request.isExtensiveResearch()) {
                 stageStart = System.nanoTime();
                 CachedInferenceResponse cached =
@@ -375,12 +382,6 @@ public class GatewayServiceImpl implements GatewayService {
             // -------------------------------
             // Provider Invocation
             // -------------------------------
-
-            if (auth.isPersonalPrincipal()
-                    && "CREDIT".equalsIgnoreCase(aiRequest.getBillingMode())) {
-                creditReservation = personalCreditExecutionService.reserve(
-                        auth, aiRequest, "inference:" + requestId);
-            }
 
             providerInvocationStarted = true;
             providerInvocationStart = System.nanoTime();
@@ -835,8 +836,16 @@ public class GatewayServiceImpl implements GatewayService {
                     .model(aiRequest.getModel())
                     .build());
 
+            if (auth.isPersonalPrincipal()
+                    && "CREDIT".equalsIgnoreCase(aiRequest.getBillingMode())) {
+                creditReservation = personalCreditExecutionService.reserve(
+                        auth, aiRequest, "inference:" + requestId);
+            }
+
             // Phase 10 exact-response cache for streaming requests. Security,
             // policy, PII, RAG, routing and entitlement checks have already run.
+            // CREDIT reservation happens before cache lookup so a zero-credit
+            // account cannot receive a cached response for free.
             if (!request.isExtensiveResearch()) {
                 stageStart = System.nanoTime();
                 CachedInferenceResponse cached = inferenceCacheService.get(auth, aiRequest);
@@ -893,12 +902,6 @@ public class GatewayServiceImpl implements GatewayService {
                             inferenceId, "CACHE_MISS", "CACHE",
                             java.util.Map.of("lookupLatencyMs", cacheLookupLatency));
                 }
-            }
-
-            if (auth.isPersonalPrincipal()
-                    && "CREDIT".equalsIgnoreCase(aiRequest.getBillingMode())) {
-                creditReservation = personalCreditExecutionService.reserve(
-                        auth, aiRequest, "inference:" + requestId);
             }
 
             var provider = providerFactory.getProvider(aiRequest.getProvider());
