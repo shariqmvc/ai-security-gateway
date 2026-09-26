@@ -953,7 +953,7 @@ public class GatewayServiceImpl implements GatewayService {
                                     .phase("PROVIDER_GENERATING")
                                     .provider(currentProvider.name())
                                     .model(currentModel)
-                                    .content(providerLabel(aiRequest.getProvider()) + " is generating…")
+                                    .content(providerLabel(currentProvider) + " is generating…")
                                     .build());
                         }
                         String restored = restoreService.restore(
