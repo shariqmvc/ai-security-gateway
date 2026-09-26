@@ -38,6 +38,10 @@ public class ChatRequest {
    /** Optional Personal execution mode: AUTO, BYOK, CREDIT, FREE. */
    private String billingMode;
 
+   /** Personal security mode: PROTECTED (default), RELAXED, or OFF. */
+   @Builder.Default
+   private String securityMode = "PROTECTED";
+
    /** Optional user-requested capabilities used by intelligent routing. */
    @Builder.Default
    private Set<String> requiredCapabilities = Collections.emptySet();
