@@ -831,6 +831,15 @@ public class GatewayServiceImpl implements GatewayService {
 
             eventConsumer.accept(GatewayStreamEvent.builder()
                     .requestId(requestId)
+                    .type("status")
+                    .phase("PROVIDER_CONNECTING")
+                    .provider(aiRequest.getProvider().name())
+                    .model(aiRequest.getModel())
+                    .content("Connecting to " + providerLabel(aiRequest.getProvider()) + "…")
+                    .build());
+
+            eventConsumer.accept(GatewayStreamEvent.builder()
+                    .requestId(requestId)
                     .type("start")
                     .provider(aiRequest.getProvider().name())
                     .model(aiRequest.getModel())
@@ -924,6 +933,7 @@ public class GatewayServiceImpl implements GatewayService {
             }
             StringBuilder restoredSoFar = new StringBuilder();
             String[] lastEmitted = {""};
+            boolean[] firstDelta = {true};
 
             AIStreamResult result = streamingProvider.stream(
                     aiRequest,
@@ -933,6 +943,17 @@ public class GatewayServiceImpl implements GatewayService {
                         }
 
                         restoredSoFar.append(delta);
+                        if (firstDelta[0]) {
+                            firstDelta[0] = false;
+                            eventConsumer.accept(GatewayStreamEvent.builder()
+                                    .requestId(requestId)
+                                    .type("status")
+                                    .phase("PROVIDER_GENERATING")
+                                    .provider(aiRequest.getProvider().name())
+                                    .model(aiRequest.getModel())
+                                    .content(providerLabel(aiRequest.getProvider()) + " is generating…")
+                                    .build());
+                        }
                         String restored = restoreService.restore(
                                 restoredSoFar.toString(),
                                 requestId);
@@ -1288,6 +1309,16 @@ public class GatewayServiceImpl implements GatewayService {
             }
         }
         return UUID.randomUUID();
+    }
+
+    private String providerLabel(Provider provider) {
+        if (provider == null) return "AI provider";
+        return switch (provider) {
+            case OPENAI -> "OpenAI";
+            case ANTHROPIC -> "Anthropic";
+            case GEMINI -> "Gemini";
+            case OLLAMA -> "Ollama";
+        };
     }
 
     private long elapsedMs(long startNanos) {
