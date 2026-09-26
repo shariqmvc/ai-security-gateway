@@ -67,8 +67,8 @@ public class PersonalRagService {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM PERSONAL_KNOWLEDGE_BASES WHERE personal_account_id=? AND lower(name)=lower(?)", Integer.class, account, name);
         if (count != null && count > 0) throw new BusinessException("Knowledge base already exists: " + name);
         UUID id = UUID.randomUUID(); LocalDateTime now = LocalDateTime.now();
-        jdbc.update("INSERT INTO PERSONAL_KNOWLEDGE_BASES (id,personal_account_id,name,description,status,embedding_provider,embedding_model,vector_store,chunking_strategy,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                id, account, name, req.getDescription(), KnowledgeBaseStatus.ACTIVE.name(), trim(req.getEmbeddingProvider()), trim(req.getEmbeddingModel()),
+        jdbc.update("INSERT INTO PERSONAL_KNOWLEDGE_BASES (id,personal_account_id,name,description,provider_scope,status,embedding_provider,embedding_model,vector_store,chunking_strategy,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                id, account, name, req.getDescription(), normalizeProviderScope(req.getProviderScope()), KnowledgeBaseStatus.ACTIVE.name(), trim(req.getEmbeddingProvider()), trim(req.getEmbeddingModel()),
                 blank(req.getVectorStore()) ? "PGVECTOR" : req.getVectorStore().trim(),
                 (req.getChunkingStrategy() == null ? ChunkingStrategy.TOKEN_AWARE : req.getChunkingStrategy()).name(), now, now);
         return get(context, id);
@@ -169,6 +169,7 @@ public class PersonalRagService {
     @Transactional(readOnly = true)
     public RagSearchResponse search(AuthenticationContext context, UUID kbId, RagSearchRequest req) {
         authorize(context); UUID account=account(context); Map<String,Object> k=kb(account,kbId);
+        enforceProviderScope(k, req == null ? null : req.getProviderScope());
         if(!KnowledgeBaseStatus.ACTIVE.name().equals(k.get("status"))) throw new BusinessException("Cannot search an archived knowledge base: "+kbId);
         if(!"PGVECTOR".equalsIgnoreCase(String.valueOf(k.get("vector_store")))) throw new BusinessException("RAG retrieval requires vectorStore=PGVECTOR.");
         if(req==null||blank(req.getQuery())) throw new BusinessException("Search query is required.");
@@ -295,13 +296,31 @@ public class PersonalRagService {
         } catch(Exception e){ markFailed(account,docId,e.getMessage()); }
     }
 
+    private void enforceProviderScope(Map<String,Object> kb, String requestedScope){
+        String scope = blank((String) kb.get("provider_scope")) ? "GLOBAL" : String.valueOf(kb.get("provider_scope")).toUpperCase(Locale.ROOT);
+        String requested = blank(requestedScope) ? "GLOBAL" : requestedScope.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("GLOBAL","OPENAI","ANTHROPIC","GEMINI","OLLAMA").contains(requested)) {
+            throw new BusinessException("Unsupported RAG provider scope: " + requested);
+        }
+        if (!"GLOBAL".equals(scope) && !scope.equals(requested)) {
+            throw new BusinessException("Knowledge base is scoped to " + scope + " and cannot be used for " + requested + " inference.");
+        }
+    }
+
     private Map<String,Object> kb(UUID account,UUID id){try{return jdbc.queryForMap("SELECT * FROM PERSONAL_KNOWLEDGE_BASES WHERE id=? AND personal_account_id=?",id,account);}catch(Exception e){throw new BusinessException("Knowledge base not found: "+id);}}
     private Map<String,Object> document(UUID account,UUID kbId,UUID id){try{return jdbc.queryForMap("SELECT * FROM PERSONAL_RAG_DOCUMENTS WHERE id=? AND personal_account_id=? AND knowledge_base_id=?",id,account,kbId);}catch(Exception e){throw new BusinessException("RAG document not found: "+id);}}
     private void ensureKb(UUID account,UUID id){kb(account,id);}
     private UUID account(AuthenticationContext c){if(c==null||!c.isPersonalPrincipal()||c.getPersonalAccountId()==null) throw new BusinessException("Personal authentication is required.");return c.getPersonalAccountId();}
     private void markFailed(UUID account,UUID id,String msg){String m=msg==null?"RAG processing failed.":msg; try { jdbc.update("UPDATE PERSONAL_RAG_DOCUMENTS SET status=?,error_message=?,updated_at=? WHERE id=? AND personal_account_id=?",DocumentStatus.FAILED.name(),m.substring(0,Math.min(2000,m.length())),LocalDateTime.now(),id,account); } catch(Exception updateError) { log.error("Unable to mark Personal RAG document {} as FAILED",id,updateError); }}
-    private KnowledgeBaseResponse mapKb(java.sql.ResultSet rs)throws java.sql.SQLException{return KnowledgeBaseResponse.builder().id(rs.getObject("id",UUID.class)).name(rs.getString("name")).description(rs.getString("description")).status(KnowledgeBaseStatus.valueOf(rs.getString("status"))).embeddingProvider(rs.getString("embedding_provider")).embeddingModel(rs.getString("embedding_model")).vectorStore(rs.getString("vector_store")).chunkingStrategy(ChunkingStrategy.valueOf(rs.getString("chunking_strategy"))).createdAt(rs.getTimestamp("created_at").toLocalDateTime()).updatedAt(rs.getTimestamp("updated_at").toLocalDateTime()).build();}
+    private KnowledgeBaseResponse mapKb(java.sql.ResultSet rs)throws java.sql.SQLException{return KnowledgeBaseResponse.builder().id(rs.getObject("id",UUID.class)).name(rs.getString("name")).description(rs.getString("description")).providerScope(rs.getString("provider_scope")).status(KnowledgeBaseStatus.valueOf(rs.getString("status"))).embeddingProvider(rs.getString("embedding_provider")).embeddingModel(rs.getString("embedding_model")).vectorStore(rs.getString("vector_store")).chunkingStrategy(ChunkingStrategy.valueOf(rs.getString("chunking_strategy"))).createdAt(rs.getTimestamp("created_at").toLocalDateTime()).updatedAt(rs.getTimestamp("updated_at").toLocalDateTime()).build();}
     private DocumentResponse mapDoc(java.sql.ResultSet rs)throws java.sql.SQLException{return DocumentResponse.builder().id(rs.getObject("id",UUID.class)).knowledgeBaseId(rs.getObject("knowledge_base_id",UUID.class)).fileName(rs.getString("file_name")).contentType(rs.getString("content_type")).fileSizeBytes(rs.getObject("file_size_bytes",Long.class)).checksumSha256(rs.getString("checksum_sha256")).status(DocumentStatus.valueOf(rs.getString("status"))).chunkCount(rs.getInt("chunk_count")).errorMessage(rs.getString("error_message")).createdAt(rs.getTimestamp("created_at").toLocalDateTime()).updatedAt(rs.getTimestamp("updated_at").toLocalDateTime()).build();}
+    private String normalizeProviderScope(String value){
+        String scope = blank(value) ? "GLOBAL" : value.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("GLOBAL","OPENAI","ANTHROPIC","GEMINI","OLLAMA").contains(scope)) {
+            throw new BusinessException("Unsupported knowledge base provider scope: " + scope);
+        }
+        return scope;
+    }
     private String trim(String s){return blank(s)?null:s.trim();} private boolean blank(String s){return s==null||s.isBlank();}
     private String safeFileName(String s){if(blank(s))throw new BusinessException("Document file name is required.");String n=Paths.get(s).getFileName().toString().trim();if(blank(n)||n.contains(".."))throw new BusinessException("Invalid document file name.");return n;}
     private String sha256(byte[] b){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
