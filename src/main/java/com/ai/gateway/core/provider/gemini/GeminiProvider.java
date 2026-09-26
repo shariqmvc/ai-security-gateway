@@ -45,6 +45,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
         this.geminiConfig = geminiConfig;
         this.performanceLogger = performanceLogger;
         this.mediaUrlFetcher = mediaUrlFetcher;
+        this.objectMapper = objectMapper;
     }
 
     private final RestTemplate restTemplate;
