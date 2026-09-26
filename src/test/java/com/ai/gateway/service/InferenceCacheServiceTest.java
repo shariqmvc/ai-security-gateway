@@ -23,6 +23,8 @@ class InferenceCacheServiceTest {
     private InferenceCacheService cache;
     private AuthenticationContext tenantA;
     private AuthenticationContext tenantB;
+    private AuthenticationContext personalA;
+    private AuthenticationContext personalB;
 
     @BeforeEach
     void setUp() {
@@ -40,6 +42,16 @@ class InferenceCacheServiceTest {
         tenantB = AuthenticationContext.builder()
                 .tenantId(UUID.randomUUID())
                 .tenantCode("TENANT-B")
+                .build();
+
+        personalA = AuthenticationContext.builder()
+                .personalPrincipal(true)
+                .personalAccountId(UUID.randomUUID())
+                .build();
+
+        personalB = AuthenticationContext.builder()
+                .personalPrincipal(true)
+                .personalAccountId(UUID.randomUUID())
                 .build();
     }
 
@@ -68,6 +80,18 @@ class InferenceCacheServiceTest {
                 new CachedInferenceResponse("tenant-a", Provider.GEMINI, "gemini-3.6-flash"));
 
         assertNull(cache.get(tenantB, request));
+    }
+
+    @Test
+    void supportsPersonalAccountIsolationWithoutTenantId() {
+        AIRequest request = request("hello", Provider.OLLAMA, "llama3.2:3b");
+        CachedInferenceResponse response =
+                new CachedInferenceResponse("personal-a", Provider.OLLAMA, "llama3.2:3b");
+
+        cache.put(personalA, request, response);
+
+        assertEquals(response, cache.get(personalA, request));
+        assertNull(cache.get(personalB, request));
     }
 
     @Test
