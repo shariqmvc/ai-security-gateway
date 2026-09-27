@@ -41,8 +41,8 @@ public class ModelRegistryImpl implements ModelRegistry {
         this(
                 providerFactory,
                 new OllamaConfig(),
-                "VISION,AUDIO,TOOLS,REASONING,DOCUMENT_INPUT",
-                "VISION,AUDIO,TOOLS,REASONING,DOCUMENT_INPUT",
+                "VISION,AUDIO,TOOLS,REASONING",
+                "VISION,AUDIO,TOOLS,REASONING,DOCUMENT_INPUT"
                 "",
                 "VISION,AUDIO,TOOLS,REASONING",
                 new ModelContextWindowProperties());
