@@ -135,6 +135,8 @@ public class ModelRegistryImpl implements ModelRegistry {
 
     private Set<String> capabilitiesFor(
             Provider provider,
+            String model,
+            OllamaConfig ollamaConfig,
             String openAi,
             String gemini,
             String ollama,
@@ -156,6 +158,16 @@ public class ModelRegistryImpl implements ModelRegistry {
                     result.add(capability.trim().toUpperCase());
                 }
             }
+        }
+
+        // Ollama is intentionally model-specific. A vision model is the
+        // exception, not a provider-wide capability.
+        if (provider == Provider.OLLAMA
+                && ollamaConfig != null
+                && ollamaConfig.getVisionModel() != null
+                && !ollamaConfig.getVisionModel().isBlank()
+                && ollamaConfig.getVisionModel().trim().equals(model)) {
+            result.add(ModelCapabilities.VISION);
         }
 
         return Set.copyOf(result);
