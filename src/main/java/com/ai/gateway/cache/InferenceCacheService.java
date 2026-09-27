@@ -182,6 +182,7 @@ public class InferenceCacheService {
             canonical.put("provider", providerName(request.getProvider()));
             canonical.put("model", request.getModel());
             canonical.put("prompt", request.getPrompt());
+            canonical.put("conversationContext", request.getConversationContext());
             canonical.put("media", request.getMedia());
 
             byte[] payload = objectMapper.writeValueAsBytes(canonical);
