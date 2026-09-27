@@ -169,7 +169,8 @@ public class PersonalProviderConnectionServiceImpl
                 case OPENAI -> validateOpenAi(apiKey);
                 case GEMINI -> validateGemini(apiKey);
                 case CLAUDE -> validateAnthropic(apiKey);
-                case XAI, GROQ -> validateOpenAiCompatible(apiKey);
+                case XAI -> validateOpenAiCompatible(apiKey, "https://api.x.ai/v1/models");
+                case GROQ -> validateOpenAiCompatible(apiKey, "https://api.groq.com/openai/v1/models");
                 case OLLAMA -> throw new PersonalProviderConnectionException(
                         "OLLAMA is local infrastructure and is not a Personal BYOK provider.");
                 default -> throw new PersonalProviderConnectionException(
@@ -190,11 +191,12 @@ public class PersonalProviderConnectionServiceImpl
         }
     }
 
-    private void validateOpenAiCompatible(String apiKey) {
-        RestClient.create("https://api.x.ai")
-                .get().uri("/v1/models")
+    private void validateOpenAiCompatible(String apiKey, String modelsUrl) {
+        RestClient.create(modelsUrl)
+                .get()
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .retrieve().toBodilessEntity();
+                .retrieve()
+                .toBodilessEntity();
     }
 
     private void validateOpenAi(String apiKey) {
