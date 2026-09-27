@@ -28,6 +28,14 @@ public class OllamaConfig {
      */
     private List<String> models = new ArrayList<>();
 
+    /**
+     * Ollama model advertised by the gateway as vision-capable.
+     *
+     * This is deliberately model-specific: regular Ollama text models must
+     * not inherit VISION merely because another Ollama model supports images.
+     */
+    private String visionModel;
+
     /** Maximum context window sent to Ollama for gateway requests. */
     private Integer numCtx = 4096;
 
