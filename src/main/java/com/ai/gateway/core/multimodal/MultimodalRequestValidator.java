@@ -126,6 +126,15 @@ public class MultimodalRequestValidator {
             throw new MultimodalValidationException(
                     "AUDIO media requires an audio/* MIME type.");
         }
+
+        if (item.getType() == MediaTypeKind.DOCUMENT
+                && (mimeType.startsWith("image/")
+                || mimeType.startsWith("audio/")
+                || mimeType.startsWith("video/"))) {
+
+            throw new MultimodalValidationException(
+                    "DOCUMENT media requires a document or text MIME type.");
+        }
     }
 
     private void validateBase64(String data) {
