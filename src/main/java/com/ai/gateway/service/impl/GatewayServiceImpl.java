@@ -228,6 +228,22 @@ public class GatewayServiceImpl implements GatewayService {
                             maskedPrompt,
                             request.getRag());
             String contextInputPrompt = ragResult.getAugmentedPrompt();
+            performanceLogger.stage(
+                    "RAG_AUGMENTATION",
+                    requestId,
+                    elapsedMs(stageStart),
+                    request.getRag() != null && request.getRag().isEnabled()
+                            ? "ENABLED"
+                            : "DISABLED");
+            if (personalInferencePersistenceService != null && request.getRag() != null && request.getRag().isEnabled()) {
+                personalInferencePersistenceService.retrievals(inferenceId, ragResult);
+                personalInferencePersistenceService.event(
+                        inferenceId, "RAG_RETRIEVAL", "RAG",
+                        java.util.Map.of(
+                                "retrievedCount", ragResult.getRetrievedCount(),
+                                "selectedCount", ragResult.getSelectedCount(),
+                                "estimatedContextTokens", ragResult.getEstimatedContextTokens()));
+            }
             stageStart = System.nanoTime();
             // Optimize the complete multi-turn request only after RAG has
             // produced the current-turn prompt. This preserves both the
@@ -766,6 +782,22 @@ public class GatewayServiceImpl implements GatewayService {
                             maskedPrompt,
                             request.getRag());
             String contextInputPrompt = ragResult.getAugmentedPrompt();
+            performanceLogger.stage(
+                    "RAG_AUGMENTATION",
+                    requestId,
+                    elapsedMs(stageStart),
+                    request.getRag() != null && request.getRag().isEnabled()
+                            ? "ENABLED"
+                            : "DISABLED");
+            if (personalInferencePersistenceService != null && request.getRag() != null && request.getRag().isEnabled()) {
+                personalInferencePersistenceService.retrievals(inferenceId, ragResult);
+                personalInferencePersistenceService.event(
+                        inferenceId, "RAG_RETRIEVAL", "RAG",
+                        java.util.Map.of(
+                                "retrievedCount", ragResult.getRetrievedCount(),
+                                "selectedCount", ragResult.getSelectedCount(),
+                                "estimatedContextTokens", ragResult.getEstimatedContextTokens()));
+            }
             stageStart = System.nanoTime();
             // Optimize the complete multi-turn request only after RAG has
             // produced the current-turn prompt. This preserves both the
