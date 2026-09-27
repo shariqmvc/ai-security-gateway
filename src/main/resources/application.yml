@@ -146,6 +146,18 @@ gateway:
           connect-timeout: ${GATEWAY_GEMINI_CONNECT_TIMEOUT:5s}
           read-timeout: ${GATEWAY_GEMINI_READ_TIMEOUT:15s}
 
+        ANTHROPIC:
+          connect-timeout: ${GATEWAY_ANTHROPIC_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_ANTHROPIC_READ_TIMEOUT:60s}
+
+        XAI:
+          connect-timeout: ${GATEWAY_XAI_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_XAI_READ_TIMEOUT:60s}
+
+        GROQ:
+          connect-timeout: ${GATEWAY_GROQ_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_GROQ_READ_TIMEOUT:60s}
+
         OPENAI:
           connect-timeout: ${GATEWAY_OPENAI_CONNECT_TIMEOUT:5s}
           read-timeout: ${GATEWAY_OPENAI_READ_TIMEOUT:30s}
@@ -179,6 +191,12 @@ gateway:
       providers:
         GEMINI:
           - OLLAMA
+        ANTHROPIC:
+          - GEMINI
+        XAI:
+          - GEMINI
+        GROQ:
+          - OLLAMA
         OPENAI:
           - GEMINI
         OLLAMA:
@@ -197,7 +215,9 @@ gateway:
       openai: ${GATEWAY_OPENAI_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING}
       gemini: ${GATEWAY_GEMINI_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING,DOCUMENT_INPUT}
       ollama: ${GATEWAY_OLLAMA_MODEL_CAPABILITIES:}
-      claude: ${GATEWAY_CLAUDE_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING}
+      claude: ${GATEWAY_CLAUDE_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
+      xai: ${GATEWAY_XAI_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
+      groq: ${GATEWAY_GROQ_MODEL_CAPABILITIES:TOOLS,REASONING}
 
     # Model-aware context budgets. Exact model entries override provider defaults.
     context-windows:
@@ -207,6 +227,8 @@ gateway:
         GEMINI: ${GATEWAY_GEMINI_CONTEXT_WINDOW:128000}
         OLLAMA: ${OLLAMA_NUM_CTX:4096}
         CLAUDE: ${GATEWAY_CLAUDE_CONTEXT_WINDOW:200000}
+        XAI: ${GATEWAY_XAI_CONTEXT_WINDOW:500000}
+        GROQ: ${GATEWAY_GROQ_CONTEXT_WINDOW:131072}
       models: {}
 
     scoring:
@@ -295,6 +317,8 @@ alroute:
         - OPENAI
         - GEMINI
         - CLAUDE
+        - XAI
+        - GROQ
         - OLLAMA
         - CHAT
         - STREAMING
@@ -340,3 +364,7 @@ alroute:
         base-url: ${ALROUTE_PERSONAL_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
       anthropic:
         base-url: ${ALROUTE_PERSONAL_ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      xai:
+        base-url: ${ALROUTE_PERSONAL_XAI_BASE_URL:https://api.x.ai}
+      groq:
+        base-url: ${ALROUTE_PERSONAL_GROQ_BASE_URL:https://api.groq.com}
