@@ -337,6 +337,12 @@ public class GatewayServiceImpl implements GatewayService {
                             .build();
 
                     String restored = restoreResponse(requestId, cachedResponse);
+
+                    if (creditReservation != null) {
+                        personalCreditExecutionService.releaseOnFailure(creditReservation);
+                        creditReservation = null;
+                    }
+
                     performanceLogger.stage(
                             "RESPONSE_RESTORE",
                             requestId,
@@ -896,6 +902,12 @@ public class GatewayServiceImpl implements GatewayService {
                                     .latencyMs(cacheLookupLatency).build())
                             .build();
                     String restored = restoreResponse(requestId, cachedResponse);
+
+                    if (creditReservation != null) {
+                        personalCreditExecutionService.releaseOnFailure(creditReservation);
+                        creditReservation = null;
+                    }
+
                     eventConsumer.accept(GatewayStreamEvent.builder()
                             .requestId(requestId).type("delta").content(restored).build());
                     long latency = elapsedMs(start);
