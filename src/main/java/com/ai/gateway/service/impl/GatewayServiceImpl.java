@@ -1,6 +1,7 @@
 package com.ai.gateway.service.impl;
 
 import com.ai.gateway.authentication.AuthenticationConstants;
+import com.ai.gateway.context.ConversationContextAssembler;
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.dto.*;
 import com.ai.gateway.entitlement.annotation.RequiresFeature;
@@ -82,6 +83,8 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final MultimodalRequestValidator multimodalRequestValidator;
 
+    private final ConversationContextAssembler conversationContextAssembler;
+
     private final InferenceCacheService inferenceCacheService;
 
     private final AIProviderFactory providerFactory;
@@ -149,6 +152,7 @@ public class GatewayServiceImpl implements GatewayService {
                             maskedPrompt,
                             request.getRag());
             String providerPrompt = ragResult.getAugmentedPrompt();
+            String conversationContext = buildConversationContext(requestId, request.getContextMessages());
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
@@ -163,7 +167,8 @@ public class GatewayServiceImpl implements GatewayService {
                             requestId,
                             request,
                             auth,
-                            providerPrompt);
+                            providerPrompt,
+                            conversationContext);
 
             performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
 
@@ -450,7 +455,8 @@ public class GatewayServiceImpl implements GatewayService {
                     requestId,
                     request,
                     auth,
-                    providerPrompt);
+                    providerPrompt,
+                    conversationContext);
             performanceLogger.stage(
                     "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
 
@@ -815,7 +821,8 @@ public class GatewayServiceImpl implements GatewayService {
 
     private MaskingResult maskPrompt(
             UUID requestId,
-            String prompt) {
+            String prompt,
+            String conversationContext) {
 
         MaskingResult result =
                 piiDetectionService.mask(prompt);
@@ -901,7 +908,8 @@ public class GatewayServiceImpl implements GatewayService {
             return AIRequest.builder()
                     .provider(selectedProvider)
                     .model(selectedModel)
-                    .prompt(prompt)
+                    .prompt(conversationContextAssembler.combine(conversationContext, prompt))
+                    .conversationContext(conversationContext)
                     .routingDecisionMetadata(routingDecision.metadata())
                     .routingStrategy(routingDecision.strategy())
                     .media(request.getMedia())
@@ -921,6 +929,27 @@ public class GatewayServiceImpl implements GatewayService {
 
             throw ex;
         }
+    }
+
+    private String buildConversationContext(UUID requestId, java.util.List<ChatMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return "";
+        }
+
+        java.util.List<ChatMessage> maskedMessages = new java.util.ArrayList<>(messages.size());
+        for (ChatMessage message : messages) {
+            if (message == null || message.getContent() == null || message.getContent().isBlank()) {
+                continue;
+            }
+
+            MaskingResult result = maskPrompt(requestId, message.getContent());
+            maskedMessages.add(ChatMessage.builder()
+                    .role(message.getRole())
+                    .content(result.getMaskedPrompt())
+                    .build());
+        }
+
+        return conversationContextAssembler.assemble(maskedMessages);
     }
 
     private void addMultimodalCapabilities(ChatRequest request) {
