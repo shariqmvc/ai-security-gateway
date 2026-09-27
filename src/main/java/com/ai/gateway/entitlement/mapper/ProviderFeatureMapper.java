@@ -16,6 +16,8 @@ public final class ProviderFeatureMapper {
             case OPENAI -> Feature.OPENAI;
             case GEMINI -> Feature.GEMINI;
             case CLAUDE -> Feature.CLAUDE;
+            case XAI -> Feature.XAI;
+            case GROQ -> Feature.GROQ;
             case OLLAMA -> Feature.OLLAMA;
 
         };
