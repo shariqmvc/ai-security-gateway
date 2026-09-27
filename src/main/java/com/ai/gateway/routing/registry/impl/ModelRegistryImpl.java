@@ -81,6 +81,8 @@ public class ModelRegistryImpl implements ModelRegistry {
                             ModelStatus.ENABLED,
                             capabilitiesFor(
                                     provider,
+                                    model,
+                                    ollamaConfig,
                                     openAiCapabilities,
                                     geminiCapabilities,
                                     ollamaCapabilities,
