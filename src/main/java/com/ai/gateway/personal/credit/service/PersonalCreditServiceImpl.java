@@ -193,6 +193,11 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
         PersonalCreditReservation reservation = reservationRepository.findByIdForUpdate(reservationId)
                 .orElseThrow(() -> new PersonalCreditException("Credit reservation not found."));
+        if (reservation.getStatus() == PersonalCreditReservationStatus.CAPTURED
+                || reservation.getStatus() == PersonalCreditReservationStatus.RELEASED) {
+            // Failure cleanup is idempotent after capture/release.
+            return reservation;
+        }
         if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED) {
             throw new PersonalCreditException("Credit reservation is no longer active.");
         }
