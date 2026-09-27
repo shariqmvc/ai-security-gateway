@@ -17,6 +17,10 @@ public class AIRequest {
     private String model;
     private String prompt;
 
+    /** Bounded conversation history already assembled into the provider prompt. */
+    @Builder.Default
+    private String conversationContext = "";
+
     @Builder.Default
     private List<MediaContent> media = Collections.emptyList();
 
