@@ -105,6 +105,8 @@ public class ModelRegistryImpl implements ModelRegistry {
                             ModelStatus.ENABLED,
                             capabilitiesFor(
                                     provider,
+                                    model,
+                                    ollamaConfig,
                                     openAiCapabilities,
                                     geminiCapabilities,
                                     ollamaCapabilities,
@@ -162,6 +164,8 @@ public class ModelRegistryImpl implements ModelRegistry {
 
     private Set<String> capabilitiesFor(
             Provider provider,
+            String model,
+            OllamaConfig ollamaConfig,
             String openAi,
             String gemini,
             String ollama,
@@ -183,6 +187,14 @@ public class ModelRegistryImpl implements ModelRegistry {
                     result.add(capability.trim().toUpperCase());
                 }
             }
+        }
+
+        if (provider == Provider.OLLAMA
+                && ollamaConfig != null
+                && ollamaConfig.getVisionModel() != null
+                && !ollamaConfig.getVisionModel().isBlank()
+                && ollamaConfig.getVisionModel().trim().equals(model)) {
+            result.add(ModelCapabilities.VISION);
         }
 
         return Set.copyOf(result);
