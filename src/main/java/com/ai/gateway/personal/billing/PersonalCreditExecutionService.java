@@ -36,7 +36,9 @@ public class PersonalCreditExecutionService {
         requirePersonal(context);
 
         int inputTokens = estimateInputTokens(request.getPrompt());
-        int outputTokens = Math.max(0, properties.getReserveOutputTokens());
+        // Reserve enough output headroom for normal provider variance. The
+        // configured value remains an override when it is larger.
+        int outputTokens = Math.max(4096, properties.getReserveOutputTokens());
 
         PreRequestCostEstimate estimate = costEstimator.estimate(
                 PreRequestCostRequest.builder()
