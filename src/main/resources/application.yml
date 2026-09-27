@@ -73,6 +73,10 @@ ollama:
   models:
     - ${OLLAMA_MODEL:llama3.1:8b}
     - ${OLLAMA_MODEL_2:llama3.2:3b}
+    - ${OLLAMA_VISION_MODEL:qwen2.5vl:3b}
+  # Vision-capable Ollama model used for image requests when the selected
+  # model does not advertise VISION.
+  vision-model: ${OLLAMA_VISION_MODEL:qwen2.5vl:3b}
   # Keep the local model resident between requests and cap generation so
   # provider latency cannot grow without bound. Override per environment.
   keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
@@ -313,7 +317,7 @@ alroute:
       # Personal FREE is intentionally limited to locally hosted Ollama models.
       # Override ALROUTE_PERSONAL_FREE_MODELS per environment when the local
       # Ollama catalog differs.
-      free-models: ${ALROUTE_PERSONAL_FREE_MODELS:OLLAMA:llama3.1:8b,OLLAMA:llama3.2:3b}
+      free-models: ${ALROUTE_PERSONAL_FREE_MODELS:OLLAMA:llama3.1:8b,OLLAMA:llama3.2:3b,OLLAMA:qwen2.5vl:3b}
       reserve-output-tokens: ${ALROUTE_PERSONAL_RESERVE_OUTPUT_TOKENS:1024}
       reservation-multiplier: ${ALROUTE_PERSONAL_RESERVATION_MULTIPLIER:1.25}
       minimum-credit-charge: ${ALROUTE_PERSONAL_MINIMUM_CREDIT_CHARGE:0.01}
