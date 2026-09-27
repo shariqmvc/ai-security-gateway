@@ -228,7 +228,7 @@ public class GatewayServiceImpl implements GatewayService {
                             maskedPrompt,
                             request.getRag());
             String contextInputPrompt = ragResult.getAugmentedPrompt();
-
+            stageStart = System.nanoTime();
             // Optimize the complete multi-turn request only after RAG has
             // produced the current-turn prompt. This preserves both the
             // conversation history and any retrieved knowledge in one bounded
@@ -268,23 +268,6 @@ public class GatewayServiceImpl implements GatewayService {
                                 "optimizedTokens", contextOptimization.getOptimizedTokens(),
                                 "tokensSaved", contextOptimization.getTokensSaved()));
             }
-            performanceLogger.stage(
-                    "RAG_AUGMENTATION",
-                    requestId,
-                    elapsedMs(stageStart),
-                    request.getRag() != null && request.getRag().isEnabled()
-                            ? "ENABLED"
-                            : "DISABLED");
-            if (personalInferencePersistenceService != null && request.getRag() != null && request.getRag().isEnabled()) {
-                personalInferencePersistenceService.retrievals(inferenceId, ragResult);
-                personalInferencePersistenceService.event(
-                        inferenceId, "RAG_RETRIEVAL", "RAG",
-                        java.util.Map.of(
-                                "retrievedCount", ragResult.getRetrievedCount(),
-                                "selectedCount", ragResult.getSelectedCount(),
-                                "estimatedContextTokens", ragResult.getEstimatedContextTokens()));
-            }
-
             if (auth.isPersonalPrincipal()) {
                 aiRequest.setBillingMode(personalBillingModeResolver
                         .resolve(auth, aiRequest.getProvider(), aiRequest.getModel(), request.getBillingMode())
@@ -783,7 +766,7 @@ public class GatewayServiceImpl implements GatewayService {
                             maskedPrompt,
                             request.getRag());
             String contextInputPrompt = ragResult.getAugmentedPrompt();
-
+            stageStart = System.nanoTime();
             // Optimize the complete multi-turn request only after RAG has
             // produced the current-turn prompt. This preserves both the
             // conversation history and any retrieved knowledge in one bounded
