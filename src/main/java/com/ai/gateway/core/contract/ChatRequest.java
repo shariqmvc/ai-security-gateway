@@ -42,6 +42,10 @@ public class ChatRequest {
    @Builder.Default
    private String securityMode = "PROTECTED";
 
+   /** AIRouter file processing strategy: AUTO, DIRECT_PROVIDER, or RAG. */
+   @Builder.Default
+   private String fileProcessingMode = "AUTO";
+
    /** Optional user-requested capabilities used by intelligent routing. */
    @Builder.Default
    private Set<String> requiredCapabilities = Collections.emptySet();
