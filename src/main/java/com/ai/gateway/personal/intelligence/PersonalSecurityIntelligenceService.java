@@ -49,13 +49,13 @@ public class PersonalSecurityIntelligenceService {
     public PersonalSecurityAssessment assess(UUID requestId, String prompt) {
         if (firewallProperties.isEnabled()) {
             PersonalFirewallDetection detection = firewallClient.detect(requestId, prompt);
-            return fromFirewall(detection);
+            return fromFirewall(detection, prompt);
         }
 
         return assessLegacy(prompt);
     }
 
-    private PersonalSecurityAssessment fromFirewall(PersonalFirewallDetection detection) {
+    private PersonalSecurityAssessment fromFirewall(PersonalFirewallDetection detection, String prompt) {
         PersonalSecurityRisk risk = parseRisk(detection.risk());
         boolean maliciousLabel = detection.labels().stream()
                 .anyMatch(label -> label != null && !"BENIGN".equalsIgnoreCase(label));
@@ -68,11 +68,41 @@ public class PersonalSecurityIntelligenceService {
                 risk,
                 detection.signals(),
                 detection.labels(),
-                detection.decision(),
+                decision,
                 detection.model(),
                 detection.modelVersion(),
                 Math.round(Math.max(0.0d, detection.latencyMs()))
         );
+    }
+
+    /**
+     * Legitimate attachment-analysis requests must not be confused with
+     * requests to reveal AIRouter's own system/developer instructions.
+     *
+     * <p>This guard is intentionally narrow: it only applies to the
+     * SYSTEM_PROMPT_EXTRACTION label and only to a short, simple file-analysis
+     * request. Any explicit system/developer prompt extraction language still
+     * goes to the normal blocking path.</p>
+     */
+    static boolean isBenignFileAnalysisRequest(String prompt) {
+        if (prompt == null) {
+            return false;
+        }
+
+        String value = prompt.trim().toLowerCase(Locale.ROOT);
+        if (value.length() > 300
+                || value.contains("system prompt")
+                || value.contains("developer message")
+                || value.contains("hidden instruction")
+                || value.contains("internal instruction")
+                || value.contains("reveal")
+                || value.contains("ignore all previous")
+                || value.contains("bypass")) {
+            return false;
+        }
+
+        return value.matches(
+                "please\\s+(analyze|summarize|review|inspect|explain|extract)\\s+the\\s+attached\\s+(image|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|zip)\\s*(file|archive)?(\\s+and\\s+its\\s+contents)?\\.?");
     }
 
     private PersonalSecurityRisk parseRisk(String value) {
