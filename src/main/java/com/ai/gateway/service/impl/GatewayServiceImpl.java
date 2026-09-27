@@ -822,8 +822,7 @@ public class GatewayServiceImpl implements GatewayService {
 
     private MaskingResult maskPrompt(
             UUID requestId,
-            String prompt,
-            String conversationContext) {
+            String prompt) {
 
         MaskingResult result =
                 piiDetectionService.mask(prompt);
@@ -840,7 +839,8 @@ public class GatewayServiceImpl implements GatewayService {
             UUID requestId,
             ChatRequest request,
             AuthenticationContext auth,
-            String prompt) {
+            String prompt,
+            String conversationContext) {
 
         try {
             RoutingDecision routingDecision =
