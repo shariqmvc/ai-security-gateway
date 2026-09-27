@@ -62,6 +62,10 @@ ollama:
   models:
     - ${OLLAMA_MODEL:llama3.1:8b}
     - ${OLLAMA_MODEL_2:llama3.2:3b}
+    - ${OLLAMA_VISION_MODEL:qwen2.5vl:3b}
+  # Vision-capable Ollama model used for image requests when the selected
+  # model does not advertise VISION.
+  vision-model: ${OLLAMA_VISION_MODEL:qwen2.5vl:3b}
   # Keep the local model resident between requests and cap generation so
   # provider latency cannot grow without bound. Override per environment.
   keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
