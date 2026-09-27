@@ -219,16 +219,31 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             stageStart = System.nanoTime();
+            // RAG retrieval uses only the current masked user query. It must
+            // not use the entire conversation because historical turns can be
+            // unrelated to the document the user is asking about.
+            RagAugmentationResult ragResult =
+                    ragAugmentationService.augment(
+                            auth,
+                            maskedPrompt,
+                            request.getRag());
+            String contextInputPrompt = ragResult.getAugmentedPrompt();
+
+            // Optimize the complete multi-turn request only after RAG has
+            // produced the current-turn prompt. This preserves both the
+            // conversation history and any retrieved knowledge in one bounded
+            // provider context.
             ContextOptimizationResult contextOptimization =
-                    optimizeContext(request, maskedPrompt, aiRequest);
+                    optimizeContext(request, contextInputPrompt, aiRequest);
             if (contextOptimization == null) {
-                contextOptimization = noOpContextOptimization(maskedPrompt);
+                contextOptimization = noOpContextOptimization(contextInputPrompt);
             }
             estimatedInputTokens = contextOptimization.getOriginalTokens();
             estimatedOptimizedTokens = contextOptimization.getOptimizedTokens();
             estimatedTokensSaved = contextOptimization.getTokensSaved();
             contextWindowTokens = resolveContextWindow(aiRequest);
             String providerPrompt = contextOptimization.getOptimizedContext();
+            aiRequest.setPrompt(providerPrompt);
             performanceLogger.stage(
                     "CONTEXT_OPTIMIZATION",
                     requestId,
@@ -253,18 +268,6 @@ public class GatewayServiceImpl implements GatewayService {
                                 "optimizedTokens", contextOptimization.getOptimizedTokens(),
                                 "tokensSaved", contextOptimization.getTokensSaved()));
             }
-
-            stageStart = System.nanoTime();
-            // RAG retrieval must use the current masked user query, not the
-            // fully assembled multi-turn provider context. Historical turns can
-            // be unrelated to the document the user is asking about.
-            RagAugmentationResult ragResult =
-                    ragAugmentationService.augment(
-                            auth,
-                            maskedPrompt,
-                            request.getRag());
-            providerPrompt = ragResult.getAugmentedPrompt();
-            aiRequest.setPrompt(providerPrompt);
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
@@ -771,16 +774,31 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             stageStart = System.nanoTime();
+            // RAG retrieval uses only the current masked user query. It must
+            // not use the entire conversation because historical turns can be
+            // unrelated to the document the user is asking about.
+            RagAugmentationResult ragResult =
+                    ragAugmentationService.augment(
+                            auth,
+                            maskedPrompt,
+                            request.getRag());
+            String contextInputPrompt = ragResult.getAugmentedPrompt();
+
+            // Optimize the complete multi-turn request only after RAG has
+            // produced the current-turn prompt. This preserves both the
+            // conversation history and any retrieved knowledge in one bounded
+            // provider context.
             ContextOptimizationResult contextOptimization =
-                    optimizeContext(request, maskedPrompt, aiRequest);
+                    optimizeContext(request, contextInputPrompt, aiRequest);
             if (contextOptimization == null) {
-                contextOptimization = noOpContextOptimization(maskedPrompt);
+                contextOptimization = noOpContextOptimization(contextInputPrompt);
             }
             estimatedInputTokens = contextOptimization.getOriginalTokens();
             estimatedOptimizedTokens = contextOptimization.getOptimizedTokens();
             estimatedTokensSaved = contextOptimization.getTokensSaved();
             contextWindowTokens = resolveContextWindow(aiRequest);
             String providerPrompt = contextOptimization.getOptimizedContext();
+            aiRequest.setPrompt(providerPrompt);
             performanceLogger.stage(
                     "CONTEXT_OPTIMIZATION",
                     requestId,
@@ -794,18 +812,6 @@ public class GatewayServiceImpl implements GatewayService {
                             + " estimatedOriginalTokens=" + contextOptimization.getOriginalTokens()
                             + " estimatedOptimizedTokens=" + contextOptimization.getOptimizedTokens()
                             + " estimatedTokensSaved=" + contextOptimization.getTokensSaved());
-
-            stageStart = System.nanoTime();
-            // RAG retrieval must use the current masked user query, not the
-            // fully assembled multi-turn provider context. Historical turns can
-            // be unrelated to the document the user is asking about.
-            RagAugmentationResult ragResult =
-                    ragAugmentationService.augment(
-                            auth,
-                            maskedPrompt,
-                            request.getRag());
-            providerPrompt = ragResult.getAugmentedPrompt();
-            aiRequest.setPrompt(providerPrompt);
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
