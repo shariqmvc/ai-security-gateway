@@ -443,6 +443,7 @@ public class GatewayServiceImpl implements GatewayService {
                             maskedPrompt,
                             request.getRag());
             String providerPrompt = ragResult.getAugmentedPrompt();
+            String conversationContext = buildConversationContext(requestId, request.getContextMessages());
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
