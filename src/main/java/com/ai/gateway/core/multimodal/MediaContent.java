@@ -30,4 +30,8 @@ public class MediaContent {
 
     @Size(max = 1000, message = "Media detail is too long.")
     private String detail;
+
+    /** Original filename used by provider-native document inputs. */
+    @Size(max = 255, message = "Media filename is too long.")
+    private String fileName;
 }
