@@ -50,6 +50,39 @@ public class PricingConfig {
                     .outputPricePerMillionTokens(
                             new BigDecimal("15.00"))
                     .build();
+
+            case XAI -> ModelPricing.builder()
+                    .provider(provider)
+                    .model(model)
+                    .inputPricePerMillionTokens(
+                            new BigDecimal("2.00"))
+                    .outputPricePerMillionTokens(
+                            new BigDecimal("6.00"))
+                    .build();
+
+            case GROQ -> {
+                // Groq pricing varies by model. Use the current GPT-OSS
+                // 120B default as the provider-level fallback.
+                if ("openai/gpt-oss-20b".equalsIgnoreCase(model)) {
+                    yield ModelPricing.builder()
+                            .provider(provider)
+                            .model(model)
+                            .inputPricePerMillionTokens(
+                                    new BigDecimal("0.075"))
+                            .outputPricePerMillionTokens(
+                                    new BigDecimal("0.30"))
+                            .build();
+                }
+
+                yield ModelPricing.builder()
+                        .provider(provider)
+                        .model(model)
+                        .inputPricePerMillionTokens(
+                                new BigDecimal("0.15"))
+                        .outputPricePerMillionTokens(
+                                new BigDecimal("0.60"))
+                        .build();
+            }
         };
     }
 }
