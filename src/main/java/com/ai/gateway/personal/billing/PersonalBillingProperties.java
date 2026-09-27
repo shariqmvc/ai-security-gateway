@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 @ConfigurationProperties(prefix = "alroute.personal.billing")
 public class PersonalBillingProperties {
     private Set<String> freeModels = new HashSet<>();
-    private int reserveOutputTokens = 1024;
+    private int reserveOutputTokens = 4096;
     private BigDecimal reservationMultiplier = new BigDecimal("1.25");
     private BigDecimal minimumCreditCharge = new BigDecimal("0.01");
 }
