@@ -13,6 +13,9 @@ public final class ModelCapabilities {
 
     public static final String AUDIO = "AUDIO";
 
+    /** Provider-native transient document/file input. */
+    public static final String DOCUMENT_INPUT = "DOCUMENT_INPUT";
+
     public static final String TOOLS = "TOOLS";
 
     public static final String REASONING = "REASONING";
