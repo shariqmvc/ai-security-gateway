@@ -24,10 +24,10 @@ import java.util.function.Consumer;
 
 @Service
 public class ClaudeProvider implements AIProvider, StreamingAIProvider {
-    @Value("\${anthropic.base-url:https://api.anthropic.com}") private String baseUrl;
-    @Value("\${anthropic.api-key:}") private String apiKey;
-    @Value("\${anthropic.model:claude-sonnet-4-6}") private String model;
-    @Value("\${anthropic.max-tokens:4096}") private int maxTokens;
+    @Value("{anthropic.base-url:https://api.anthropic.com}") private String baseUrl;
+    @Value("{anthropic.api-key:}") private String apiKey;
+    @Value("{anthropic.model:claude-sonnet-4-6}") private String model;
+    @Value("{anthropic.max-tokens:4096}") private int maxTokens;
 
     private final ObjectMapper mapper;
     private final PerformanceLogger logger;
