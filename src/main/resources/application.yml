@@ -354,9 +354,8 @@ alroute:
         - DASHBOARD
 
     billing:
-      # Personal FREE is intentionally limited to locally hosted Ollama models.
-      # Override ALROUTE_PERSONAL_FREE_MODELS per environment when the local
-      # Ollama catalog differs.
+      # Personal FREE includes local Ollama models plus provider free-tier
+      # models. Override ALROUTE_PERSONAL_FREE_MODELS per environment.
       free-models: ${ALROUTE_PERSONAL_FREE_MODELS:OLLAMA:llama3.1:8b,OLLAMA:llama3.2:3b,OLLAMA:qwen2.5vl:3b,GROQ:openai/gpt-oss-20b,GROQ:openai/gpt-oss-120b}
       reserve-output-tokens: ${ALROUTE_PERSONAL_RESERVE_OUTPUT_TOKENS:1024}
       reservation-multiplier: ${ALROUTE_PERSONAL_RESERVATION_MULTIPLIER:1.25}
