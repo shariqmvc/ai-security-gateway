@@ -45,6 +45,8 @@ public class ModelRegistryImpl implements ModelRegistry {
                 "VISION,AUDIO,TOOLS,REASONING,DOCUMENT_INPUT",
                 "",
                 "VISION,AUDIO,TOOLS,REASONING",
+                "VISION,TOOLS,REASONING",
+                "TOOLS,REASONING",
                 new ModelContextWindowProperties());
     }
 
@@ -60,12 +62,9 @@ public class ModelRegistryImpl implements ModelRegistry {
             String ollamaCapabilities,
             String claudeCapabilities) {
         this(
-                providerFactory,
-                ollamaConfig,
-                openAiCapabilities,
-                geminiCapabilities,
-                ollamaCapabilities,
-                claudeCapabilities,
+                providerFactory, ollamaConfig, openAiCapabilities, geminiCapabilities,
+                ollamaCapabilities, claudeCapabilities,
+                "VISION,TOOLS,REASONING", "TOOLS,REASONING",
                 new ModelContextWindowProperties());
     }
 
@@ -76,7 +75,9 @@ public class ModelRegistryImpl implements ModelRegistry {
             @Value("${gateway.routing.model-capabilities.openai:VISION,AUDIO,TOOLS,REASONING}") String openAiCapabilities,
             @Value("${gateway.routing.model-capabilities.gemini:VISION,AUDIO,TOOLS,REASONING}") String geminiCapabilities,
             @Value("${gateway.routing.model-capabilities.ollama:}") String ollamaCapabilities,
-            @Value("${gateway.routing.model-capabilities.claude:VISION,AUDIO,TOOLS,REASONING}") String claudeCapabilities,
+            @Value("${gateway.routing.model-capabilities.claude:VISION,TOOLS,REASONING}") String claudeCapabilities,
+            @Value("${gateway.routing.model-capabilities.xai:VISION,TOOLS,REASONING}") String xaiCapabilities,
+            @Value("${gateway.routing.model-capabilities.groq:TOOLS,REASONING}") String groqCapabilities,
             ModelContextWindowProperties contextWindowProperties) {
 
         EnumMap<Provider, List<ModelDefinition>> byProvider =
@@ -110,7 +111,9 @@ public class ModelRegistryImpl implements ModelRegistry {
                                     openAiCapabilities,
                                     geminiCapabilities,
                                     ollamaCapabilities,
-                                    claudeCapabilities),
+                                    claudeCapabilities,
+                                    xaiCapabilities,
+                                    groqCapabilities),
                             contextWindowProperties.resolve(
                                     provider.name(),
                                     model));
@@ -169,7 +172,9 @@ public class ModelRegistryImpl implements ModelRegistry {
             String openAi,
             String gemini,
             String ollama,
-            String claude) {
+            String claude,
+            String xai,
+            String groq) {
 
         LinkedHashSet<String> result = new LinkedHashSet<>();
         result.add(ModelCapabilities.CHAT);
@@ -179,6 +184,8 @@ public class ModelRegistryImpl implements ModelRegistry {
             case GEMINI -> gemini;
             case OLLAMA -> ollama;
             case CLAUDE -> claude;
+            case XAI -> xai;
+            case GROQ -> groq;
         };
 
         if (raw != null) {
