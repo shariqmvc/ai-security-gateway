@@ -27,7 +27,7 @@ public class TikaDocumentParser implements DocumentParser {
     public boolean supports(String fileName, String contentType) {
         String extension = extension(fileName);
         if (extension != null && (properties.getAllowedExtensions().contains(extension)
-                || java.util.Set.of("doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp").contains(extension))) {
+                || java.util.Set.of("doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "zip").contains(extension))) {
             return true;
         }
 
@@ -47,7 +47,9 @@ public class TikaDocumentParser implements DocumentParser {
                 || normalized.equals("text/markdown")
                 || normalized.equals("text/html")
                 || normalized.equals("application/json")
-                || normalized.equals("text/csv");
+                || normalized.equals("text/csv")
+                || normalized.equals("application/zip")
+                || normalized.equals("application/x-zip-compressed");
     }
 
     @Override
