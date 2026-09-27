@@ -162,9 +162,9 @@ gateway:
           connect-timeout: ${GATEWAY_GEMINI_CONNECT_TIMEOUT:5s}
           read-timeout: ${GATEWAY_GEMINI_READ_TIMEOUT:15s}
 
-        ANTHROPIC:
-          connect-timeout: ${GATEWAY_ANTHROPIC_CONNECT_TIMEOUT:5s}
-          read-timeout: ${GATEWAY_ANTHROPIC_READ_TIMEOUT:60s}
+        CLAUDE:
+          connect-timeout: ${GATEWAY_CLAUDE_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_CLAUDE_READ_TIMEOUT:60s}
 
         XAI:
           connect-timeout: ${GATEWAY_XAI_CONNECT_TIMEOUT:5s}
@@ -207,7 +207,7 @@ gateway:
       providers:
         GEMINI:
           - OLLAMA
-        ANTHROPIC:
+        CLAUDE:
           - GEMINI
         XAI:
           - GEMINI
