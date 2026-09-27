@@ -24,6 +24,8 @@ public class AIRequest {
     @Builder.Default
     private List<MediaContent> media = Collections.emptyList();
 
+    private String fileProcessingMode;
+
     /** 6.7 feedback context retained with the actual provider invocation. */
     private RoutingDecisionMetadata routingDecisionMetadata;
     private RoutingStrategy routingStrategy;
