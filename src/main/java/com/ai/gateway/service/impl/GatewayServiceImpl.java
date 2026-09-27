@@ -1691,6 +1691,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .routingDecisionMetadata(routingDecision.metadata())
                     .routingStrategy(routingDecision.strategy())
                     .media(request.getMedia())
+                    .fileProcessingMode(request.getFileProcessingMode())
                     .build();
         } catch (Exception ex) {
 
@@ -1721,6 +1722,8 @@ public class GatewayServiceImpl implements GatewayService {
                 capabilities.add(ModelCapabilities.VISION);
             } else if (media != null && media.getType() == MediaTypeKind.AUDIO) {
                 capabilities.add(ModelCapabilities.AUDIO);
+            } else if (media != null && media.getType() == MediaTypeKind.DOCUMENT) {
+                capabilities.add(ModelCapabilities.DOCUMENT_INPUT);
             }
         }
         request.setRequiredCapabilities(java.util.Set.copyOf(capabilities));
