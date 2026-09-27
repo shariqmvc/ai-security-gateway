@@ -62,6 +62,14 @@ public class PersonalSecurityIntelligenceService {
         int score = maliciousLabel
                 ? (int) Math.round(Math.max(0.0d, Math.min(1.0d, detection.score())) * 100.0d)
                 : 0;
+        boolean benignFileAnalysis = detection.labels().stream()
+                .anyMatch(label -> "SYSTEM_PROMPT_EXTRACTION".equalsIgnoreCase(label))
+                && isBenignFileAnalysisRequest(prompt);
+        String decision = benignFileAnalysis ? "ALLOW" : detection.decision();
+        if (benignFileAnalysis) {
+            risk = PersonalSecurityRisk.LOW;
+            score = Math.min(score, 15);
+        }
 
         return new PersonalSecurityAssessment(
                 score,
