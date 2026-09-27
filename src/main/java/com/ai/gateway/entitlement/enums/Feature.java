@@ -6,6 +6,8 @@ public enum Feature {
     GEMINI,
     OLLAMA,
     CLAUDE,
+    XAI,
+    GROQ,
 
     // Core Gateway
     CHAT,
