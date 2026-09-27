@@ -1,5 +1,7 @@
 package com.ai.gateway.core.provider.claude;
 
+import com.ai.gateway.config.ProviderHttpProperties;
+import com.ai.gateway.config.ProviderHttpRequestFactory;
 import com.ai.gateway.core.contract.AIRequest;
 import com.ai.gateway.core.contract.AIResponse;
 import com.ai.gateway.core.contract.Usage;
@@ -32,8 +34,9 @@ public class ClaudeProvider implements AIProvider, StreamingAIProvider {
     private final PersonalProviderCredentialResolver credentials;
     private final RestTemplate rest=new RestTemplate();
 
-    public ClaudeProvider(ObjectMapper mapper,PerformanceLogger logger,PersonalProviderCredentialResolver credentials){
+    public ClaudeProvider(ObjectMapper mapper,PerformanceLogger logger,PersonalProviderCredentialResolver credentials,ProviderHttpProperties httpProperties){
         this.mapper=mapper;this.logger=logger;this.credentials=credentials;
+        this.rest.setRequestFactory(new ProviderHttpRequestFactory(Provider.CLAUDE,httpProperties.forProvider(Provider.CLAUDE)));
     }
     @Override public Provider provider(){return Provider.CLAUDE;}
     @Override public String defaultModel(){return model;}
