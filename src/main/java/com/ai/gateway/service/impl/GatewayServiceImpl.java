@@ -1352,6 +1352,8 @@ public class GatewayServiceImpl implements GatewayService {
             case OPENAI -> "OpenAI";
             case CLAUDE -> "Anthropic";
             case GEMINI -> "Gemini";
+            case XAI -> "xAI";
+            case GROQ -> "Groq";
             case OLLAMA -> "Ollama";
         };
     }
