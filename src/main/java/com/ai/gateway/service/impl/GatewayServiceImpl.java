@@ -1304,6 +1304,24 @@ public class GatewayServiceImpl implements GatewayService {
                 return "Insufficient AIRouter credits. Add credits to your wallet or switch Billing mode from CREDIT.";
             }
 
+            if (current instanceof com.ai.gateway.core.failover.ProviderAuthenticationException providerAuthenticationException) {
+                String provider = providerLabel(providerAuthenticationException.getProvider());
+                return provider + " authentication failed. Check the configured API key and provider credentials.";
+            }
+
+            if (current instanceof org.springframework.web.reactive.function.client.WebClientResponseException providerResponse) {
+                int status = providerResponse.getStatusCode().value();
+                if (status == 401 || status == 403) {
+                    return "Provider authentication failed. Check the configured API key and provider credentials.";
+                }
+                if (status == 429) {
+                    return "Provider rate limit exceeded. Please retry later or use another provider.";
+                }
+                if (status >= 500) {
+                    return "Provider service returned an upstream error. Please retry or use another provider.";
+                }
+            }
+
             if (current instanceof java.net.SocketTimeoutException
                     || current instanceof java.util.concurrent.TimeoutException
                     || current.getClass().getSimpleName().contains("Timeout")) {
