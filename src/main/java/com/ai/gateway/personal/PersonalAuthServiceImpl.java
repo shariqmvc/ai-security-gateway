@@ -297,12 +297,10 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
 
     @Override
     @Transactional
-    public PersonalVerificationResponse sendPhoneVerification(
-            AuthenticationContext context,
-            PersonalPhoneRequest request) {
-        requirePersonalAccount(context);
-        PersonalUser user = userRepository.findById(context.getPersonalUserId())
-                .orElseThrow(() -> new AccessDeniedException("Personal user not found."));
+    public PersonalVerificationResponse sendPhoneVerification(PersonalPhoneRequest request) {
+        String email = normalizeEmail(request.email());
+        PersonalUser user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new PersonalAuthenticationException("Unable to start phone verification."));
 
         String phone = normalizePhone(request.phoneNumber());
         if (!phone.equals(user.getPhoneNumber())) {
@@ -330,12 +328,10 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
 
     @Override
     @Transactional
-    public PersonalVerificationResponse verifyPhone(
-            AuthenticationContext context,
-            PersonalVerifyPhoneRequest request) {
-        requirePersonalAccount(context);
-        PersonalUser user = userRepository.findById(context.getPersonalUserId())
-                .orElseThrow(() -> new AccessDeniedException("Personal user not found."));
+    public PersonalVerificationResponse verifyPhone(PersonalVerifyPhoneRequest request) {
+        String email = normalizeEmail(request.email());
+        PersonalUser user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new PersonalAuthenticationException("Invalid phone verification request."));
 
         if (user.isPhoneVerified()) {
             return new PersonalVerificationResponse(true, false, "Phone number is already verified.", null);
@@ -349,6 +345,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
         if (verification.getExpiresAt().isBefore(now) || verification.getAttempts() >= 5) {
             throw new PersonalAuthenticationException("Invalid or expired phone verification code.");
         }
+
         verification.setAttempts(verification.getAttempts() + 1);
         if (!hashToken(request.code()).equals(verification.getCodeHash())) {
             throw new PersonalAuthenticationException("Invalid or expired phone verification code.");
@@ -360,16 +357,6 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
         return new PersonalVerificationResponse(true, false, "Phone number verified successfully.", null);
     }
 
-    private void requirePersonalAccount(AuthenticationContext context) {
-        if (context == null || !context.isPersonalPrincipal() || context.getPersonalUserId() == null
-                || context.getPersonalAccountId() == null) {
-            throw new AccessDeniedException("Personal authentication is required.");
-        }
-    }
-
-    private String normalizePhone(String phone) {
-        return phone == null ? null : phone.trim();
-    }
 
     private PersonalUserResponse toUserResponse(
             PersonalUser user,
