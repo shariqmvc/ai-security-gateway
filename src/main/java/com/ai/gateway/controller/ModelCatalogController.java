@@ -3,6 +3,7 @@ package com.ai.gateway.controller;
 import com.ai.gateway.common.APIResponse;
 import com.ai.gateway.core.routing.registry.ModelCatalogItem;
 import com.ai.gateway.core.routing.registry.ModelRegistry;
+import com.ai.gateway.core.cost.config.PricingConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,11 +18,12 @@ import java.util.List;
 public class ModelCatalogController {
 
     private final ModelRegistry modelRegistry;
+    private final PricingConfig pricingConfig;
 
     @GetMapping
     public ResponseEntity<APIResponse<List<ModelCatalogItem>>> models() {
         List<ModelCatalogItem> items = modelRegistry.findAll().stream()
-                .map(ModelCatalogItem::from)
+                .map(model -> ModelCatalogItem.from(model, pricingConfig))
                 .toList();
         return ResponseEntity.ok(APIResponse.<List<ModelCatalogItem>>builder()
                 .success(true)
