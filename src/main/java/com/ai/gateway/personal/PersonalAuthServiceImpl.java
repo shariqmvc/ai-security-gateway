@@ -38,6 +38,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
     private final PersonalAccountRepository accountRepository;
     private final PersonalSessionRepository sessionRepository;
     private final PersonalEmailVerificationTokenRepository verificationTokenRepository;
+    private final PersonalPhoneVerificationCodeRepository phoneVerificationCodeRepository;
     private final PasswordEncoder passwordEncoder;
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -54,6 +55,12 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
     @Value("${alroute.personal.auth.expose-verification-token:false}")
     private boolean exposeVerificationToken;
 
+    @Value("${alroute.personal.auth.expose-verification-code:false}")
+    private boolean exposeVerificationCode;
+
+    @Value("${alroute.personal.auth.phone-verification-ttl:10m}")
+    private String phoneVerificationTtl;
+
     @Override
     @Transactional
     public PersonalSignupResponse signup(PersonalSignupRequest request) {
@@ -69,6 +76,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .displayName(normalizeDisplayName(request.displayName()))
+                .phoneNumber(normalizePhone(request.phoneNumber()))
                 .status("ACTIVE")
                 .emailVerified(autoVerifyOnSignup)
                 .createdAt(now)
@@ -109,11 +117,14 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 account.getId(),
                 user.getEmail(),
                 user.getDisplayName(),
+                user.getPhoneNumber(),
                 account.getPlan(),
                 account.getStatus(),
                 user.isEmailVerified(),
                 !user.isEmailVerified(),
-                exposeVerificationToken ? verificationToken : null);
+                exposeVerificationToken ? verificationToken : null,
+                !user.isPhoneVerified(),
+                null);
     }
 
     @Override
@@ -157,6 +168,10 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
 
         if (!user.isEmailVerified()) {
             throw new PersonalAuthenticationException("Email verification is required.");
+        }
+
+        if (!user.isPhoneVerified()) {
+            throw new PersonalAuthenticationException("Phone verification is required.");
         }
 
         PersonalAccount account = accountRepository.findByUserId(user.getId())
@@ -279,6 +294,83 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 .ifPresent(session -> session.setRevokedAt(LocalDateTime.now()));
     }
 
+
+    @Override
+    @Transactional
+    public PersonalVerificationResponse sendPhoneVerification(
+            AuthenticationContext context,
+            PersonalPhoneRequest request) {
+        requirePersonalAccount(context);
+        PersonalUser user = userRepository.findById(context.getPersonalUserId())
+                .orElseThrow(() -> new AccessDeniedException("Personal user not found."));
+
+        String phone = normalizePhone(request.phoneNumber());
+        if (!phone.equals(user.getPhoneNumber())) {
+            throw new PersonalAuthenticationException("Phone number does not match the account.");
+        }
+        if (user.isPhoneVerified()) {
+            return new PersonalVerificationResponse(true, false, "Phone number is already verified.", null);
+        }
+
+        String code = String.format("%06d", secureRandom.nextInt(1_000_000));
+        LocalDateTime now = LocalDateTime.now();
+        PersonalPhoneVerificationCode entity = PersonalPhoneVerificationCode.builder()
+                .user(user)
+                .codeHash(hashToken(code))
+                .createdAt(now)
+                .expiresAt(now.plus(parseDuration(phoneVerificationTtl, "10m")))
+                .attempts(0)
+                .build();
+        phoneVerificationCodeRepository.save(entity);
+
+        return new PersonalVerificationResponse(
+                false, true, "Verification code generated. Deliver it through your SMS adapter.",
+                exposeVerificationCode ? code : null);
+    }
+
+    @Override
+    @Transactional
+    public PersonalVerificationResponse verifyPhone(
+            AuthenticationContext context,
+            PersonalVerifyPhoneRequest request) {
+        requirePersonalAccount(context);
+        PersonalUser user = userRepository.findById(context.getPersonalUserId())
+                .orElseThrow(() -> new AccessDeniedException("Personal user not found."));
+
+        if (user.isPhoneVerified()) {
+            return new PersonalVerificationResponse(true, false, "Phone number is already verified.", null);
+        }
+
+        PersonalPhoneVerificationCode verification =
+                phoneVerificationCodeRepository.findTopByUserIdAndUsedAtIsNullOrderByCreatedAtDesc(user.getId())
+                        .orElseThrow(() -> new PersonalAuthenticationException("No active phone verification code exists."));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (verification.getExpiresAt().isBefore(now) || verification.getAttempts() >= 5) {
+            throw new PersonalAuthenticationException("Invalid or expired phone verification code.");
+        }
+        verification.setAttempts(verification.getAttempts() + 1);
+        if (!hashToken(request.code()).equals(verification.getCodeHash())) {
+            throw new PersonalAuthenticationException("Invalid or expired phone verification code.");
+        }
+
+        verification.setUsedAt(now);
+        user.setPhoneVerified(true);
+        user.setUpdatedAt(now);
+        return new PersonalVerificationResponse(true, false, "Phone number verified successfully.", null);
+    }
+
+    private void requirePersonalAccount(AuthenticationContext context) {
+        if (context == null || !context.isPersonalPrincipal() || context.getPersonalUserId() == null
+                || context.getPersonalAccountId() == null) {
+            throw new AccessDeniedException("Personal authentication is required.");
+        }
+    }
+
+    private String normalizePhone(String phone) {
+        return phone == null ? null : phone.trim();
+    }
+
     private PersonalUserResponse toUserResponse(
             PersonalUser user,
             PersonalAccount account) {
@@ -288,9 +380,11 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 account.getId(),
                 user.getEmail(),
                 user.getDisplayName(),
+                user.getPhoneNumber(),
                 account.getPlan(),
                 account.getStatus(),
-                user.isEmailVerified());
+                user.isEmailVerified(),
+                user.isPhoneVerified());
     }
 
     private String normalizeEmail(String email) {
