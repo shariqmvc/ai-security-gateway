@@ -324,6 +324,9 @@ alroute:
       # Keep false in production. When enabled, signup returns a one-time
       # verification token to support local dogfooding without email delivery.
       expose-verification-token: ${ALROUTE_PERSONAL_EXPOSE_VERIFICATION_TOKEN:false}
+      # Local dogfooding only. Production SMS delivery must use a real SMS adapter.
+      expose-verification-code: ${ALROUTE_PERSONAL_EXPOSE_VERIFICATION_CODE:false}
+      phone-verification-ttl: ${ALROUTE_PERSONAL_PHONE_VERIFICATION_TTL:10m}
 
     # Personal feature entitlements are intentionally separate from Business
     # tenant entitlements. Business tenant authorization continues to use
