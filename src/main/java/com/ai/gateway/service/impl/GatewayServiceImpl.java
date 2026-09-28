@@ -255,7 +255,7 @@ public class GatewayServiceImpl implements GatewayService {
                             auth,
                             maskedPrompt,
                             request.getRag());
-            String contextInputPrompt = ragResult.getAugmentedPrompt();
+            String contextInputPrompt = mergeMaterializedDocumentPrompt(\n                    aiRequest.getPrompt(),\n                    ragResult.getAugmentedPrompt(),\n                    maskedPrompt);
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
@@ -833,7 +833,7 @@ public class GatewayServiceImpl implements GatewayService {
                             auth,
                             maskedPrompt,
                             request.getRag());
-            String contextInputPrompt = ragResult.getAugmentedPrompt();
+            String contextInputPrompt = mergeMaterializedDocumentPrompt(\n                    aiRequest.getPrompt(),\n                    ragResult.getAugmentedPrompt(),\n                    maskedPrompt);
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
@@ -1704,6 +1704,46 @@ public class GatewayServiceImpl implements GatewayService {
         }
 
         return contextOptimizationService.optimize(maskedPrompt, budget);
+    }
+
+    /**
+     * Preserves provider-neutral document text after RAG augmentation.
+     *
+     * AttachedDocumentExtractionService materializes unsupported DOCUMENT media
+     * by appending extracted text to AIRequest.prompt. RAG augmentation is built
+     * from the original user query, so replacing the prompt with the RAG result
+     * would otherwise discard the extracted document evidence. Keep the RAG
+     * result as the primary prompt and append only the materialized document
+     * suffix.
+     */
+    private String mergeMaterializedDocumentPrompt(
+            String materializedPrompt,
+            String ragPrompt,
+            String originalMaskedPrompt) {
+        String materialized = materializedPrompt == null ? "" : materializedPrompt.trim();
+        String rag = ragPrompt == null ? "" : ragPrompt.trim();
+        String original = originalMaskedPrompt == null ? "" : originalMaskedPrompt.trim();
+
+        if (materialized.isBlank()) {
+            return rag;
+        }
+        if (rag.isBlank()) {
+            return materialized;
+        }
+        if (materialized.equals(rag)) {
+            return materialized;
+        }
+
+        String documentEvidence = materialized;
+        if (!original.isBlank() && materialized.startsWith(original)) {
+            documentEvidence = materialized.substring(original.length()).trim();
+        }
+
+        if (documentEvidence.isBlank()) {
+            return rag;
+        }
+
+        return rag + "\\n\\n" + documentEvidence;
     }
 
     private int resolveContextWindow(AIRequest request) {
