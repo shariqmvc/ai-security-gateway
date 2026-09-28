@@ -1848,6 +1848,15 @@ public class GatewayServiceImpl implements GatewayService {
                 ragEnabled);
     }
 
+    /**
+     * Adds capabilities that are required by the transport itself.
+     *
+     * DOCUMENT media is intentionally not converted into a DOCUMENT_INPUT
+     * routing requirement here. DOCUMENT_INPUT means provider-native document
+     * support. The gateway normalizes DOCUMENT media for providers that do not
+     * support native document parts, so requiring DOCUMENT_INPUT at routing time
+     * would reject valid mixed image + document requests before normalization.
+     */
     private void addMultimodalCapabilities(ChatRequest request) {
         if (request.getMedia() == null || request.getMedia().isEmpty()) {
             return;
@@ -1860,8 +1869,6 @@ public class GatewayServiceImpl implements GatewayService {
                 capabilities.add(ModelCapabilities.VISION);
             } else if (media != null && media.getType() == MediaTypeKind.AUDIO) {
                 capabilities.add(ModelCapabilities.AUDIO);
-            } else if (media != null && media.getType() == MediaTypeKind.DOCUMENT) {
-                capabilities.add(ModelCapabilities.DOCUMENT_INPUT);
             }
         }
         request.setRequiredCapabilities(java.util.Set.copyOf(capabilities));
