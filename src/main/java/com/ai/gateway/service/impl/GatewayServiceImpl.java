@@ -75,11 +75,12 @@ public class GatewayServiceImpl implements GatewayService {
      * multimodal safety reserve so the text/RAG budget does not fill the
      * provider context window before Ollama accounts for the image.
      *
-     * Qwen2.5-VL telemetry showed ~1.1K additional input tokens for a single
-     * image, so 1024 is the conservative gateway reserve while retaining a
-     * full 1024-token generation reserve.
+     * Qwen2.5-VL telemetry showed ~1.2K additional input tokens for a single
+     * image. A 1536-token reserve covers that observed overhead plus the
+     * gateway's multimodal instruction text while retaining a full 1024-token
+     * generation reserve.
      */
-    private static final int MULTIMODAL_INPUT_SAFETY_RESERVE_TOKENS = 1024;
+    private static final int MULTIMODAL_INPUT_SAFETY_RESERVE_TOKENS = 1536;
 
     private final PIIDetectionService piiDetectionService;
 
