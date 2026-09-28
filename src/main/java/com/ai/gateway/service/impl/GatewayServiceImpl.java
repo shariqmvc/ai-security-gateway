@@ -124,6 +124,8 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final ModelRegistry modelRegistry;
 
+    private final AttachedDocumentExtractionService attachedDocumentExtractionService;
+
     @Override
     @RequiresFeature(Feature.CHAT)
     public ChatResponse process(ChatRequest request) {
@@ -208,6 +210,19 @@ public class GatewayServiceImpl implements GatewayService {
                             request,
                             auth,
                             maskedPrompt);
+
+            // Providers differ in native document support. Keep native document
+            // media for Gemini, but materialize every attached document into a
+            // bounded, untrusted text context for providers whose adapters only
+            // support images. This prevents a multi-file request from silently
+            // dropping DOCUMENT media (or failing in Ollama) while preserving
+            // the same AIRequest contract for all providers.
+            aiRequest = attachedDocumentExtractionService.materializeUnsupportedDocuments(
+                    requestId,
+                    inferenceId,
+                    auth,
+                    aiRequest);
+
             performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
             if (personalInferencePersistenceService != null) {
                 personalInferencePersistenceService.updateTarget(inferenceId, aiRequest);
