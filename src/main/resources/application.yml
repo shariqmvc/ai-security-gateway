@@ -327,6 +327,14 @@ alroute:
       # Local dogfooding only. Production SMS delivery must use a real SMS adapter.
       expose-verification-code: ${ALROUTE_PERSONAL_EXPOSE_VERIFICATION_CODE:false}
       phone-verification-ttl: ${ALROUTE_PERSONAL_PHONE_VERIFICATION_TTL:10m}
+      verification-base-url: ${ALROUTE_PERSONAL_VERIFICATION_BASE_URL:http://localhost:5173/verify-email}
+      mail-from: ${ALROUTE_PERSONAL_MAIL_FROM:noreply@airouter.local}
+      sms:
+        provider: ${ALROUTE_PERSONAL_SMS_PROVIDER:none}
+        twilio:
+          account-sid: ${TWILIO_ACCOUNT_SID:}
+          auth-token: ${TWILIO_AUTH_TOKEN:}
+          from: ${TWILIO_FROM:}
 
     # Personal feature entitlements are intentionally separate from Business
     # tenant entitlements. Business tenant authorization continues to use
