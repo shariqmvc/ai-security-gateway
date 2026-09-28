@@ -39,6 +39,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
     private final PersonalSessionRepository sessionRepository;
     private final PersonalEmailVerificationTokenRepository verificationTokenRepository;
     private final PersonalPhoneVerificationCodeRepository phoneVerificationCodeRepository;
+    private final PersonalVerificationDeliveryService verificationDeliveryService;
     private final PasswordEncoder passwordEncoder;
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -110,6 +111,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                             .build();
 
             verificationTokenRepository.save(token);
+            verificationDeliveryService.sendEmailVerification(user.getEmail(), verificationToken);
         }
 
         return new PersonalSignupResponse(
@@ -320,6 +322,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 .attempts(0)
                 .build();
         phoneVerificationCodeRepository.save(entity);
+        verificationDeliveryService.sendPhoneVerification(user.getPhoneNumber(), code);
 
         return new PersonalVerificationResponse(
                 false, true, "Verification code generated. Deliver it through your SMS adapter.",
