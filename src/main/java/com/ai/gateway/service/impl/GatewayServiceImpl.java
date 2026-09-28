@@ -1018,6 +1018,16 @@ public class GatewayServiceImpl implements GatewayService {
             providerInvocationSucceeded = true;
 
             long providerLatency = elapsedMs(providerStart);
+            log.info(
+                    "PROVIDER_STREAM_USAGE requestId={} provider={} model={} inputTokens={} outputTokens={} totalTokens={} providerLatencyMs={}",
+                    requestId,
+                    result.getProvider(),
+                    result.getModel(),
+                    result.getInputTokens(),
+                    result.getOutputTokens(),
+                    result.getTotalTokens(),
+                    providerLatency);
+
             if (personalInferencePersistenceService != null) {
                 personalInferencePersistenceService.providerAttempt(
                         inferenceId, 1,
@@ -1206,6 +1216,20 @@ public class GatewayServiceImpl implements GatewayService {
             return;
 
         } catch (Exception ex) {
+            Throwable rootCause = ex;
+            while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+                rootCause = rootCause.getCause();
+            }
+            log.error(
+                    "PROVIDER_STREAM_FAILED requestId={} provider={} model={} exceptionType={} message={} rootCauseType={} rootCauseMessage={}",
+                    requestId,
+                    aiRequest == null ? null : aiRequest.getProvider(),
+                    aiRequest == null ? null : aiRequest.getModel(),
+                    ex.getClass().getSimpleName(),
+                    ex.getMessage(),
+                    rootCause.getClass().getSimpleName(),
+                    rootCause.getMessage(),
+                    ex);
             if (creditReservation != null) {
                 personalCreditExecutionService.releaseOnFailure(creditReservation);
                 creditReservation = null;
