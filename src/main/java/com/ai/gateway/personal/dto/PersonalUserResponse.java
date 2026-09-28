@@ -7,7 +7,9 @@ public record PersonalUserResponse(
         UUID accountId,
         String email,
         String displayName,
+        String phoneNumber,
         String plan,
         String status,
-        boolean emailVerified) {
+        boolean emailVerified,
+        boolean phoneVerified) {
 }
