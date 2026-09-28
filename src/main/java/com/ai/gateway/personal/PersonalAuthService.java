@@ -16,9 +16,9 @@ public interface PersonalAuthService {
 
     void verifyEmail(String token);
 
-    PersonalVerificationResponse sendPhoneVerification(AuthenticationContext context, PersonalPhoneRequest request);
+    PersonalVerificationResponse sendPhoneVerification(PersonalPhoneRequest request);
 
-    PersonalVerificationResponse verifyPhone(AuthenticationContext context, PersonalVerifyPhoneRequest request);
+    PersonalVerificationResponse verifyPhone(PersonalVerifyPhoneRequest request);
 
     AuthenticationContext authenticateBearer(String token);
 
