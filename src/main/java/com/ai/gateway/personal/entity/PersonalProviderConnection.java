@@ -38,6 +38,9 @@ public class PersonalProviderConnection {
     @Column(name = "encrypted_api_key", nullable = false, length = 4096)
     private String encryptedApiKey;
 
+    @Column(name = "api_key_last4", nullable = false, length = 4)
+    private String apiKeyLast4;
+
     @Column(name = "status", nullable = false, length = 32)
     @Builder.Default
     private String status = "ACTIVE";
