@@ -101,10 +101,11 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
         String url =
                 baseUrl + "/api/chat";
 
+        OllamaMessage message = buildMessage(request);
         OllamaRequest ollamaRequest =
                 OllamaRequest.builder()
                         .model(selectedModel)
-                        .messages(List.of(buildMessage(request)))
+                        .messages(List.of(message))
                         .stream(false)
                         .options(
                                 OllamaOptions.builder()
@@ -113,6 +114,13 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
                                         .build())
                         .keepAlive(ollamaConfig.getKeepAlive())
                         .build();
+
+        org.slf4j.LoggerFactory.getLogger(OllamaProvider.class).info(
+                "OLLAMA_MULTIMODAL_PAYLOAD requestId={} model={} mediaCount={} imageCount={}",
+                requestId,
+                selectedModel,
+                request.getMedia() == null ? 0 : request.getMedia().size(),
+                message.getImages() == null ? 0 : message.getImages().size());
 
         HttpHeaders headers =
                 new HttpHeaders();
@@ -247,9 +255,10 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
 
         String url = baseUrl + "/api/chat";
 
+        OllamaMessage message = buildMessage(request);
         OllamaRequest ollamaRequest = OllamaRequest.builder()
                 .model(selectedModel)
-                .messages(List.of(buildMessage(request)))
+                .messages(List.of(message))
                 .stream(true)
                 .options(OllamaOptions.builder()
                         .numCtx(ollamaConfig.getNumCtx())
@@ -257,6 +266,13 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
                         .build())
                 .keepAlive(ollamaConfig.getKeepAlive())
                 .build();
+
+        org.slf4j.LoggerFactory.getLogger(OllamaProvider.class).info(
+                "OLLAMA_MULTIMODAL_PAYLOAD requestId={} model={} mediaCount={} imageCount={}",
+                requestId,
+                selectedModel,
+                request.getMedia() == null ? 0 : request.getMedia().size(),
+                message.getImages() == null ? 0 : message.getImages().size());
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
