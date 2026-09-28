@@ -7,9 +7,12 @@ public record PersonalSignupResponse(
         UUID accountId,
         String email,
         String displayName,
+        String phoneNumber,
         String plan,
         String status,
         boolean emailVerified,
         boolean emailVerificationRequired,
-        String verificationToken) {
+        String verificationToken,
+        boolean phoneVerificationRequired,
+        String phoneVerificationCode) {
 }
