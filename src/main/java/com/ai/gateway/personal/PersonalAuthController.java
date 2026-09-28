@@ -41,14 +41,14 @@ public class PersonalAuthController {
     public PersonalVerificationResponse sendPhoneVerification(
             HttpServletRequest request,
             @Valid @RequestBody PersonalPhoneRequest body) {
-        return personalAuthService.sendPhoneVerification(context(request), body);
+        return personalAuthService.sendPhoneVerification(body);
     }
 
     @PostMapping("/verify-phone")
     public PersonalVerificationResponse verifyPhone(
             HttpServletRequest request,
             @Valid @RequestBody PersonalVerifyPhoneRequest body) {
-        return personalAuthService.verifyPhone(context(request), body);
+        return personalAuthService.verifyPhone(body);
     }
 
     @PostMapping("/logout")
