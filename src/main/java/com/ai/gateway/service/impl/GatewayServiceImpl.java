@@ -800,6 +800,19 @@ public class GatewayServiceImpl implements GatewayService {
                     request,
                     auth,
                     maskedPrompt);
+
+            // Providers differ in native document support. Keep native document
+            // media for providers that support it, but materialize attached
+            // documents for adapters such as Ollama that currently accept IMAGE
+            // media only. This must happen in the streaming path as well as the
+            // synchronous path; otherwise DIRECT_PROVIDER documents reach the
+            // provider unchanged and Ollama rejects them before making a request.
+            aiRequest = attachedDocumentExtractionService.materializeUnsupportedDocuments(
+                    requestId,
+                    inferenceId,
+                    auth,
+                    aiRequest);
+
             performanceLogger.stage(
                     "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
             if (personalInferencePersistenceService != null) {
