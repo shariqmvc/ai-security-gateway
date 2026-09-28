@@ -390,6 +390,14 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
         return normalized.isBlank() ? null : normalized;
     }
 
+    private String normalizePhone(String phoneNumber) {
+        if (phoneNumber == null) {
+            return null;
+        }
+
+        return phoneNumber.trim();
+    }
+
     private String generateToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
         secureRandom.nextBytes(bytes);
