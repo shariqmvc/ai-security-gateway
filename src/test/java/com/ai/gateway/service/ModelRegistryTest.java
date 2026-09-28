@@ -80,6 +80,42 @@ class ModelRegistryTest {
                         .isEmpty());
     }
 
+
+    @Test
+    void shouldAdvertiseVisionOnlyForConfiguredOllamaVisionModel() {
+        when(providerFactory.getProvider(Provider.OLLAMA))
+                .thenReturn(provider);
+
+        when(provider.defaultModel())
+                .thenReturn("llama3.2:3b");
+
+        com.ai.gateway.config.OllamaConfig ollamaConfig =
+                new com.ai.gateway.config.OllamaConfig();
+        ollamaConfig.setModel("llama3.2:3b");
+        ollamaConfig.setModels(java.util.List.of(
+                "llama3.2:3b",
+                "qwen2.5vl:3b"));
+        ollamaConfig.setVisionModel("qwen2.5vl:3b");
+
+        registry = new ModelRegistryImpl(
+                providerFactory,
+                ollamaConfig,
+                "VISION,AUDIO,TOOLS,REASONING",
+                "VISION,AUDIO,TOOLS,REASONING",
+                "",
+                "VISION,TOOLS,REASONING");
+
+        assertTrue(registry.find(Provider.OLLAMA, "qwen2.5vl:3b")
+                .orElseThrow()
+                .supports("VISION"));
+
+        assertTrue(registry.find(Provider.OLLAMA, "llama3.2:3b")
+                .orElseThrow()
+                .capabilities()
+                .stream()
+                .noneMatch("VISION"::equals));
+    }
+
     @Test
     void shouldRegisterAllConfiguredOllamaModels() {
         when(providerFactory.getProvider(Provider.OLLAMA))
