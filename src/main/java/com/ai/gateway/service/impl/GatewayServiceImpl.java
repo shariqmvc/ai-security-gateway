@@ -255,7 +255,10 @@ public class GatewayServiceImpl implements GatewayService {
                             auth,
                             maskedPrompt,
                             request.getRag());
-            String contextInputPrompt = mergeMaterializedDocumentPrompt(\n                    aiRequest.getPrompt(),\n                    ragResult.getAugmentedPrompt(),\n                    maskedPrompt);
+            String contextInputPrompt = mergeMaterializedDocumentPrompt(
+                    aiRequest.getPrompt(),
+                    ragResult.getAugmentedPrompt(),
+                    maskedPrompt);
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
@@ -833,7 +836,10 @@ public class GatewayServiceImpl implements GatewayService {
                             auth,
                             maskedPrompt,
                             request.getRag());
-            String contextInputPrompt = mergeMaterializedDocumentPrompt(\n                    aiRequest.getPrompt(),\n                    ragResult.getAugmentedPrompt(),\n                    maskedPrompt);
+            String contextInputPrompt = mergeMaterializedDocumentPrompt(
+                    aiRequest.getPrompt(),
+                    ragResult.getAugmentedPrompt(),
+                    maskedPrompt);
             performanceLogger.stage(
                     "RAG_AUGMENTATION",
                     requestId,
