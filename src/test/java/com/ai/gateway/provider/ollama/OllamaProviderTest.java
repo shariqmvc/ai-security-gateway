@@ -126,6 +126,74 @@ class OllamaProviderTest {
     }
 
     @Test
+    void sendsBase64ImagesToOllamaVisionModel() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        OllamaConfig config = new OllamaConfig();
+        config.setModel("qwen2.5vl:3b");
+        config.setNumCtx(4096);
+        config.setNumPredict(512);
+
+        ProviderConcurrencyProperties concurrencyProperties =
+                new ProviderConcurrencyProperties();
+        concurrencyProperties.setProviders(new EnumMap<>(Provider.class));
+        ProviderConcurrencyLimiter limiter = new ProviderConcurrencyLimiter(
+                concurrencyProperties,
+                performanceLogger);
+
+        OllamaResponse response = new OllamaResponse(
+                OllamaMessage.builder()
+                        .role("assistant")
+                        .content("The image contains an appointment receipt.")
+                        .build(),
+                null, null, 1, null, 1, null);
+
+        when(restTemplate.exchange(
+                anyString(),
+                eq(HttpMethod.POST),
+                any(HttpEntity.class),
+                eq(OllamaResponse.class)))
+                .thenReturn(ResponseEntity.ok(response));
+
+        OllamaProvider provider = new OllamaProvider(
+                restTemplate,
+                config,
+                performanceLogger,
+                limiter,
+                objectMapper);
+
+        provider.chat(
+                AIRequest.builder()
+                        .provider(Provider.OLLAMA)
+                        .model("qwen2.5vl:3b")
+                        .prompt("Analyze the attached image.")
+                        .media(List.of(com.ai.gateway.core.multimodal.MediaContent.builder()
+                                .type(com.ai.gateway.core.multimodal.MediaTypeKind.IMAGE)
+                                .sourceType(com.ai.gateway.core.multimodal.MediaSourceType.BASE64)
+                                .mimeType("image/png")
+                                .data("aGVsbG8=")
+                                .build()))
+                        .build());
+
+        @SuppressWarnings("unchecked")
+        var captor = org.mockito.ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).exchange(
+                anyString(),
+                eq(HttpMethod.POST),
+                captor.capture(),
+                eq(OllamaResponse.class));
+
+        OllamaRequest request = (OllamaRequest) captor.getValue().getBody();
+        assertNotNull(request);
+        assertEquals("qwen2.5vl:3b", request.getModel());
+        assertNotNull(request.getMessages());
+        assertEquals(1, request.getMessages().size());
+        assertEquals(List.of("aGVsbG8="), request.getMessages().get(0).getImages());
+    }
+
+    @Test
     void streamsNdjsonDeltasAndMapsFinalTelemetry() throws Exception {
         RestTemplate restTemplate = mock(RestTemplate.class);
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
