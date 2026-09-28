@@ -57,14 +57,6 @@ public class PersonalProviderConnectionServiceImpl
         java.util.UUID accountId = requireAccount(context);
         Provider provider = request.provider();
 
-        if (connectionRepository
-                .findByPersonalAccountIdAndProvider(accountId, provider)
-                .isPresent()) {
-            throw new PersonalAccountConflictException(
-                    "A Personal connection already exists for "
-                            + provider + ".");
-        }
-
         String apiKey = request.apiKey().trim();
 
         /*
@@ -89,17 +81,23 @@ public class PersonalProviderConnectionServiceImpl
         LocalDateTime now = LocalDateTime.now();
 
         PersonalProviderConnection connection =
-                PersonalProviderConnection.builder()
-                        .personalAccount(account)
-                        .provider(provider)
-                        .displayName(request.displayName().trim())
-                        .encryptedApiKey(encryptionUtil.encrypt(apiKey))
-                        .status("ACTIVE")
-                        .lastValidatedAt(now)
-                        .validationMessage("Validated successfully.")
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build();
+                connectionRepository
+                        .findByPersonalAccountIdAndProvider(accountId, provider)
+                        .orElseGet(() -> PersonalProviderConnection.builder()
+                                .personalAccount(account)
+                                .provider(provider)
+                                .createdAt(now)
+                                .build());
+
+        connection.setDisplayName(request.displayName().trim());
+        connection.setEncryptedApiKey(encryptionUtil.encrypt(apiKey));
+        connection.setApiKeyLast4(apiKey.length() <= 4
+                ? apiKey
+                : apiKey.substring(apiKey.length() - 4));
+        connection.setStatus("ACTIVE");
+        connection.setLastValidatedAt(now);
+        connection.setValidationMessage("Validated successfully.");
+        connection.setUpdatedAt(now);
 
         return toResponse(connectionRepository.save(connection));
     }
@@ -258,11 +256,10 @@ public class PersonalProviderConnectionServiceImpl
     private PersonalProviderConnectionResponse toResponse(
             PersonalProviderConnection connection) {
 
-        String encrypted = connection.getEncryptedApiKey();
-        String masked = "••••••••";
-        if (encrypted != null && !encrypted.isBlank()) {
-            masked = "Connected";
-        }
+        String last4 = connection.getApiKeyLast4();
+        String masked = last4 == null || last4.isBlank()
+                ? "Connected"
+                : "••••" + last4;
 
         return new PersonalProviderConnectionResponse(
                 connection.getId(),
@@ -270,6 +267,7 @@ public class PersonalProviderConnectionServiceImpl
                 connection.getDisplayName(),
                 connection.getStatus(),
                 masked,
+                last4,
                 connection.getLastValidatedAt(),
                 connection.getValidationMessage(),
                 connection.getCreatedAt(),
