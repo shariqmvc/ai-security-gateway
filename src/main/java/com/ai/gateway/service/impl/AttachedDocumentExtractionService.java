@@ -15,6 +15,7 @@ import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.stereotype.Service;
 import org.xml.sax.ContentHandler;
+import org.apache.tika.parser.ParseContext;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -142,7 +143,7 @@ public class AttachedDocumentExtractionService {
             }
 
             AutoDetectParser parser = new AutoDetectParser();
-            parser.parse(input, handler, metadata);
+            parser.parse(input, handler, metadata, new ParseContext());
             String text = handler.toString().trim();
 
             if (text.isBlank()) {
