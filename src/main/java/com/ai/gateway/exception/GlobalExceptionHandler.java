@@ -179,7 +179,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(
             org.springframework.security.access.AccessDeniedException ex,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            jakarta.servlet.http.HttpServletResponse httpResponse) {
+
+        if (httpResponse.isCommitted()) {
+            log.debug("Access denied after response was already committed. path={}", request.getRequestURI());
+            return null;
+        }
 
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -308,7 +314,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(
             Exception ex,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            jakarta.servlet.http.HttpServletResponse httpResponse) {
+
+        if (httpResponse.isCommitted()) {
+            log.debug("Unhandled exception after response was already committed. path={}, message={}",
+                    request.getRequestURI(), ex.getMessage());
+            return null;
+        }
 
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
