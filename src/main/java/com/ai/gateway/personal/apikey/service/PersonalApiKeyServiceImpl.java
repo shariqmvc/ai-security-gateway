@@ -24,7 +24,7 @@ import java.util.*;
 public class PersonalApiKeyServiceImpl implements PersonalApiKeyService {
     private static final int KEY_BYTES = 32;
     private static final Set<String> ALLOWED_SCOPES = Set.of("chat", "rag", "models");
-    private static final Set<String> DEFAULT_SCOPES = Set.of("chat", "models");
+    private static final Set<String> DEFAULT_SCOPES = Set.of("chat");
 
     private final PersonalApiKeyRepository keyRepository;
     private final PersonalAccountRepository accountRepository;
