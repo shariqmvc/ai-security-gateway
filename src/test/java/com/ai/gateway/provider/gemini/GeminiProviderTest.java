@@ -1,4 +1,4 @@
-package com.ai.gateway.core.provider.gemini;
+package com.ai.gateway.provider.gemini;
 
 import com.ai.gateway.config.GeminiConfig;
 import com.ai.gateway.core.contract.AIRequest;
@@ -8,6 +8,7 @@ import com.ai.gateway.core.multimodal.MediaSourceType;
 import com.ai.gateway.core.multimodal.MediaTypeKind;
 import com.ai.gateway.core.multimodal.MediaUrlFetcher;
 import com.ai.gateway.core.observability.PerformanceLogger;
+import com.ai.gateway.core.provider.gemini.GeminiProvider;
 import com.ai.gateway.core.provider.gemini.dto.Candidate;
 import com.ai.gateway.core.provider.gemini.dto.CandidateContent;
 import com.ai.gateway.core.provider.gemini.dto.GeminiPart;
