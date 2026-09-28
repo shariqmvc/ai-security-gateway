@@ -13,6 +13,7 @@ import com.ai.gateway.core.provider.gemini.dto.CandidateContent;
 import com.ai.gateway.core.provider.gemini.dto.GeminiPart;
 import com.ai.gateway.core.provider.gemini.dto.GeminiResponse;
 import com.ai.gateway.core.provider.gemini.dto.UsageMetadata;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -37,8 +38,9 @@ class GeminiProviderTest {
         config.setApiKey("test-key");
         PerformanceLogger logger = mock(PerformanceLogger.class);
         MediaUrlFetcher fetcher = mock(MediaUrlFetcher.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
 
-        GeminiProvider provider = new GeminiProvider(restTemplate, config, logger, fetcher);
+        GeminiProvider provider = new GeminiProvider(restTemplate, config, logger, fetcher, objectMapper);
         ReflectionTestUtils.setField(provider, "apiKey", "test-key");
         ReflectionTestUtils.setField(provider, "baseUrl", "https://generativelanguage.googleapis.com");
         ReflectionTestUtils.setField(provider, "model", "gemini-3.6-flash");
