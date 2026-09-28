@@ -143,9 +143,21 @@ public class AttachedDocumentExtractionService {
             }
 
             AutoDetectParser parser = new AutoDetectParser();
-            parser.parse(input, handler, metadata, new ParseContext());
-            String text = handler.toString().trim();
+            try {
+                parser.parse(input, handler, metadata, new ParseContext());
+            } catch (Exception ex) {
+                // BodyContentHandler can stop at the configured character
+                // budget. Preserve the bounded prefix instead of dropping the
+                // entire attachment; context optimization will bound the final
+                // provider prompt again.
+                String partial = handler.toString().trim();
+                if (!partial.isBlank()) {
+                    return partial;
+                }
+                throw ex;
+            }
 
+            String text = handler.toString().trim();
             if (text.isBlank()) {
                 throw new IllegalArgumentException(
                         "No extractable text was found in attached document " + safeName(media) + ".");
