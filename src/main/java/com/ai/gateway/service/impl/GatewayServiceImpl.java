@@ -1749,7 +1749,7 @@ public class GatewayServiceImpl implements GatewayService {
             return rag;
         }
 
-        return rag + "\\n\\n" + documentEvidence;
+        return rag + "\n\n" + documentEvidence;
     }
 
     private int resolveContextWindow(AIRequest request) {
