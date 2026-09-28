@@ -11,6 +11,7 @@ import com.ai.gateway.personal.inference.PersonalTokenVaultService;
 import com.ai.gateway.service.PIIDetectionService;
 import com.ai.gateway.service.TokenVaultService;
 import org.apache.tika.metadata.Metadata;
+import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.stereotype.Service;
@@ -136,7 +137,7 @@ public class AttachedDocumentExtractionService {
             ContentHandler handler = new BodyContentHandler(MAX_DOCUMENT_CHARS);
             Metadata metadata = new Metadata();
             if (media.getFileName() != null && !media.getFileName().isBlank()) {
-                metadata.set(Metadata.RESOURCE_NAME_KEY, media.getFileName());
+                metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, media.getFileName());
             }
             if (media.getMimeType() != null && !media.getMimeType().isBlank()) {
                 metadata.set(Metadata.CONTENT_TYPE, media.getMimeType());
