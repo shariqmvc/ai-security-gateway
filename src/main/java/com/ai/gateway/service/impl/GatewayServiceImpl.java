@@ -69,6 +69,18 @@ public class GatewayServiceImpl implements GatewayService {
 
     private static final int DEFAULT_RESERVED_OUTPUT_TOKENS = 1024;
 
+    /*
+     * Vision models consume additional context for image embeddings/visual
+     * tokens that the gateway's text estimator cannot see. Keep a dedicated
+     * multimodal safety reserve so the text/RAG budget does not fill the
+     * provider context window before Ollama accounts for the image.
+     *
+     * Qwen2.5-VL telemetry showed ~1.1K additional input tokens for a single
+     * image, so 1024 is the conservative gateway reserve while retaining a
+     * full 1024-token generation reserve.
+     */
+    private static final int MULTIMODAL_INPUT_SAFETY_RESERVE_TOKENS = 1024;
+
     private final PIIDetectionService piiDetectionService;
 
     private final TokenVaultService tokenVaultService;
@@ -286,6 +298,9 @@ public class GatewayServiceImpl implements GatewayService {
                             + " model=" + aiRequest.getModel()
                             + " contextWindowTokens=" + resolveContextWindow(aiRequest)
                             + " reservedOutputTokens=" + DEFAULT_RESERVED_OUTPUT_TOKENS
+                            + " multimodalSafetyReserveTokens=" + (hasVisionMedia(aiRequest)
+                                    ? MULTIMODAL_INPUT_SAFETY_RESERVE_TOKENS
+                                    : 0)
                             + " inputBudgetTokens=" + resolveContextInputBudget(aiRequest)
                             + " estimatedOriginalTokens=" + contextOptimization.getOriginalTokens()
                             + " estimatedOptimizedTokens=" + contextOptimization.getOptimizedTokens()
@@ -1691,9 +1706,29 @@ public class GatewayServiceImpl implements GatewayService {
         if (request == null) {
             return 15000;
         }
-        return modelRegistry.find(request.getProvider(), request.getModel())
-                .map(model -> Math.max(256, model.contextWindowTokens() - DEFAULT_RESERVED_OUTPUT_TOKENS))
-                .orElse(Math.max(256, 16000 - DEFAULT_RESERVED_OUTPUT_TOKENS));
+
+        int contextWindow = modelRegistry.find(request.getProvider(), request.getModel())
+                .map(ModelDefinition::contextWindowTokens)
+                .filter(value -> value > 0)
+                .orElse(16000);
+
+        int safetyReserve = hasVisionMedia(request)
+                ? MULTIMODAL_INPUT_SAFETY_RESERVE_TOKENS
+                : 0;
+
+        return Math.max(
+                256,
+                contextWindow
+                        - DEFAULT_RESERVED_OUTPUT_TOKENS
+                        - safetyReserve);
+    }
+
+    private boolean hasVisionMedia(AIRequest request) {
+        return request != null
+                && request.getMedia() != null
+                && request.getMedia().stream()
+                        .anyMatch(media -> media != null
+                                && media.getType() == MediaTypeKind.IMAGE);
     }
 
     private AIRequest buildAIRequest(
