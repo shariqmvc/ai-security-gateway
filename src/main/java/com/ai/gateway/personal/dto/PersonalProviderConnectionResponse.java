@@ -11,6 +11,7 @@ public record PersonalProviderConnectionResponse(
         String displayName,
         String status,
         String maskedCredential,
+        String apiKeyLast4,
         LocalDateTime lastValidatedAt,
         String validationMessage,
         LocalDateTime createdAt,
