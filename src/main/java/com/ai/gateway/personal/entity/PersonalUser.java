@@ -36,6 +36,13 @@ public class PersonalUser {
     @Builder.Default
     private boolean emailVerified = false;
 
+    @Column(name = "phone_number", length = 20, unique = true)
+    private String phoneNumber;
+
+    @Column(name = "phone_verified", nullable = false)
+    @Builder.Default
+    private boolean phoneVerified = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
