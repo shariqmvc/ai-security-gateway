@@ -259,7 +259,9 @@ public class GatewayServiceImpl implements GatewayService {
             estimatedTokensSaved = contextOptimization.getTokensSaved();
             contextWindowTokens = resolveContextWindow(aiRequest);
             String providerPrompt = contextOptimization.getOptimizedContext();
+            providerPrompt = reinforceMultimodalPrompt(providerPrompt, aiRequest);
             aiRequest.setPrompt(providerPrompt);
+            logMultimodalRequest(requestId, aiRequest, request);
             performanceLogger.stage(
                     "CONTEXT_OPTIMIZATION",
                     requestId,
@@ -819,7 +821,9 @@ public class GatewayServiceImpl implements GatewayService {
             estimatedTokensSaved = contextOptimization.getTokensSaved();
             contextWindowTokens = resolveContextWindow(aiRequest);
             String providerPrompt = contextOptimization.getOptimizedContext();
+            providerPrompt = reinforceMultimodalPrompt(providerPrompt, aiRequest);
             aiRequest.setPrompt(providerPrompt);
+            logMultimodalRequest(requestId, aiRequest, request);
             performanceLogger.stage(
                     "CONTEXT_OPTIMIZATION",
                     requestId,
@@ -1775,6 +1779,58 @@ public class GatewayServiceImpl implements GatewayService {
 
             throw ex;
         }
+    }
+
+    private String reinforceMultimodalPrompt(String providerPrompt, AIRequest aiRequest) {
+        String prompt = providerPrompt == null ? "" : providerPrompt;
+        if (aiRequest == null || aiRequest.getMedia() == null || aiRequest.getMedia().isEmpty()) {
+            return prompt;
+        }
+
+        boolean hasImage = aiRequest.getMedia().stream()
+                .anyMatch(media -> media != null && media.getType() == MediaTypeKind.IMAGE);
+        if (!hasImage) {
+            return prompt;
+        }
+
+        /*
+         * Mixed RAG + vision requests contain two independent evidence channels.
+         * Make that contract explicit to vision models so retrieved document text
+         * cannot accidentally become a substitute for the attached image.
+         */
+        return "MULTIMODAL INPUT INSTRUCTION:\n"
+                + "One or more images are attached to this request. Inspect the attached image(s) directly and use their visual content when answering. "
+                + "Retrieved RAG text is supplementary evidence and must not be treated as a substitute for the attached image(s).\n\n"
+                + prompt;
+    }
+
+    private void logMultimodalRequest(
+            UUID requestId,
+            AIRequest aiRequest,
+            ChatRequest request) {
+
+        if (aiRequest == null || aiRequest.getMedia() == null || aiRequest.getMedia().isEmpty()) {
+            return;
+        }
+
+        String mediaTypes = aiRequest.getMedia().stream()
+                .filter(java.util.Objects::nonNull)
+                .map(media -> media.getType() == null ? "UNKNOWN" : media.getType().name())
+                .collect(java.util.stream.Collectors.joining(","));
+
+        boolean ragEnabled = request != null
+                && request.getRag() != null
+                && request.getRag().isEnabled();
+
+        log.info(
+                "MULTIMODAL_REQUEST requestId={} provider={} model={} mediaCount={} mediaTypes={} fileProcessingMode={} ragEnabled={}",
+                requestId,
+                aiRequest.getProvider(),
+                aiRequest.getModel(),
+                aiRequest.getMedia().size(),
+                mediaTypes,
+                aiRequest.getFileProcessingMode(),
+                ragEnabled);
     }
 
     private void addMultimodalCapabilities(ChatRequest request) {
