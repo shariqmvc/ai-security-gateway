@@ -337,6 +337,8 @@ public class GatewayServiceImpl implements GatewayService {
                 aiRequest.setBillingMode(personalBillingModeResolver
                         .resolve(auth, aiRequest.getProvider(), aiRequest.getModel(), request.getBillingMode())
                         .name());
+                personalQuotaService.ensureFreeComputeCapacity(
+                        auth, aiRequest, estimatedOptimizedTokens == null ? estimatedInputTokens : estimatedOptimizedTokens);
             }
 
             stageStart = System.nanoTime();
@@ -487,7 +489,7 @@ public class GatewayServiceImpl implements GatewayService {
 
             if (auth.isPersonalPrincipal()) {
                 personalQuotaService.afterSuccess(auth, aiResponse);
-                personalQuotaService.enforceAndRecordFreeComputeCost(auth, aiRequest, aiResponse);
+                personalQuotaService.recordFreeComputeCost(auth, aiRequest, aiResponse);
             }
 
             long providerLatency = elapsedMs(providerInvocationStart);
