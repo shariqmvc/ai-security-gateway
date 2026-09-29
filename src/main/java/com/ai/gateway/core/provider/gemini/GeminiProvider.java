@@ -108,6 +108,9 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
                         GeminiContent.builder()
                                 .parts(buildParts(request))
                                 .build()))
+                .generationConfig(GenerationConfig.builder()
+                        .maxOutputTokens(STREAM_MAX_OUTPUT_TOKENS)
+                        .build())
                 .build();
 
         HttpHeaders headers = new HttpHeaders();
