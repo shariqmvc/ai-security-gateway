@@ -1093,7 +1093,7 @@ public class GatewayServiceImpl implements GatewayService {
 
             long providerLatency = elapsedMs(providerStart);
             log.info(
-                    "PROVIDER_STREAM_USAGE requestId={} provider={} model={} inputTokens={} outputTokens={} totalTokens={} providerLatencyMs={}",
+                    "PROVIDER_STREAM_USAGE requestId={} provider={} model={} inputTokens={} outputTokens={} totalTokens={} providerLatencyMs={} finishReason={}",
                     requestId,
                     result.getProvider(),
                     result.getModel(),
