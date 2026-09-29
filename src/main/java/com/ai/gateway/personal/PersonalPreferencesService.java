@@ -28,6 +28,8 @@ public class PersonalPreferencesService {
 
     private final PersonalAccountRepository accountRepository;
     private final PersonalAccountPreferencesRepository preferencesRepository;
+    private final com.ai.gateway.personal.policy.service.PersonalAccountPolicyService policyService;
+    private final com.ai.gateway.core.routing.registry.ModelRegistry modelRegistry;
 
     /**
      * Applies persisted Personal preferences only where the request has not
@@ -82,16 +84,26 @@ public class PersonalPreferencesService {
         PersonalAccount account = requireActiveAccount(context);
         PersonalAccountPreferences preferences = ensurePreferences(account);
 
+        String nextProvider = preferences.getDefaultProvider();
+        String nextModel = preferences.getDefaultModel();
+        String nextBillingMode = preferences.getBillingMode();
+
         if (request.defaultProvider() != null) {
-            preferences.setDefaultProvider(normalizeProvider(request.defaultProvider()));
+            nextProvider = normalizeProvider(request.defaultProvider());
         }
         if (request.defaultModel() != null) {
-            preferences.setDefaultModel(normalizeOptional(request.defaultModel()));
+            nextModel = normalizeOptional(request.defaultModel());
         }
         if (request.billingMode() != null) {
-            preferences.setBillingMode(normalizeEnum(
-                    request.billingMode(), BILLING_MODES, "billingMode"));
+            nextBillingMode = normalizeEnum(
+                    request.billingMode(), BILLING_MODES, "billingMode");
         }
+
+        validateModelPreference(account.getId(), nextProvider, nextModel, nextBillingMode);
+
+        preferences.setDefaultProvider(nextProvider);
+        preferences.setDefaultModel(nextModel);
+        preferences.setBillingMode(nextBillingMode);
         if (request.routingPriority() != null) {
             preferences.setRoutingPriority(normalizeEnum(
                     request.routingPriority(), ROUTING_PRIORITIES, "routingPriority"));
@@ -99,6 +111,34 @@ public class PersonalPreferencesService {
 
         preferences.setUpdatedAt(LocalDateTime.now());
         return toResponse(preferencesRepository.save(preferences));
+    }
+
+    private void validateModelPreference(UUID accountId, String providerValue, String modelId, String billingMode) {
+        if (modelId == null || modelId.isBlank()) {
+            return;
+        }
+
+        Provider provider = providerValue == null ? null : Provider.valueOf(providerValue);
+        var definition = provider == null
+                ? modelRegistry.findByModel(modelId).orElseThrow(() ->
+                        new IllegalArgumentException("Unsupported defaultModel: " + modelId))
+                : modelRegistry.find(provider, modelId).orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Model " + modelId + " is not available for provider " + provider + "."));
+
+        if (!definition.isEnabled()) {
+            throw new IllegalArgumentException("Default model is disabled: " + modelId);
+        }
+
+        if (billingMode.equalsIgnoreCase("FREE")) {
+            String key = definition.provider().name() + ":" + definition.modelId();
+            if (!policyService.freeModels(accountId).contains(key)
+                    && !policyService.freeModels(accountId).contains(definition.modelId())) {
+                throw new IllegalArgumentException(
+                        "Default model is not configured as a Personal free model: "
+                                + definition.provider() + ":" + definition.modelId());
+            }
+        }
     }
 
     private PersonalAccountPreferences ensurePreferences(PersonalAccount account) {
