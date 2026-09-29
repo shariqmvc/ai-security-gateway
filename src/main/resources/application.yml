@@ -371,6 +371,7 @@ alroute:
       reserve-output-tokens: ${ALROUTE_PERSONAL_RESERVE_OUTPUT_TOKENS:1024}
       reservation-multiplier: ${ALROUTE_PERSONAL_RESERVATION_MULTIPLIER:1.25}
       minimum-credit-charge: ${ALROUTE_PERSONAL_MINIMUM_CREDIT_CHARGE:0.01}
+      monthly-free-compute-credit-cap: ${ALROUTE_PERSONAL_MONTHLY_FREE_COMPUTE_CREDIT_CAP:0}
 
     payment:
       provider: ${ALROUTE_PERSONAL_PAYMENT_PROVIDER:EXTERNAL}
