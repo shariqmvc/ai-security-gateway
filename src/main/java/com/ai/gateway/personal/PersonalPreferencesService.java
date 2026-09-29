@@ -33,7 +33,7 @@ public class PersonalPreferencesService {
      * Applies persisted Personal preferences only where the request has not
      * supplied an explicit value. Explicit request fields always win.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public void applyRequestDefaults(AuthenticationContext context, ChatRequest request) {
         if (context == null || !context.isPersonalPrincipal() || request == null) {
             return;
@@ -42,7 +42,7 @@ public class PersonalPreferencesService {
         PersonalAccount account = requireActiveAccount(context);
         PersonalAccountPreferences preferences = ensurePreferences(account);
 
-        if (request.getProvider() == null && request.getModel() == null) {
+        if (request.getProvider() == null && (request.getModel() == null || request.getModel().isBlank())) {
             String defaultProvider = normalizeOptional(preferences.getDefaultProvider());
             String defaultModel = normalizeOptional(preferences.getDefaultModel());
             if (defaultProvider != null) {
