@@ -9,6 +9,7 @@ import com.ai.gateway.core.observability.PerformanceLogger;
 import com.ai.gateway.core.provider.AIProvider;
 import com.ai.gateway.core.provider.AIProviderFactory;
 import com.ai.gateway.core.routing.analytics.RoutingAnalyticsService;
+import com.ai.gateway.core.routing.health.RoutingHealthService;
 import com.ai.gateway.core.routing.registry.ModelDefinition;
 import com.ai.gateway.core.routing.registry.ModelStatus;
 import com.ai.gateway.core.routing.registry.ProviderDefinition;
@@ -61,6 +62,9 @@ class ProviderFailoverServiceImplTest {
     @Mock
     private ProviderCircuitBreaker providerCircuitBreaker;
 
+    @Mock
+    private RoutingHealthService routingHealthService;
+
     private FailoverProperties properties;
     private ProviderFailoverServiceImpl service;
 
@@ -91,6 +95,10 @@ class ProviderFailoverServiceImplTest {
                 service,
                 "providerCircuitBreaker",
                 providerCircuitBreaker);
+        ReflectionTestUtils.setField(
+                service,
+                "routingHealthService",
+                routingHealthService);
 
         primaryRequest = AIRequest.builder()
                 .provider(Provider.GEMINI)
@@ -966,6 +974,39 @@ class ProviderFailoverServiceImplTest {
         assertEquals(Provider.GEMINI, thrown.getProvider());
         assertSame(failure, thrown.getCause());
         verify(providerFactory, never()).getProvider(Provider.OPENAI);
+    }
+
+
+    @Test
+    void shouldSkipUnhealthyFallbackCandidate() {
+
+        allowPrimaryCircuit();
+
+        when(providerFactory.getProvider(Provider.GEMINI))
+                .thenReturn(geminiProvider);
+
+        RuntimeException primaryFailure =
+                new RuntimeException("Gemini unavailable");
+
+        when(geminiProvider.chat(primaryRequest))
+                .thenThrow(primaryFailure);
+
+        when(routingHealthService.isHealthyForRouting(any()))
+                .thenReturn(false);
+
+        RuntimeException thrown =
+                assertThrows(
+                        RuntimeException.class,
+                        () -> service.execute(primaryRequest));
+
+        assertSame(primaryFailure, thrown);
+
+        verify(geminiProvider).chat(primaryRequest);
+        verify(providerFactory, never()).getProvider(Provider.OPENAI);
+        verify(routingHealthService).isHealthyForRouting(
+                argThat(candidate ->
+                        candidate.provider() == Provider.OPENAI
+                                && candidate.model().equals("gpt-test")));
     }
 
 }
