@@ -148,8 +148,12 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
         if (cap == null || cap.compareTo(BigDecimal.ZERO) < 0) cap = BigDecimal.ZERO;
 
         if (cost.compareTo(BigDecimal.ZERO) > 0) {
-            repository.consumeMonthlyFreeComputeCost(
+            int updated = repository.consumeMonthlyFreeComputeCost(
                     auth.getPersonalAccountId(), YearMonth.now().atDay(1), cost, cap);
+            if (updated == 0 && cap.compareTo(BigDecimal.ZERO) > 0) {
+                throw new PersonalQuotaExceededException(
+                        "Personal monthly free-model compute cap exceeded.");
+            }
         }
     }
 
