@@ -1,6 +1,9 @@
 package com.ai.gateway.personal.usage.service;
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.core.contract.*;
+import com.ai.gateway.core.cost.dto.PreRequestCostEstimate;
+import com.ai.gateway.core.cost.dto.PreRequestCostRequest;
+import com.ai.gateway.core.cost.service.PreRequestCostEstimator;
 import com.ai.gateway.personal.usage.dto.*;
 import com.ai.gateway.personal.usage.entity.*;
 import com.ai.gateway.personal.usage.repository.PersonalRequestHistoryRepository;
@@ -23,6 +26,7 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
  private final PersonalQuotaProperties quotaProperties;
  private final PersonalQuotaUsageRepository quotaRepository;
  private final PersonalBillingProperties billingProperties;
+ private final PreRequestCostEstimator costEstimator;
  private final com.ai.gateway.personal.usage.repository.PersonalRequestFeedbackRepository feedbackRepository;
 
  @Override @Transactional
@@ -38,7 +42,7 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
    .inputTokens(u==null?null:u.getInputTokens()).outputTokens(u==null?null:u.getOutputTokens())
    .totalTokens(u==null?null:u.getTotalTokens()).estimatedInputTokens(estIn)
    .estimatedOptimizedTokens(estOpt).estimatedTokensSaved(saved).contextWindowTokens(window)
-   .latencyMs(latency).providerLatencyMs(providerLatency).cacheHit(cacheHit).ragEnabled(rag).build());
+   .latencyMs(latency).providerLatencyMs(providerLatency).cost(actualCost(req, resp)).cacheHit(cacheHit).ragEnabled(rag).build());
  }
  @Override @Transactional
  public void recordFailure(UUID id,AuthenticationContext auth,AIRequest req,String prompt,long latency,long providerLatency,String category){
@@ -128,6 +132,16 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
   if(value instanceof Number)return BigDecimal.valueOf(((Number)value).doubleValue());
   try{return new BigDecimal(value.toString());}
   catch(NumberFormatException ex){return BigDecimal.ZERO;}
+ }
+ private BigDecimal actualCost(AIRequest req, AIResponse resp){
+  if(req==null||resp==null||resp.getUsage()==null||resp.getProvider()==null||resp.getModel()==null)return BigDecimal.ZERO;
+  var u=resp.getUsage();
+  PreRequestCostEstimate estimate=costEstimator.estimate(PreRequestCostRequest.builder()
+   .provider(resp.getProvider()).model(resp.getModel())
+   .inputTokens(u.getInputTokens()==null?0:u.getInputTokens())
+   .outputTokens(u.getOutputTokens()==null?0:u.getOutputTokens())
+   .cachedInputTokens(0).build());
+  return estimate.getTotalEstimatedCost()==null?BigDecimal.ZERO:estimate.getTotalEstimatedCost();
  }
  private boolean personal(AuthenticationContext a){return a!=null&&a.isPersonalPrincipal()&&a.getPersonalAccountId()!=null;}
  private PersonalRequestHistoryResponse toResponse(PersonalRequestHistory h, PersonalResponseRating responseRating){
