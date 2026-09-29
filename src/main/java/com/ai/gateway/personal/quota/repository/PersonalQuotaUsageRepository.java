@@ -34,7 +34,6 @@ public interface PersonalQuotaUsageRepository extends JpaRepository<PersonalQuot
  """,nativeQuery=true)
  int consumeMonthlyTokens(@Param("accountId") UUID accountId,@Param("periodStart") LocalDate periodStart,
                           @Param("tokens") long tokens,@Param("limit") long limit);
-}
 
  @Modifying
  @Query(value="""
@@ -48,3 +47,4 @@ public interface PersonalQuotaUsageRepository extends JpaRepository<PersonalQuot
  """,nativeQuery=true)
  int consumeMonthlyFreeComputeCost(@Param("accountId") UUID accountId,@Param("periodStart") LocalDate periodStart,
                                    @Param("cost") BigDecimal cost,@Param("cap") BigDecimal cap);
+}
