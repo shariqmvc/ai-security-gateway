@@ -285,6 +285,7 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
         final int[] inputTokens = {0};
         final int[] outputTokens = {0};
         final long[] totalDuration = {0L};
+        final String[] finishReason = {null};
 
         try (ProviderConcurrencyLimiter.Permit ignored =
                      concurrencyLimiter.acquire(requestId, provider())) {
@@ -317,6 +318,9 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
                                 OllamaResponse chunk =
                                         objectMapper.readValue(line, OllamaResponse.class);
                                 chunksSeen[0]++;
+                                if (chunk.getDoneReason() != null && !chunk.getDoneReason().isBlank()) {
+                                    finishReason[0] = chunk.getDoneReason();
+                                }
 
                                 if (chunk.getMessage() != null
                                         && chunk.getMessage().getContent() != null
@@ -388,6 +392,7 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
                 .outputTokens(outputTokens[0])
                 .totalTokens(totalTokens)
                 .latencyMs(latencyMs)
+                .finishReason(finishReason[0])
                 .build();
     }
 
