@@ -97,7 +97,7 @@ ollama:
   # provider latency cannot grow without bound. Override per environment.
   keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
   num-ctx: ${OLLAMA_NUM_CTX:4096}
-  num-predict: ${OLLAMA_NUM_PREDICT:512}
+  num-predict: ${OLLAMA_NUM_PREDICT:1024}
 
 aegis:
   security:
