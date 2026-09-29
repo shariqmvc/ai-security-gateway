@@ -60,6 +60,10 @@ public class PersonalQuotaUsage {
     @Builder.Default
     private Long tokenCount = 0L;
 
+    @Column(name = "free_compute_cost", nullable = false, precision = 19, scale = 8)
+    @Builder.Default
+    private java.math.BigDecimal freeComputeCost = java.math.BigDecimal.ZERO;
+
     @Version
     private Long version;
 }
