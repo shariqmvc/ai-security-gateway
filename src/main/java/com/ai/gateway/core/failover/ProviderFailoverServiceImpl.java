@@ -390,6 +390,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         AIProvider provider =
                 providerFactory.getProvider(request.getProvider());
 
+        long startedAtNanos = System.nanoTime();
+
         String previousAttempt = MDC.get("providerAttempt");
         MDC.put("providerAttempt", String.valueOf(attempt));
         try {
@@ -411,6 +413,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 response.setProvider(request.getProvider());
                 response.setModel(request.getModel());
             }
+
+            recordRoutingHealthSuccess(request, startedAtNanos);
             return response;
         } finally {
             if (previousAttempt == null) {
@@ -449,6 +453,31 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                             + provider + "/" + model
                             + " before attempt " + attempt + ".");
         }
+    }
+
+    private void recordRoutingHealthSuccess(
+            AIRequest request,
+            long startedAtNanos) {
+
+        if (routingHealthService == null
+                || request == null
+                || request.getProvider() == null
+                || request.getModel() == null
+                || request.getModel().isBlank()) {
+            return;
+        }
+
+        long latencyMs =
+                Math.max(
+                        0L,
+                        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                                System.nanoTime() - startedAtNanos));
+
+        routingHealthService.recordSuccess(
+                new RoutingCandidate(
+                        request.getProvider(),
+                        request.getModel()),
+                latencyMs);
     }
 
     private void recordProviderFailure(AIRequest request, Exception ex) {
