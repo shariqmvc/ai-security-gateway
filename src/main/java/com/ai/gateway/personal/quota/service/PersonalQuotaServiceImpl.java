@@ -6,6 +6,11 @@ import com.ai.gateway.personal.policy.entity.PersonalAccountPolicy;
 import com.ai.gateway.personal.policy.service.PersonalAccountPolicyService;
 import com.ai.gateway.personal.quota.exception.PersonalQuotaExceededException;
 import com.ai.gateway.personal.quota.repository.PersonalQuotaUsageRepository;
+import com.ai.gateway.personal.billing.PersonalBillingProperties;
+import com.ai.gateway.core.cost.dto.PreRequestCostEstimate;
+import com.ai.gateway.core.cost.dto.PreRequestCostRequest;
+import com.ai.gateway.core.cost.service.PreRequestCostEstimator;
+import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +27,8 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
 
     private final PersonalAccountPolicyService policyService;
     private final PersonalQuotaUsageRepository repository;
+    private final PersonalBillingProperties billingProperties;
+    private final PreRequestCostEstimator costEstimator;
     private final ConcurrentHashMap<UUID, AtomicInteger> active = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, ConcurrentLinkedDeque<Long>> starts = new ConcurrentHashMap<>();
 
