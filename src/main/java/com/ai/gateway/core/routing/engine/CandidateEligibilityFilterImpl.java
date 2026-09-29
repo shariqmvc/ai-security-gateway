@@ -2,16 +2,25 @@ package com.ai.gateway.core.routing.engine;
 
 import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.core.routing.policy.RoutingPolicy;
-import lombok.RequiredArgsConstructor;
+import com.ai.gateway.core.routing.health.RoutingHealthService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
 
 @Service
-@RequiredArgsConstructor
 public class CandidateEligibilityFilterImpl
         implements CandidateEligibilityFilter {
+
+    private final RoutingHealthService routingHealthService;
+
+    public CandidateEligibilityFilterImpl(RoutingHealthService routingHealthService) {
+        this.routingHealthService = routingHealthService;
+    }
+
+    public CandidateEligibilityFilterImpl() {
+        this.routingHealthService = null;
+    }
 
     @Override
     public List<RoutingCandidate> filter(
@@ -39,6 +48,9 @@ public class CandidateEligibilityFilterImpl
                 .filter(candidate ->
                         policy.allowsModel(
                                 candidate.model()))
+                .filter(candidate ->
+                        routingHealthService == null
+                                || routingHealthService.isHealthyForRouting(candidate))
                 .distinct()
                 .toList();
     }
