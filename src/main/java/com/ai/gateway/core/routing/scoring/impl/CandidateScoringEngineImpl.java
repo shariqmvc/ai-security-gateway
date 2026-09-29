@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import com.ai.gateway.core.routing.scoring.objective.RoutingObjective;
 import com.ai.gateway.core.routing.scoring.objective.RoutingObjectiveVector;
+import com.ai.gateway.core.routing.scoring.objective.RoutingObjectiveWeights;
 import com.ai.gateway.core.routing.scoring.objective.RoutingUtilityCalculator;
 import com.ai.gateway.core.routing.scoring.objective.RoutingUtilityResult;
 
@@ -94,7 +95,7 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
             if (context.objectiveWeights() != null) {
                 RoutingObjectiveVector vector = objectiveVector(components);
                 RoutingUtilityResult utility = utilityCalculator.calculate(
-                        vector, context.objectiveWeights());
+                        vector, effectiveObjectiveWeights(context));
                 total = utility.utility();
 
                 List<CandidateScoreComponent> utilityComponents = new ArrayList<>(components.size());
@@ -116,6 +117,60 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
         }
 
         return List.copyOf(result);
+    }
+
+    /**
+     * Applies runtime optimization as a multiplicative adaptation of the
+     * selected optimization profile. The profile remains the governing
+     * baseline, while health/latency/cost optimization can move its active
+     * score dimensions without being discarded by the objective layer.
+     */
+    private RoutingObjectiveWeights effectiveObjectiveWeights(
+            CandidateScoringContext context) {
+
+        RoutingObjectiveWeights profileWeights = context.objectiveWeights();
+        if (context.weightOverrides().isEmpty()) {
+            return profileWeights;
+        }
+
+        RoutingScoringProperties.Weights configured = properties.getWeights();
+        EnumMap<RoutingObjective, Double> values =
+                new EnumMap<>(RoutingObjective.class);
+        values.putAll(profileWeights.values());
+
+        applyRuntimeFactor(values, RoutingObjective.COST,
+                context.weightOverrides().get(CandidateScoreDimension.COST),
+                configured.getCost());
+        applyRuntimeFactor(values, RoutingObjective.LATENCY,
+                context.weightOverrides().get(CandidateScoreDimension.LATENCY),
+                configured.getLatency());
+        applyRuntimeFactor(values, RoutingObjective.AVAILABILITY,
+                context.weightOverrides().get(CandidateScoreDimension.AVAILABILITY),
+                configured.getAvailability());
+        applyRuntimeFactor(values, RoutingObjective.POLICY_PREFERENCE,
+                context.weightOverrides().get(CandidateScoreDimension.POLICY_PREFERENCE),
+                configured.getPolicyPreference());
+
+        return new RoutingObjectiveWeights(values);
+    }
+
+    private void applyRuntimeFactor(
+            Map<RoutingObjective, Double> values,
+            RoutingObjective objective,
+            Double optimizedWeight,
+            double configuredWeight) {
+
+        if (optimizedWeight == null || configuredWeight <= 0.0) {
+            return;
+        }
+
+        Double profileWeight = values.get(objective);
+        if (profileWeight == null || profileWeight <= 0.0) {
+            return;
+        }
+
+        values.put(objective,
+                profileWeight * (optimizedWeight / configuredWeight));
     }
 
     private RoutingObjectiveVector objectiveVector(List<CandidateScoreComponent> components) {
