@@ -125,8 +125,37 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
 
 
     @Override
+    @Transactional(readOnly = true)
+    public void ensureFreeComputeCapacity(AuthenticationContext auth, AIRequest request, long estimatedInputTokens) {
+        if (!personal(auth) || request == null || !"FREE".equalsIgnoreCase(request.getBillingMode())) return;
+        BigDecimal cap = billingProperties.getMonthlyFreeComputeCreditCap();
+        if (cap == null || cap.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        int input = (int) Math.min(Integer.MAX_VALUE, Math.max(1L, estimatedInputTokens));
+        PreRequestCostEstimate estimate = costEstimator.estimate(
+                PreRequestCostRequest.builder()
+                        .provider(request.getProvider())
+                        .model(request.getModel())
+                        .inputTokens(input)
+                        .outputTokens(1024)
+                        .cachedInputTokens(0)
+                        .build());
+        BigDecimal projected = estimate.getTotalEstimatedCost() == null ? BigDecimal.ZERO : estimate.getTotalEstimatedCost();
+        BigDecimal used = freeComputeCost(auth.getPersonalAccountId());
+        if (used.add(projected).compareTo(cap) > 0) {
+            throw new PersonalQuotaExceededException("Personal monthly free-model compute cap exceeded.");
+        }
+    }
+
+    private BigDecimal freeComputeCost(UUID accountId) {
+        var row = repository.findByPersonalAccountIdAndPeriodTypeAndPeriodStart(
+                accountId, com.ai.gateway.enums.QuotaPeriodType.MONTHLY, YearMonth.now().atDay(1)).orElse(null);
+        return row == null || row.getFreeComputeCost() == null ? BigDecimal.ZERO : row.getFreeComputeCost();
+    }
+
+    @Override
     @Transactional
-    public void enforceAndRecordFreeComputeCost(AuthenticationContext auth, AIRequest request, AIResponse response) {
+    public void recordFreeComputeCost(AuthenticationContext auth, AIRequest request, AIResponse response) {
         if (!personal(auth) || request == null || response == null || response.getProvider() == null || response.getModel() == null) return;
         if (!"FREE".equalsIgnoreCase(request.getBillingMode())) return;
 
@@ -150,10 +179,7 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
         if (cost.compareTo(BigDecimal.ZERO) > 0) {
             int updated = repository.consumeMonthlyFreeComputeCost(
                     auth.getPersonalAccountId(), YearMonth.now().atDay(1), cost, cap);
-            if (updated == 0 && cap.compareTo(BigDecimal.ZERO) > 0) {
-                throw new PersonalQuotaExceededException(
-                        "Personal monthly free-model compute cap exceeded.");
-            }
+            // Cap enforcement happens before provider execution; this records actual cost.
         }
     }
 
