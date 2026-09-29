@@ -15,4 +15,6 @@ public class PersonalBillingProperties {
     private int reserveOutputTokens = 4096;
     private BigDecimal reservationMultiplier = new BigDecimal("1.25");
     private BigDecimal minimumCreditCharge = new BigDecimal("0.01");
+    /** Monthly provider compute-cost allowance for FREE model execution; 0 means unlimited. */
+    private BigDecimal monthlyFreeComputeCreditCap = BigDecimal.ZERO;
 }
