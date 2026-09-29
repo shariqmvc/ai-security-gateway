@@ -5,6 +5,11 @@ import com.ai.gateway.core.cost.dto.ModelPricing;
 import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import com.ai.gateway.core.routing.policy.RoutingPolicy;
+import com.ai.gateway.core.routing.intelligence.RoutingOptimizationService;
+import com.ai.gateway.core.routing.intelligence.RoutingPriority;
+import com.ai.gateway.core.routing.intelligence.RoutingRuntimeSignals;
+import com.ai.gateway.core.routing.scoring.objective.profile.RoutingOptimizationProfile;
+import com.ai.gateway.core.routing.scoring.objective.profile.RoutingOptimizationProfileRegistry;
 import com.ai.gateway.core.routing.scoring.CandidateScoreDimension;
 import com.ai.gateway.core.routing.scoring.CandidateScoringContext;
 import com.ai.gateway.core.routing.scoring.ScoredCandidate;
@@ -212,6 +217,54 @@ class CandidateScoringEngineImplTest {
                         CandidateScoreDimension.AVAILABILITY
                 ).rawValue()
         );
+    }
+
+    @Test
+    void runtimeHealthOptimizationSurvivesObjectiveProfileSelection() {
+        stubPricing();
+
+        RoutingCandidate openAi =
+                new RoutingCandidate(Provider.OPENAI, "gpt-a");
+        RoutingCandidate gemini =
+                new RoutingCandidate(Provider.GEMINI, "gemini-b");
+
+        RoutingRuntimeSignals signals = new RoutingRuntimeSignals(
+                java.util.Map.of(
+                        "OPENAI:gpt-a", 200.0,
+                        "GEMINI:gemini-b", 800.0),
+                java.util.Map.of(
+                        "OPENAI:gpt-a", 0.80,
+                        "GEMINI:gemini-b", 0.99));
+
+        java.util.Map<CandidateScoreDimension, Double> optimizedWeights =
+                new RoutingOptimizationService().optimize(
+                        java.util.Map.of(
+                                CandidateScoreDimension.COST, 0.30,
+                                CandidateScoreDimension.LATENCY, 0.25,
+                                CandidateScoreDimension.AVAILABILITY, 0.20,
+                                CandidateScoreDimension.POLICY_PREFERENCE, 0.25),
+                        signals,
+                        RoutingPriority.BALANCED);
+
+        RoutingOptimizationProfile profile =
+                new RoutingOptimizationProfileRegistry()
+                        .get(RoutingOptimizationProfileRegistry.BALANCED);
+
+        CandidateScoringContext context =
+                new CandidateScoringContext(
+                        policy(), 1_000, 1_000, false, null,
+                        null, optimizedWeights, signals)
+                        .withObjectiveWeights(profile.weights());
+
+        List<ScoredCandidate> result = engine.score(
+                List.of(openAi, gemini), context);
+
+        double availabilityWeight = component(
+                result.get(0), CandidateScoreDimension.AVAILABILITY).weight();
+
+        assertTrue(
+                availabilityWeight > 0.125,
+                "Runtime health optimization must still influence the final profile-weighted score.");
     }
 
     @Test
