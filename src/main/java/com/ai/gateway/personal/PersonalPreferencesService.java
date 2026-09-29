@@ -4,6 +4,7 @@ import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.personal.dto.PersonalPreferencesResponse;
 import com.ai.gateway.personal.dto.PersonalPreferencesUpdateRequest;
+import com.ai.gateway.core.contract.ChatRequest;
 import com.ai.gateway.personal.entity.PersonalAccount;
 import com.ai.gateway.personal.preferences.entity.PersonalAccountPreferences;
 import com.ai.gateway.personal.preferences.repository.PersonalAccountPreferencesRepository;
@@ -27,6 +28,45 @@ public class PersonalPreferencesService {
 
     private final PersonalAccountRepository accountRepository;
     private final PersonalAccountPreferencesRepository preferencesRepository;
+
+    /**
+     * Applies persisted Personal preferences only where the request has not
+     * supplied an explicit value. Explicit request fields always win.
+     */
+    @Transactional(readOnly = true)
+    public void applyRequestDefaults(AuthenticationContext context, ChatRequest request) {
+        if (context == null || !context.isPersonalPrincipal() || request == null) {
+            return;
+        }
+
+        PersonalAccount account = requireActiveAccount(context);
+        PersonalAccountPreferences preferences = ensurePreferences(account);
+
+        if (request.getProvider() == null && request.getModel() == null) {
+            String defaultProvider = normalizeOptional(preferences.getDefaultProvider());
+            String defaultModel = normalizeOptional(preferences.getDefaultModel());
+            if (defaultProvider != null) {
+                request.setProvider(Provider.valueOf(defaultProvider.toUpperCase(Locale.ROOT)));
+            }
+            if (defaultModel != null) {
+                request.setModel(defaultModel);
+            }
+        } else if (request.getProvider() == null && request.getModel() != null
+                && !request.getModel().isBlank()) {
+            // An explicit model is sufficient to let the model registry derive
+            // its provider. Never inject a provider preference over it.
+        } else if (request.getProvider() != null && (request.getModel() == null || request.getModel().isBlank())) {
+            // An explicit provider remains authoritative; its registry default
+            // model will be selected by the routing strategy.
+        }
+
+        if (request.getBillingMode() == null || request.getBillingMode().isBlank()) {
+            request.setBillingMode(preferences.getBillingMode());
+        }
+        if (request.getRoutingPriority() == null || request.getRoutingPriority().isBlank()) {
+            request.setRoutingPriority(preferences.getRoutingPriority());
+        }
+    }
 
     @Transactional
     public PersonalPreferencesResponse get(AuthenticationContext context) {
