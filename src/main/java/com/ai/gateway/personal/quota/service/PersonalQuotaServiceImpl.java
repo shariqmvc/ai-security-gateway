@@ -126,9 +126,9 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
 
     @Override
     @Transactional
-    public void enforceAndRecordFreeComputeCost(AuthenticationContext auth, AIResponse response) {
-        if (!personal(auth) || response == null || response.getProvider() == null || response.getModel() == null) return;
-        if (!"FREE".equalsIgnoreCase(response.getBillingMode())) return;
+    public void enforceAndRecordFreeComputeCost(AuthenticationContext auth, AIRequest request, AIResponse response) {
+        if (!personal(auth) || request == null || response == null || response.getProvider() == null || response.getModel() == null) return;
+        if (!"FREE".equalsIgnoreCase(request.getBillingMode())) return;
 
         var usage = response.getUsage();
         int input = usage == null || usage.getInputTokens() == null ? 0 : usage.getInputTokens();
