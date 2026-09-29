@@ -13,6 +13,7 @@ import com.ai.gateway.personal.PersonalProviderCredentialResolver;
 import com.ai.gateway.core.provider.gemini.dto.GeminiContent;
 import com.ai.gateway.core.provider.gemini.dto.GeminiPart;
 import com.ai.gateway.core.provider.gemini.dto.GeminiRequest;
+import com.ai.gateway.core.provider.gemini.dto.GenerationConfig;
 import com.ai.gateway.core.provider.gemini.dto.GeminiResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,8 @@ import com.ai.gateway.core.multimodal.MediaInputException;
 
 @Service
 public class GeminiProvider implements AIProvider, StreamingAIProvider {
+
+    private static final int STREAM_MAX_OUTPUT_TOKENS = 8192;
 
     public GeminiProvider(
             @Qualifier("geminiRestTemplate") RestTemplate restTemplate,
@@ -191,6 +194,9 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
 
         GeminiRequest geminiRequest = GeminiRequest.builder()
                 .contents(List.of(GeminiContent.builder().parts(buildParts(request)).build()))
+                .generationConfig(GenerationConfig.builder()
+                        .maxOutputTokens(STREAM_MAX_OUTPUT_TOKENS)
+                        .build())
                 .build();
 
         HttpHeaders headers = new HttpHeaders();
@@ -202,6 +208,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
         final int[] inputTokens = {0};
         final int[] outputTokens = {0};
         final int[] totalTokens = {0};
+        final String[] finishReason = {null};
 
         try {
             performanceLogger.providerStart(
@@ -232,6 +239,10 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
                                 }
 
                                 GeminiResponse chunk = objectMapper.readValue(json, GeminiResponse.class);
+                                if (chunk.getCandidates() != null && !chunk.getCandidates().isEmpty()
+                                        && chunk.getCandidates().getFirst().getFinishReason() != null) {
+                                    finishReason[0] = chunk.getCandidates().getFirst().getFinishReason();
+                                }
                                 if (chunk.getCandidates() != null && !chunk.getCandidates().isEmpty()
                                         && chunk.getCandidates().getFirst().getContent() != null
                                         && chunk.getCandidates().getFirst().getContent().getParts() != null) {
@@ -301,6 +312,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
                 .outputTokens(outputTokens[0])
                 .totalTokens(totalTokens[0] == 0 ? inputTokens[0] + outputTokens[0] : totalTokens[0])
                 .latencyMs(latencyMs)
+                .finishReason(finishReason[0])
                 .build();
     }
 
