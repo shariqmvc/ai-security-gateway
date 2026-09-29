@@ -47,4 +47,17 @@ public interface PersonalQuotaUsageRepository extends JpaRepository<PersonalQuot
  """,nativeQuery=true)
  int consumeMonthlyFreeComputeCost(@Param("accountId") UUID accountId,@Param("periodStart") LocalDate periodStart,
                                    @Param("cost") BigDecimal cost,@Param("cap") BigDecimal cap);
+
+ @Modifying
+ @Query(value="""
+ UPDATE PERSONAL_QUOTA_USAGE
+ SET free_compute_cost=free_compute_cost+:delta
+ WHERE personal_account_id=:accountId
+   AND period_type='MONTHLY'
+   AND period_start=:periodStart
+   AND free_compute_cost+:delta >= 0
+   AND (:cap <= 0 OR free_compute_cost+:delta <= :cap)
+ """,nativeQuery=true)
+ int adjustMonthlyFreeComputeCost(@Param("accountId") UUID accountId,@Param("periodStart") LocalDate periodStart,
+                                  @Param("delta") BigDecimal delta,@Param("cap") BigDecimal cap);
 }
