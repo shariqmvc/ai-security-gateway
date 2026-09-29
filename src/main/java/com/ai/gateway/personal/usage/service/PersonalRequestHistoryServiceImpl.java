@@ -5,6 +5,7 @@ import com.ai.gateway.personal.usage.dto.*;
 import com.ai.gateway.personal.usage.entity.*;
 import com.ai.gateway.personal.usage.repository.PersonalRequestHistoryRepository;
 import com.ai.gateway.personal.quota.config.PersonalQuotaProperties;
+import com.ai.gateway.personal.billing.PersonalBillingProperties;
 import com.ai.gateway.personal.quota.repository.PersonalQuotaUsageRepository;
 import com.ai.gateway.enums.QuotaPeriodType;
 import com.ai.gateway.exception.BusinessException;
@@ -21,6 +22,7 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
  private final PersonalRequestHistoryRepository repository;
  private final PersonalQuotaProperties quotaProperties;
  private final PersonalQuotaUsageRepository quotaRepository;
+ private final PersonalBillingProperties billingProperties;
  private final com.ai.gateway.personal.usage.repository.PersonalRequestFeedbackRepository feedbackRepository;
 
  @Override @Transactional
@@ -81,7 +83,9 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
    .costThisMonth(decimal(a,3))
    .contextTokensSavedThisMonth(num(o,0)).cacheHitsThisMonth(num(o,1))
    .quotaRequestsRemainingToday(dailyRemaining(accountId))
-   .quotaTokensRemainingThisMonth(monthlyRemaining(accountId)).build();
+   .quotaTokensRemainingThisMonth(monthlyRemaining(accountId))
+   .freeComputeCostThisMonth(freeComputeCost(accountId))
+   .freeComputeCostRemainingThisMonth(freeComputeRemaining(accountId)).build();
  }
  private long dailyRemaining(UUID accountId){
   if(quotaProperties.getRequestsPerDay()<=0)return 0L;
@@ -89,6 +93,16 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
     accountId,QuotaPeriodType.DAILY,LocalDate.now()).orElse(null);
   long used=row==null?0:row.getRequestCount();
   return Math.max(0L,quotaProperties.getRequestsPerDay()-used);
+ }
+ private BigDecimal freeComputeCost(UUID accountId){
+  var row=quotaRepository.findByPersonalAccountIdAndPeriodTypeAndPeriodStart(
+    accountId,QuotaPeriodType.MONTHLY,YearMonth.now().atDay(1)).orElse(null);
+  return row==null||row.getFreeComputeCost()==null?BigDecimal.ZERO:row.getFreeComputeCost();
+ }
+ private BigDecimal freeComputeRemaining(UUID accountId){
+  BigDecimal cap=billingProperties.getMonthlyFreeComputeCreditCap();
+  if(cap==null||cap.compareTo(BigDecimal.ZERO)<=0)return BigDecimal.ZERO;
+  return cap.subtract(freeComputeCost(accountId)).max(BigDecimal.ZERO);
  }
  private long monthlyRemaining(UUID accountId){
   if(quotaProperties.getMonthlyTokenQuota()<=0)return 0L;
