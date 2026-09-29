@@ -19,4 +19,5 @@ public class GatewayStreamEvent {
     Long latencyMs;
     String error;
     String phase;
+    String finishReason;
 }
