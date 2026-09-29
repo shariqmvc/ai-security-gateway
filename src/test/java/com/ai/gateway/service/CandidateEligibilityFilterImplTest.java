@@ -353,7 +353,6 @@ class CandidateEligibilityFilterImplTest {
                 candidates,
                 result);
     }
-}
 
     @Test
     void shouldRemoveUnhealthyCandidatesWhenHealthRejectsThem() {
@@ -402,3 +401,4 @@ class CandidateEligibilityFilterImplTest {
                 List.of(candidate),
                 healthAwareFilter.filter(List.of(candidate), policy));
     }
+}
