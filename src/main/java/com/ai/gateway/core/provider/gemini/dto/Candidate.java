@@ -10,4 +10,8 @@ import lombok.*;
 public class Candidate {
 
     private CandidateContent content;
+
+    private String finishReason;
+
+    private String finishMessage;
 }
