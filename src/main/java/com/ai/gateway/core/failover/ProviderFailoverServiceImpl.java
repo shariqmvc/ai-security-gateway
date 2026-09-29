@@ -262,6 +262,21 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 continue;
             }
 
+            if (routingHealthService != null
+                    && !routingHealthService.isHealthyForRouting(
+                            new RoutingCandidate(
+                                    fallbackRequest.getProvider(),
+                                    fallbackRequest.getModel()))) {
+
+                log.info(
+                        "FAILOVER_CANDIDATE_UNHEALTHY requestId={} provider={} model={}",
+                        requestId(),
+                        fallbackRequest.getProvider(),
+                        fallbackRequest.getModel());
+
+                continue;
+            }
+
             if (isCircuitOpen(
                     fallbackRequest.getProvider(),
                     fallbackRequest.getModel())) {
