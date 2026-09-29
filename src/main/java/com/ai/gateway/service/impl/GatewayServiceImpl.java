@@ -487,6 +487,7 @@ public class GatewayServiceImpl implements GatewayService {
 
             if (auth.isPersonalPrincipal()) {
                 personalQuotaService.afterSuccess(auth, aiResponse);
+                personalQuotaService.enforceAndRecordFreeComputeCost(auth, aiRequest, aiResponse);
             }
 
             long providerLatency = elapsedMs(providerInvocationStart);
