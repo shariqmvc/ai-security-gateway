@@ -5,6 +5,7 @@ import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.core.routing.engine.CandidateEligibilityFilter;
 import com.ai.gateway.core.routing.engine.CandidateEligibilityFilterImpl;
 import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.routing.health.RoutingHealthService;
 import com.ai.gateway.core.routing.policy.RoutingPolicy;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +14,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class CandidateEligibilityFilterImplTest {
 
@@ -351,3 +354,51 @@ class CandidateEligibilityFilterImplTest {
                 result);
     }
 }
+
+    @Test
+    void shouldRemoveUnhealthyCandidatesWhenHealthRejectsThem() {
+        RoutingHealthService health = mock(RoutingHealthService.class);
+        CandidateEligibilityFilter healthAwareFilter =
+                new CandidateEligibilityFilterImpl(health);
+
+        RoutingPolicy policy =
+                new RoutingPolicy(
+                        true,
+                        List.of(Provider.OPENAI, Provider.GEMINI),
+                        List.of("gpt-test", "gemini-test"),
+                        null,
+                        null);
+
+        RoutingCandidate openAi =
+                new RoutingCandidate(Provider.OPENAI, "gpt-test");
+        RoutingCandidate gemini =
+                new RoutingCandidate(Provider.GEMINI, "gemini-test");
+
+        when(health.isHealthyForRouting(openAi)).thenReturn(false);
+        when(health.isHealthyForRouting(gemini)).thenReturn(true);
+
+        assertEquals(
+                List.of(gemini),
+                healthAwareFilter.filter(List.of(openAi, gemini), policy));
+    }
+
+    @Test
+    void shouldKeepCandidatesWhenHealthServiceIsUnavailable() {
+        CandidateEligibilityFilter healthAwareFilter =
+                new CandidateEligibilityFilterImpl(null);
+
+        RoutingPolicy policy =
+                new RoutingPolicy(
+                        true,
+                        List.of(Provider.GEMINI),
+                        List.of("gemini-test"),
+                        null,
+                        null);
+
+        RoutingCandidate candidate =
+                new RoutingCandidate(Provider.GEMINI, "gemini-test");
+
+        assertEquals(
+                List.of(candidate),
+                healthAwareFilter.filter(List.of(candidate), policy));
+    }
