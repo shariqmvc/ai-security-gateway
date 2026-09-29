@@ -1100,7 +1100,8 @@ public class GatewayServiceImpl implements GatewayService {
                     result.getInputTokens(),
                     result.getOutputTokens(),
                     result.getTotalTokens(),
-                    providerLatency);
+                    providerLatency,
+                    result.getFinishReason());
 
             if (personalInferencePersistenceService != null) {
                 personalInferencePersistenceService.providerAttempt(
@@ -1237,6 +1238,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .outputTokens(result.getOutputTokens())
                     .totalTokens(result.getTotalTokens())
                     .latencyMs(latency)
+                    .finishReason(result.getFinishReason())
                     .build());
 
         } catch (StreamClientDisconnectedException ex) {
