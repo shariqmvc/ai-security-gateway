@@ -123,6 +123,36 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
         }
     }
 
+
+    @Override
+    @Transactional
+    public void enforceAndRecordFreeComputeCost(AuthenticationContext auth, AIResponse response) {
+        if (!personal(auth) || response == null || response.getProvider() == null || response.getModel() == null) return;
+        if (!"FREE".equalsIgnoreCase(response.getBillingMode())) return;
+
+        var usage = response.getUsage();
+        int input = usage == null || usage.getInputTokens() == null ? 0 : usage.getInputTokens();
+        int output = usage == null || usage.getOutputTokens() == null ? 0 : usage.getOutputTokens();
+
+        PreRequestCostEstimate estimate = costEstimator.estimate(
+                PreRequestCostRequest.builder()
+                        .provider(response.getProvider())
+                        .model(response.getModel())
+                        .inputTokens(input)
+                        .outputTokens(output)
+                        .cachedInputTokens(0)
+                        .build());
+
+        BigDecimal cost = estimate.getTotalEstimatedCost() == null ? BigDecimal.ZERO : estimate.getTotalEstimatedCost();
+        BigDecimal cap = billingProperties.getMonthlyFreeComputeCreditCap();
+        if (cap == null || cap.compareTo(BigDecimal.ZERO) < 0) cap = BigDecimal.ZERO;
+
+        if (cost.compareTo(BigDecimal.ZERO) > 0) {
+            repository.consumeMonthlyFreeComputeCost(
+                    auth.getPersonalAccountId(), YearMonth.now().atDay(1), cost, cap);
+        }
+    }
+
     @Override
     public void release(AuthenticationContext auth) {
         if (!personal(auth)) return;
