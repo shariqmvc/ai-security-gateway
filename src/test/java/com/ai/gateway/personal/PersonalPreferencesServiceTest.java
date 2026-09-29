@@ -3,6 +3,8 @@ package com.ai.gateway.personal;
 import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.personal.dto.PersonalPreferencesResponse;
 import com.ai.gateway.personal.dto.PersonalPreferencesUpdateRequest;
+import com.ai.gateway.core.contract.ChatRequest;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.personal.entity.PersonalAccount;
 import com.ai.gateway.personal.preferences.entity.PersonalAccountPreferences;
 import com.ai.gateway.personal.preferences.repository.PersonalAccountPreferencesRepository;
@@ -101,4 +103,80 @@ class PersonalPreferencesServiceTest {
                         new PersonalPreferencesUpdateRequest(
                                 null, null, "INVALID", null)));
     }
+    @Test
+    void appliesSavedDefaultsOnlyToOmittedRequestFields() {
+        UUID accountId = UUID.randomUUID();
+        PersonalAccount account = PersonalAccount.builder()
+                .id(accountId)
+                .status("ACTIVE")
+                .plan("PERSONAL_FREE")
+                .build();
+        PersonalAccountPreferences preferences = PersonalAccountPreferences.builder()
+                .personalAccount(account)
+                .defaultProvider("OLLAMA")
+                .defaultModel("llama3.2:3b")
+                .billingMode("BYOK")
+                .routingPriority("LATENCY")
+                .build();
+
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(preferencesRepository.findByPersonalAccountId(accountId)).thenReturn(Optional.of(preferences));
+
+        AuthenticationContext context = AuthenticationContext.builder()
+                .personalPrincipal(true)
+                .personalAccountId(accountId)
+                .build();
+
+        ChatRequest request = ChatRequest.builder()
+                .prompt("hello")
+                .build();
+
+        preferencesService.applyRequestDefaults(context, request);
+
+        assertEquals(Provider.OLLAMA, request.getProvider());
+        assertEquals("llama3.2:3b", request.getModel());
+        assertEquals("BYOK", request.getBillingMode());
+        assertEquals("LATENCY", request.getRoutingPriority());
+    }
+
+    @Test
+    void preservesExplicitRequestValuesOverSavedDefaults() {
+        UUID accountId = UUID.randomUUID();
+        PersonalAccount account = PersonalAccount.builder()
+                .id(accountId)
+                .status("ACTIVE")
+                .plan("PERSONAL_FREE")
+                .build();
+        PersonalAccountPreferences preferences = PersonalAccountPreferences.builder()
+                .personalAccount(account)
+                .defaultProvider("OLLAMA")
+                .defaultModel("llama3.2:3b")
+                .billingMode("BYOK")
+                .routingPriority("LATENCY")
+                .build();
+
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(preferencesRepository.findByPersonalAccountId(accountId)).thenReturn(Optional.of(preferences));
+
+        AuthenticationContext context = AuthenticationContext.builder()
+                .personalPrincipal(true)
+                .personalAccountId(accountId)
+                .build();
+
+        ChatRequest request = ChatRequest.builder()
+                .prompt("hello")
+                .provider(Provider.GEMINI)
+                .model("gemini-3.6-flash")
+                .billingMode("CREDIT")
+                .routingPriority("COST")
+                .build();
+
+        preferencesService.applyRequestDefaults(context, request);
+
+        assertEquals(Provider.GEMINI, request.getProvider());
+        assertEquals("gemini-3.6-flash", request.getModel());
+        assertEquals("CREDIT", request.getBillingMode());
+        assertEquals("COST", request.getRoutingPriority());
+    }
+
 }
