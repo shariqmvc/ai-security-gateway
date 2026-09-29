@@ -42,6 +42,7 @@ import com.ai.gateway.core.routing.registry.ProviderModelRegistryService;
 import com.ai.gateway.core.routing.registry.ModelRegistry;
 import com.ai.gateway.core.routing.registry.ModelDefinition;
 import com.ai.gateway.personal.billing.PersonalBillingModeResolver;
+import com.ai.gateway.personal.PersonalPreferencesService;
 import com.ai.gateway.personal.PersonalFeatureEntitlementService;
 import com.ai.gateway.personal.billing.PersonalCreditExecutionService;
 import com.ai.gateway.personal.intelligence.PersonalSecurityIntelligenceService;
@@ -120,6 +121,8 @@ public class GatewayServiceImpl implements GatewayService {
 
     private final PersonalBillingModeResolver personalBillingModeResolver;
 
+    private final PersonalPreferencesService personalPreferencesService;
+
     private final PersonalCreditExecutionService personalCreditExecutionService;
 
     private final PersonalSecurityIntelligenceService personalSecurityIntelligenceService;
@@ -159,6 +162,16 @@ public class GatewayServiceImpl implements GatewayService {
         long stageStart = System.nanoTime();
         AuthenticationContext auth = getAuthenticationContext();
         performanceLogger.stage("AUTHENTICATION", requestId, elapsedMs(stageStart), "SUCCESS");
+
+        /*
+         * Resolve persisted Personal preferences at the request boundary.
+         * Explicit request fields remain authoritative; preferences only fill
+         * omitted provider/model/billing/routing values. This keeps the same
+         * precedence for browser chat, API clients, and future SDKs.
+         */
+        if (auth != null && auth.isPersonalPrincipal()) {
+            personalPreferencesService.applyRequestDefaults(auth, request);
+        }
 
         UUID inferenceId = personalInferencePersistenceService == null ? null
                 : personalInferencePersistenceService.start(
