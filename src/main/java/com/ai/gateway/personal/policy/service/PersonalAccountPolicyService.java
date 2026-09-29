@@ -1,6 +1,7 @@
 package com.ai.gateway.personal.policy.service;
 
 import com.ai.gateway.personal.entity.PersonalAccount;
+import com.ai.gateway.personal.repository.PersonalAccountRepository;
 import com.ai.gateway.personal.policy.entity.PersonalAccountPolicy;
 import com.ai.gateway.personal.policy.repository.PersonalAccountFeatureRepository;
 import com.ai.gateway.personal.policy.repository.PersonalAccountFreeModelRepository;
@@ -26,6 +27,7 @@ public class PersonalAccountPolicyService {
     private final PersonalAccountFreeModelRepository freeModelRepository;
     private final PersonalQuotaProperties quotaDefaults;
     private final PersonalBillingProperties billingDefaults;
+    private final PersonalAccountRepository accountRepository;
 
     @Transactional
     public PersonalAccountPolicy ensurePolicy(PersonalAccount account) {
@@ -59,6 +61,17 @@ public class PersonalAccountPolicyService {
                     }
 
                     return policy;
+                });
+    }
+
+    @Transactional
+    public PersonalAccountPolicy getOrCreate(UUID accountId) {
+        return policyRepository.findByPersonalAccountId(accountId)
+                .orElseGet(() -> {
+                    PersonalAccount account = accountRepository.findById(accountId)
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "Personal account not found."));
+                    return ensurePolicy(account);
                 });
     }
 
