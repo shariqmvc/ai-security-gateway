@@ -1,6 +1,8 @@
 package com.ai.gateway.personal.policy.service;
 
 import com.ai.gateway.personal.entity.PersonalAccount;
+import com.ai.gateway.personal.policy.entity.PersonalAccountFeature;
+import com.ai.gateway.personal.policy.entity.PersonalAccountFreeModel;
 import com.ai.gateway.personal.repository.PersonalAccountRepository;
 import com.ai.gateway.personal.policy.entity.PersonalAccountPolicy;
 import com.ai.gateway.personal.policy.repository.PersonalAccountFeatureRepository;

@@ -1,11 +1,7 @@
 package com.ai.gateway.personal;
 
 import com.ai.gateway.authentication.AuthenticationContext;
-import com.ai.gateway.personal.dto.PersonalLoginRequest;
-import com.ai.gateway.personal.dto.PersonalLoginResponse;
-import com.ai.gateway.personal.dto.PersonalSignupRequest;
-import com.ai.gateway.personal.dto.PersonalSignupResponse;
-import com.ai.gateway.personal.dto.PersonalUserResponse;
+import com.ai.gateway.personal.dto.*;
 import jakarta.servlet.http.HttpServletRequest;
 
 public interface PersonalAuthService {
