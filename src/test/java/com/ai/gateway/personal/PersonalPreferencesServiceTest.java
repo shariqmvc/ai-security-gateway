@@ -5,6 +5,9 @@ import com.ai.gateway.personal.dto.PersonalPreferencesResponse;
 import com.ai.gateway.personal.dto.PersonalPreferencesUpdateRequest;
 import com.ai.gateway.core.contract.ChatRequest;
 import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.registry.ModelDefinition;
+import com.ai.gateway.core.routing.registry.ModelRegistry;
+import com.ai.gateway.personal.policy.service.PersonalAccountPolicyService;
 import com.ai.gateway.personal.entity.PersonalAccount;
 import com.ai.gateway.personal.preferences.entity.PersonalAccountPreferences;
 import com.ai.gateway.personal.preferences.repository.PersonalAccountPreferencesRepository;
@@ -30,6 +33,12 @@ class PersonalPreferencesServiceTest {
 
     @Mock
     private PersonalAccountPreferencesRepository preferencesRepository;
+
+    @Mock
+    private PersonalAccountPolicyService policyService;
+
+    @Mock
+    private ModelRegistry modelRegistry;
 
     @InjectMocks
     private PersonalPreferencesService preferencesService;
@@ -177,6 +186,67 @@ class PersonalPreferencesServiceTest {
         assertEquals("gemini-3.6-flash", request.getModel());
         assertEquals("CREDIT", request.getBillingMode());
         assertEquals("COST", request.getRoutingPriority());
+    }
+
+
+    @Test
+    void rejectsUnknownDefaultModel() {
+        UUID accountId = UUID.randomUUID();
+        PersonalAccount account = activeAccount(accountId);
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(preferencesRepository.findByPersonalAccountId(accountId))
+                .thenReturn(Optional.of(existingPreferences(account)));
+        when(modelRegistry.find(Provider.OLLAMA, "missing"))
+                .thenReturn(Optional.empty());
+
+        AuthenticationContext context = personalContext(accountId);
+
+        assertThrows(IllegalArgumentException.class, () -> preferencesService.update(
+                context,
+                new PersonalPreferencesUpdateRequest(
+                        "OLLAMA", "missing", "AUTO", null)));
+        verify(preferencesRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsFreeDefaultModelNotInPolicy() {
+        UUID accountId = UUID.randomUUID();
+        PersonalAccount account = activeAccount(accountId);
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(preferencesRepository.findByPersonalAccountId(accountId))
+                .thenReturn(Optional.of(existingPreferences(account)));
+        ModelDefinition model = mock(ModelDefinition.class);
+        when(model.provider()).thenReturn(Provider.OLLAMA);
+        when(model.modelId()).thenReturn("llama3.2:3b");
+        when(model.isEnabled()).thenReturn(true);
+        when(modelRegistry.find(Provider.OLLAMA, "llama3.2:3b"))
+                .thenReturn(Optional.of(model));
+        when(policyService.freeModels(accountId)).thenReturn(java.util.Set.of());
+
+        assertThrows(IllegalArgumentException.class, () -> preferencesService.update(
+                personalContext(accountId),
+                new PersonalPreferencesUpdateRequest(
+                        "OLLAMA", "llama3.2:3b", "FREE", null)));
+        verify(preferencesRepository, never()).save(any());
+    }
+
+    private PersonalAccount activeAccount(UUID accountId) {
+        return PersonalAccount.builder().id(accountId).status("ACTIVE").plan("PERSONAL_FREE").build();
+    }
+
+    private PersonalAccountPreferences existingPreferences(PersonalAccount account) {
+        return PersonalAccountPreferences.builder()
+                .personalAccount(account)
+                .billingMode("AUTO")
+                .routingPriority("BALANCED")
+                .build();
+    }
+
+    private AuthenticationContext personalContext(UUID accountId) {
+        return AuthenticationContext.builder()
+                .personalPrincipal(true)
+                .personalAccountId(accountId)
+                .build();
     }
 
 }
