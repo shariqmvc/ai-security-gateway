@@ -82,16 +82,18 @@ public class PersonalAccountPolicyService {
                         "Personal account policy is not configured."));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Set<Feature> enabledFeatures(UUID accountId) {
+        getOrCreate(accountId);
         return featureRepository.findAllByPersonalAccountId(accountId).stream()
                 .map(PersonalAccountFeature::getFeature)
                 .map(Feature::valueOf)
                 .collect(Collectors.toSet());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Set<String> freeModels(UUID accountId) {
+        getOrCreate(accountId);
         return freeModelRepository.findAllByPersonalAccountId(accountId).stream()
                 .map(PersonalAccountFreeModel::getModelKey)
                 .collect(Collectors.toSet());
