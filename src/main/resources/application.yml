@@ -96,7 +96,7 @@ ollama:
   # Keep the local model resident between requests and cap generation so
   # provider latency cannot grow without bound. Override per environment.
   keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
-  num-ctx: ${OLLAMA_NUM_CTX:4096}
+  num-ctx: ${OLLAMA_NUM_CTX:16384}
   num-predict: ${OLLAMA_NUM_PREDICT:1024}
 
 aegis:
