@@ -13,4 +13,5 @@ public class AIStreamResult {
     Integer outputTokens;
     Integer totalTokens;
     Long latencyMs;
+    String finishReason;
 }
