@@ -11,6 +11,7 @@ import com.ai.gateway.personal.repository.PersonalSessionRepository;
 import com.ai.gateway.personal.repository.PersonalEmailVerificationTokenRepository;
 import com.ai.gateway.personal.entity.PersonalEmailVerificationToken;
 import com.ai.gateway.personal.repository.PersonalUserRepository;
+import com.ai.gateway.personal.policy.service.PersonalAccountPolicyService;
 import com.ai.gateway.security.SecurityRole;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
     private final PersonalEmailVerificationTokenRepository verificationTokenRepository;
     private final PersonalPhoneVerificationCodeRepository phoneVerificationCodeRepository;
     private final PersonalVerificationDeliveryService verificationDeliveryService;
+    private final PersonalAccountPolicyService policyService;
     private final PasswordEncoder passwordEncoder;
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -95,6 +97,7 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 .build();
 
         account = accountRepository.save(account);
+        policyService.ensurePolicy(account);
 
         String verificationToken = null;
 
