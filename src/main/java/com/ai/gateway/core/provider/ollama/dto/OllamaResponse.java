@@ -14,6 +14,11 @@ public class OllamaResponse {
 
     private OllamaMessage message;
 
+    private Boolean done;
+
+    @JsonProperty("done_reason")
+    private String doneReason;
+
     @JsonProperty("total_duration")
     private Long totalDuration;
 
