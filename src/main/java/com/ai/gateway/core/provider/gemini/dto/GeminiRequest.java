@@ -11,4 +11,5 @@ import java.util.List;
 @Builder
 public class GeminiRequest {
     private List<GeminiContent> contents;
+    private GenerationConfig generationConfig;
 }
