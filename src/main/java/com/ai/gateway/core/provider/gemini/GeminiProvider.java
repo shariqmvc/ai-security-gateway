@@ -9,6 +9,7 @@ import com.ai.gateway.core.observability.PerformanceLogger;
 import com.ai.gateway.core.provider.AIProvider;
 import com.ai.gateway.core.provider.AIStreamResult;
 import com.ai.gateway.core.provider.StreamingAIProvider;
+import com.ai.gateway.personal.PersonalProviderCredentialResolver;
 import com.ai.gateway.core.provider.gemini.dto.GeminiContent;
 import com.ai.gateway.core.provider.gemini.dto.GeminiPart;
 import com.ai.gateway.core.provider.gemini.dto.GeminiRequest;
@@ -40,12 +41,14 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
             GeminiConfig geminiConfig,
             PerformanceLogger performanceLogger,
             MediaUrlFetcher mediaUrlFetcher,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            PersonalProviderCredentialResolver credentials) {
         this.restTemplate = restTemplate;
         this.geminiConfig = geminiConfig;
         this.performanceLogger = performanceLogger;
         this.mediaUrlFetcher = mediaUrlFetcher;
         this.objectMapper = objectMapper;
+        this.credentials = credentials;
     }
 
     private final RestTemplate restTemplate;
@@ -53,6 +56,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
     private final PerformanceLogger performanceLogger;
     private final MediaUrlFetcher mediaUrlFetcher;
     private final ObjectMapper objectMapper;
+    private final PersonalProviderCredentialResolver credentials;
 
     @Value("${gemini.api.key}")
     private String apiKey;
@@ -94,7 +98,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
                 "/v1beta/models/" +
                 selectedModel +
                 ":generateContent?key=" +
-                apiKey;
+                key(request);
 
         GeminiRequest geminiRequest = GeminiRequest.builder()
                 .contents(List.of(
@@ -183,7 +187,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
                 + "/v1beta/models/"
                 + selectedModel
                 + ":streamGenerateContent?alt=sse&key="
-                + apiKey;
+                + key(request);
 
         GeminiRequest geminiRequest = GeminiRequest.builder()
                 .contents(List.of(GeminiContent.builder().parts(buildParts(request)).build()))
@@ -298,6 +302,17 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
                 .totalTokens(totalTokens[0] == 0 ? inputTokens[0] + outputTokens[0] : totalTokens[0])
                 .latencyMs(latencyMs)
                 .build();
+    }
+
+    private String key(AIRequest request) {
+        if ("BYOK".equalsIgnoreCase(request.getBillingMode())
+                && request.getPersonalAccountId() != null) {
+            return credentials.resolveApiKey(request.getPersonalAccountId(), provider());
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("No API key configured for GEMINI.");
+        }
+        return apiKey;
     }
 
     private List<GeminiPart> buildParts(AIRequest request) {
