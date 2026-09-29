@@ -9,6 +9,8 @@ import com.ai.gateway.personal.entity.PersonalAccount;
 import com.ai.gateway.personal.preferences.entity.PersonalAccountPreferences;
 import com.ai.gateway.personal.preferences.repository.PersonalAccountPreferencesRepository;
 import com.ai.gateway.personal.repository.PersonalAccountRepository;
+import com.ai.gateway.personal.policy.service.PersonalAccountPolicyService;
+import com.ai.gateway.core.routing.registry.ModelRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -28,8 +30,8 @@ public class PersonalPreferencesService {
 
     private final PersonalAccountRepository accountRepository;
     private final PersonalAccountPreferencesRepository preferencesRepository;
-    private final com.ai.gateway.personal.policy.service.PersonalAccountPolicyService policyService;
-    private final com.ai.gateway.core.routing.registry.ModelRegistry modelRegistry;
+    private final PersonalAccountPolicyService policyService;
+    private final ModelRegistry modelRegistry;
 
     /**
      * Applies persisted Personal preferences only where the request has not
