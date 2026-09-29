@@ -697,6 +697,13 @@ public class GatewayServiceImpl implements GatewayService {
         AuthenticationContext auth = getAuthenticationContext();
         validateFeature(auth, Feature.STREAMING);
 
+        // Apply Personal defaults before stream admission and before the request
+        // is handed to the streaming execution path. Explicit request values
+        // remain authoritative.
+        if (auth != null && auth.isPersonalPrincipal()) {
+            personalPreferencesService.applyRequestDefaults(auth, request);
+        }
+
         UUID inferenceId = personalInferencePersistenceService == null ? null
                 : personalInferencePersistenceService.start(
                         auth, requestId, endpoint, operation, null);
