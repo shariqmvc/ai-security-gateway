@@ -141,8 +141,10 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
                         .cachedInputTokens(0)
                         .build());
         BigDecimal projected = estimate.getTotalEstimatedCost() == null ? BigDecimal.ZERO : estimate.getTotalEstimatedCost();
-        BigDecimal used = freeComputeCost(auth.getPersonalAccountId());
-        if (used.add(projected).compareTo(cap) > 0) {
+        if (projected.compareTo(BigDecimal.ZERO) <= 0) return;
+        int reserved = repository.consumeMonthlyFreeComputeCost(
+                auth.getPersonalAccountId(), YearMonth.now().atDay(1), projected, cap);
+        if (reserved == 0) {
             throw new PersonalQuotaExceededException("Personal monthly free-model compute cap exceeded.");
         }
     }
@@ -177,9 +179,25 @@ public class PersonalQuotaServiceImpl implements PersonalQuotaService {
         if (cap == null || cap.compareTo(BigDecimal.ZERO) < 0) cap = BigDecimal.ZERO;
 
         if (cost.compareTo(BigDecimal.ZERO) > 0) {
-            int updated = repository.consumeMonthlyFreeComputeCost(
-                    auth.getPersonalAccountId(), YearMonth.now().atDay(1), cost, cap);
-            // Cap enforcement happens before provider execution; this records actual cost.
+            int inputEstimate = Math.max(1, input);
+            PreRequestCostEstimate reservationEstimate = costEstimator.estimate(
+                    PreRequestCostRequest.builder()
+                            .provider(request.getProvider())
+                            .model(request.getModel())
+                            .inputTokens(inputEstimate)
+                            .outputTokens(1024)
+                            .cachedInputTokens(0)
+                            .build());
+            BigDecimal reserved = reservationEstimate.getTotalEstimatedCost() == null
+                    ? BigDecimal.ZERO : reservationEstimate.getTotalEstimatedCost();
+            BigDecimal delta = cost.subtract(reserved);
+            if (delta.compareTo(BigDecimal.ZERO) != 0) {
+                int updated = repository.adjustMonthlyFreeComputeCost(
+                        auth.getPersonalAccountId(), YearMonth.now().atDay(1), delta, cap);
+                if (updated == 0 && delta.compareTo(BigDecimal.ZERO) > 0) {
+                    throw new PersonalQuotaExceededException("Personal monthly free-model compute cap exceeded.");
+                }
+            }
         }
     }
 
