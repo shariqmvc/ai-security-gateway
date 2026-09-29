@@ -5,6 +5,8 @@ import com.ai.gateway.personal.dto.PersonalEffectiveSettingsResponse;
 import com.ai.gateway.personal.entity.PersonalAccount;
 import com.ai.gateway.personal.policy.entity.PersonalAccountPolicy;
 import com.ai.gateway.personal.policy.service.PersonalAccountPolicyService;
+import com.ai.gateway.personal.preferences.entity.PersonalAccountPreferences;
+import com.ai.gateway.personal.preferences.repository.PersonalAccountPreferencesRepository;
 import com.ai.gateway.personal.repository.PersonalAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -19,6 +21,7 @@ public class PersonalSettingsService {
 
     private final PersonalAccountRepository accountRepository;
     private final PersonalAccountPolicyService policyService;
+    private final PersonalAccountPreferencesRepository preferencesRepository;
 
     @Transactional
     public PersonalEffectiveSettingsResponse getEffectiveSettings(AuthenticationContext context) {
@@ -36,11 +39,20 @@ public class PersonalSettingsService {
         }
 
         PersonalAccountPolicy policy = policyService.getOrCreate(account.getId());
+        PersonalAccountPreferences preferences = preferencesRepository.findByPersonalAccountId(account.getId())
+                .orElse(null);
 
         return new PersonalEffectiveSettingsResponse(
                 new PersonalEffectiveSettingsResponse.Account(
                         account.getPlan(),
                         account.getStatus()),
+                preferences == null
+                        ? new PersonalEffectiveSettingsResponse.Preferences(null, null, "AUTO", "BALANCED")
+                        : new PersonalEffectiveSettingsResponse.Preferences(
+                                preferences.getDefaultProvider(),
+                                preferences.getDefaultModel(),
+                                preferences.getBillingMode(),
+                                preferences.getRoutingPriority()),
                 new PersonalEffectiveSettingsResponse.Limits(
                         policy.isQuotaEnabled(),
                         policy.getRequestsPerMinute(),
