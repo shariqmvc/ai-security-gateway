@@ -96,7 +96,7 @@ public class PersonalPreferencesService {
         }
 
         try {
-            return Provider.valueOf(normalized).name();
+            return Provider.valueOf(normalized.toUpperCase(Locale.ROOT)).name();
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException("Unsupported defaultProvider: " + value);
         }
@@ -104,11 +104,11 @@ public class PersonalPreferencesService {
 
     private String normalizeEnum(String value, Set<String> allowed, String field) {
         String normalized = normalizeOptional(value);
-        if (normalized == null || !allowed.contains(normalized)) {
+        if (normalized == null || !allowed.contains(normalized.toUpperCase(Locale.ROOT))) {
             throw new IllegalArgumentException(
                     "Unsupported " + field + ": " + value);
         }
-        return normalized;
+        return normalized.toUpperCase(Locale.ROOT);
     }
 
     private String normalizeOptional(String value) {
@@ -116,7 +116,7 @@ public class PersonalPreferencesService {
             return null;
         }
         String normalized = value.trim();
-        return normalized.isBlank() ? null : normalized.toUpperCase(Locale.ROOT);
+        return normalized.isBlank() ? null : normalized;
     }
 
     private PersonalPreferencesResponse toResponse(PersonalAccountPreferences preferences) {
