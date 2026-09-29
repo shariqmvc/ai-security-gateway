@@ -32,7 +32,7 @@ public class OllamaConfig {
     private String visionModel;
 
     /** Maximum context window sent to Ollama for gateway requests. */
-    private Integer numCtx = 4096;
+    private Integer numCtx = 16384;
 
     /** Maximum generated tokens. This prevents unbounded local generation latency. */
     private Integer numPredict = 1024;
