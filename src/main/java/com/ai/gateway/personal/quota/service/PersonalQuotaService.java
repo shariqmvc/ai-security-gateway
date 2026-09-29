@@ -6,7 +6,7 @@ import java.util.UUID;
 public interface PersonalQuotaService {
  void beforeRequest(AuthenticationContext auth,long estimatedInputTokens);
  void afterSuccess(AuthenticationContext auth,AIResponse response);
- void enforceAndRecordFreeComputeCost(AuthenticationContext auth, AIResponse response);
+ void enforceAndRecordFreeComputeCost(AuthenticationContext auth, AIRequest request, AIResponse response);
  void release(AuthenticationContext auth);
  long activeRequests(UUID accountId);
 }
