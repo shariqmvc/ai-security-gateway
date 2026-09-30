@@ -398,6 +398,8 @@ alroute:
       platform-fee-rate: ${ALROUTE_PERSONAL_PLATFORM_FEE_RATE:0.055}
       minimum-platform-fee: ${ALROUTE_PERSONAL_MINIMUM_PLATFORM_FEE:0.80}
       invoice-creation-enabled: ${ALROUTE_PERSONAL_STRIPE_INVOICE_CREATION_ENABLED:true}
+      custom-minimum-credits: ${ALROUTE_PERSONAL_CUSTOM_MINIMUM_CREDITS:10}
+      custom-maximum-credits: ${ALROUTE_PERSONAL_CUSTOM_MAXIMUM_CREDITS:1000}
       credits-policy: ${ALROUTE_PERSONAL_CREDITS_POLICY:Credits do not expire.}
       refund-policy: ${ALROUTE_PERSONAL_REFUND_POLICY:Refunds are handled under the published AIRouter refund policy.}
       tax-policy: ${ALROUTE_PERSONAL_TAX_POLICY:USD billing; taxes are determined by the configured Stripe tax setup.}
