@@ -276,3 +276,15 @@ Commits:
 - 90f5577d61f5ffca4be91ac60068b2f9804a065e — Ollama executes against selected endpoint
 - 3cf7f78a689df2783ea79f5fad30d18e2a591951 — configure executable endpoint URLs
 - 787cc07ea9dfdfd44c3e7182552d3d7556e695ec — preserve endpoint identity during failover
+
+## Multi-endpoint candidate expansion
+
+Model registration now expands each provider/model across every enabled executable endpoint registered for that provider. Each resulting RoutingCandidate retains its own endpoint ID, so scoring, health filtering, latency/availability signals, selection, and failover can distinguish otherwise identical models hosted on different endpoints.
+
+Example:
+OLLAMA / llama3.2:3b @ ollama-gpu-01
+OLLAMA / llama3.2:3b @ ollama-gpu-02
+
+The first registered endpoint remains the default model lookup result for backward-compatible explicit model resolution. Endpoint-aware policy routing, however, sees each executable endpoint as an independent candidate.
+
+Commit: bcc7a5fd379d0b4450f454b917a34a18882b383b
