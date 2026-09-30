@@ -496,6 +496,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             if (response != null) {
                 response.setProvider(request.getProvider());
                 response.setModel(request.getModel());
+                response.setEndpointId(request.getEndpointId());
             }
 
             recordRoutingHealthSuccess(request, startedAtNanos);
