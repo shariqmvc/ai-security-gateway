@@ -454,6 +454,9 @@ public class GatewayServiceImpl implements GatewayService {
                                 "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
             }
 
+            Provider requestedProvider = aiRequest.getProvider();
+            String requestedModel = aiRequest.getModel();
+
             AIResponse aiResponse =
                     invokeProvider(aiRequest);
 
@@ -586,6 +589,10 @@ public class GatewayServiceImpl implements GatewayService {
             return ChatResponse.builder()
                     .requestId(requestId)
                     .response(restored)
+                    .requestedProvider(requestedProvider == null ? null : requestedProvider.name())
+                    .requestedModel(requestedModel)
+                    .provider(aiResponse.getProvider() == null ? null : aiResponse.getProvider().name())
+                    .model(aiResponse.getModel())
                     .finishReason(aiResponse.getFinishReason())
                     .inputTokens(aiResponse.getUsage() == null ? null : aiResponse.getUsage().getInputTokens())
                     .outputTokens(aiResponse.getUsage() == null ? null : aiResponse.getUsage().getOutputTokens())
@@ -939,12 +946,17 @@ public class GatewayServiceImpl implements GatewayService {
                     elapsedMs(stageStart),
                     "SUCCESS");
 
+            Provider requestedStreamProvider = aiRequest.getProvider();
+            String requestedStreamModel = aiRequest.getModel();
+
             eventConsumer.accept(GatewayStreamEvent.builder()
                     .requestId(requestId)
                     .type("status")
                     .phase("PROVIDER_CONNECTING")
                     .provider(aiRequest.getProvider().name())
                     .model(aiRequest.getModel())
+                    .requestedProvider(requestedStreamProvider.name())
+                    .requestedModel(requestedStreamModel)
                     .content("Connecting to " + providerLabel(aiRequest.getProvider()) + "…")
                     .build());
 
@@ -953,6 +965,8 @@ public class GatewayServiceImpl implements GatewayService {
                     .type("start")
                     .provider(aiRequest.getProvider().name())
                     .model(aiRequest.getModel())
+                    .requestedProvider(requestedStreamProvider.name())
+                    .requestedModel(requestedStreamModel)
                     .build());
 
             if (auth.isPersonalPrincipal()
