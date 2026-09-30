@@ -10,6 +10,7 @@ import com.ai.gateway.core.observability.PerformanceLogger;
 import com.ai.gateway.core.provider.AIProvider;
 import com.ai.gateway.core.provider.AIStreamResult;
 import com.ai.gateway.core.provider.StreamingAIProvider;
+import com.ai.gateway.core.routing.registry.ProviderEndpointRegistry;
 import com.ai.gateway.core.provider.ollama.dto.OllamaMessage;
 import com.ai.gateway.core.provider.ollama.dto.OllamaRequest;
 import com.ai.gateway.core.provider.ollama.dto.OllamaResponse;
@@ -43,6 +44,7 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
     private final PerformanceLogger performanceLogger;
     private final ProviderConcurrencyLimiter concurrencyLimiter;
     private final ObjectMapper objectMapper;
+    private final ProviderEndpointRegistry endpointRegistry;
 
     @Value("${ollama.base.url}")
     private String baseUrl;
@@ -56,13 +58,15 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
             OllamaConfig ollamaConfig,
             PerformanceLogger performanceLogger,
             ProviderConcurrencyLimiter concurrencyLimiter,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ProviderEndpointRegistry endpointRegistry) {
 
         this.restTemplate = restTemplate;
         this.ollamaConfig = ollamaConfig;
         this.performanceLogger = performanceLogger;
         this.concurrencyLimiter = concurrencyLimiter;
         this.objectMapper = objectMapper;
+        this.endpointRegistry = endpointRegistry;
     }
 
     @Override
@@ -98,8 +102,7 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
                         ? request.getModel()
                         : model;
 
-        String url =
-                baseUrl + "/api/chat";
+        String url = endpointRegistry.requireUrl(provider(), request.getEndpointId()) + "/api/chat";
 
         OllamaMessage message = buildMessage(request);
         OllamaRequest ollamaRequest =
@@ -254,7 +257,7 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
                         ? request.getModel()
                         : model;
 
-        String url = baseUrl + "/api/chat";
+        String url = endpointRegistry.requireUrl(provider(), request.getEndpointId()) + "/api/chat";
 
         OllamaMessage message = buildMessage(request);
         OllamaRequest ollamaRequest = OllamaRequest.builder()
