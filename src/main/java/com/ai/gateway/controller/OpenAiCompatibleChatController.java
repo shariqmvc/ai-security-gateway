@@ -96,6 +96,27 @@ public class OpenAiCompatibleChatController {
                                     .build()))
                             .build();
                     writeSse(outputStream, chunk);
+                } else if ("routing".equals(event.getType())) {
+                    OpenAiRoutingMetadata metadata = OpenAiRoutingMetadata.builder()
+                            .provider(event.getProvider())
+                            .model(event.getModel())
+                            .endpointId(event.getEndpointId())
+                            .requestedProvider(event.getRequestedProvider())
+                            .requestedModel(event.getRequestedModel())
+                            .failoverFromProvider(event.getFailoverFromProvider())
+                            .failoverFromEndpointId(event.getFailoverFromEndpointId())
+                            .failoverReason(event.getFailoverReason())
+                            .providerAttempt(event.getProviderAttempt())
+                            .providerAttempts(event.getProviderAttempts())
+                            .build();
+                    OpenAiChatCompletionChunk chunk = OpenAiChatCompletionChunk.builder()
+                            .id(completionId)
+                            .object("chat.completion.routing")
+                            .created(created)
+                            .model(event.getModel() == null ? request.getModel() : event.getModel())
+                            .routing(metadata)
+                            .build();
+                    writeSse(outputStream, chunk);
                 } else if ("done".equals(event.getType())) {
                     OpenAiChatCompletionChunk chunk = OpenAiChatCompletionChunk.builder()
                             .id(completionId)
@@ -234,6 +255,22 @@ public class OpenAiCompatibleChatController {
     public static class OpenAiChatCompletionChunk {
         private String id; private String object; private long created; private String model;
         private List<OpenAiChunkChoice> choices;
+        private OpenAiRoutingMetadata routing;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class OpenAiRoutingMetadata {
+        private String provider;
+        private String model;
+        private String endpointId;
+        private String requestedProvider;
+        private String requestedModel;
+        private String failoverFromProvider;
+        private String failoverFromEndpointId;
+        private String failoverReason;
+        private Integer providerAttempt;
+        private List<com.ai.gateway.core.provider.AIStreamResult.ProviderAttempt> providerAttempts;
     }
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class OpenAiChunkChoice { private int index; private OpenAiDelta delta; private String finishReason; }
