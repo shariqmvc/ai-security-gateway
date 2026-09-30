@@ -15,6 +15,9 @@ public class PersonalPaymentIntent {
  @Column(name="package_code", nullable=false, length=64) private String packageCode;
  @Column(name="currency", nullable=false, length=3) private String currency;
  @Column(name="amount", nullable=false, precision=19, scale=8) private BigDecimal amount;
+ @Column(name="base_amount",nullable=false,precision=19,scale=8) private BigDecimal baseAmount;
+ @Column(name="fee_amount",nullable=false,precision=19,scale=8) private BigDecimal feeAmount;
+ @Column(name="tax_amount",nullable=false,precision=19,scale=8) private BigDecimal taxAmount;
  @Column(name="credits", nullable=false, precision=19, scale=8) private BigDecimal credits;
  @Column(name="provider", nullable=false, length=64) private String provider;
  @Column(name="provider_payment_id", length=255) private String providerPaymentId;
@@ -26,6 +29,4 @@ public class PersonalPaymentIntent {
  @Column(name="created_at", nullable=false) private LocalDateTime createdAt;
  @Column(name="updated_at", nullable=false) private LocalDateTime updatedAt;
  @Column(name="completed_at") private LocalDateTime completedAt;
- @Transient private String checkoutUrl;
- @Transient private String checkoutUrl;
 }
