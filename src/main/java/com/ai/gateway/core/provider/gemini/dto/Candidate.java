@@ -18,4 +18,8 @@ public class Candidate {
     public Candidate(CandidateContent content, String finishReason) {
         this(content, finishReason, null);
     }
+
+    public Candidate(CandidateContent content) {
+        this(content, null, null);
+    }
 }
