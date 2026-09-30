@@ -59,6 +59,22 @@ class PolicyBasedRoutingScoringIntegrationTest {
         constraintEvaluator = mock(CandidateConstraintEvaluator.class);
         pricingConfig = mock(PricingConfig.class);
 
+        lenient().when(registryService.requireProvider(any()))
+                .thenAnswer(invocation -> new com.ai.gateway.core.routing.registry.ProviderDefinition(
+                        invocation.getArgument(0),
+                        invocation.getArgument(0).toString(),
+                        com.ai.gateway.core.routing.registry.ProviderStatus.ENABLED,
+                        java.util.Set.of("CHAT")));
+
+        lenient().when(registryService.requireModels(any(), anyString(), any()))
+                .thenAnswer(invocation -> java.util.List.of(
+                        new com.ai.gateway.core.routing.registry.ModelDefinition(
+                                invocation.getArgument(0),
+                                invocation.getArgument(1),
+                                invocation.getArgument(1),
+                                com.ai.gateway.core.routing.registry.ModelStatus.ENABLED,
+                                java.util.Set.of("CHAT"))));
+
         RoutingScoringProperties properties =
                 new RoutingScoringProperties();
 
