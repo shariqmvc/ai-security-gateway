@@ -80,6 +80,22 @@ class PolicyRoutingIntegrationTest {
         when(candidateConstraintEvaluator.filter(anyList(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
+        lenient().when(registryService.requireProvider(any()))
+                .thenAnswer(invocation -> new com.ai.gateway.core.routing.registry.ProviderDefinition(
+                        invocation.getArgument(0),
+                        invocation.getArgument(0).toString(),
+                        com.ai.gateway.core.routing.registry.ProviderStatus.ENABLED,
+                        java.util.Set.of("CHAT")));
+
+        lenient().when(registryService.requireModels(any(), anyString(), any()))
+                .thenAnswer(invocation -> java.util.List.of(
+                        new ModelDefinition(
+                                invocation.getArgument(0),
+                                invocation.getArgument(1),
+                                invocation.getArgument(1),
+                                ModelStatus.ENABLED,
+                                java.util.Set.of("CHAT"))));
+
         ExplicitProviderRoutingStrategy
                 explicitProvider =
                 new ExplicitProviderRoutingStrategy(
