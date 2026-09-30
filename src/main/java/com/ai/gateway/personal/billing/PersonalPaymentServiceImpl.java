@@ -158,7 +158,13 @@ public class PersonalPaymentServiceImpl implements PersonalPaymentService {
   if("PAYMENT_SUCCEEDED".equals(type)){fulfill(intent,providerPaymentId,null);}
   else if("PAYMENT_FAILED".equals(type)){intent.setStatus(PersonalPaymentStatus.FAILED);intent.setCompletedAt(LocalDateTime.now());}
   else if("PAYMENT_CANCELED".equals(type)){intent.setStatus(PersonalPaymentStatus.CANCELED);intent.setCompletedAt(LocalDateTime.now());}
-  else if("PAYMENT_REFUNDED".equals(type)){handleRefund(intent,minor(intent.getAmount()),minor(intent.getAmount()));}
+  else if("PAYMENT_REFUNDED".equals(type)){
+   if(intent.getStatus()==PersonalPaymentStatus.SUCCEEDED){
+    credits.debit(intent.getPersonalAccountId(),intent.getCredits(),"refund:"+intent.getId(),"Credit purchase refund "+intent.getPackageCode());
+    intent.setStatus(PersonalPaymentStatus.REFUNDED);
+    intent.setCompletedAt(LocalDateTime.now());
+   }
+  }
   else throw new PersonalCreditException("Unsupported payment event type: "+type);
   intent.setUpdatedAt(LocalDateTime.now());intents.save(intent);event.setStatus("PROCESSED");event.setProcessedAt(LocalDateTime.now());events.save(event);
  }
