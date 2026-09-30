@@ -258,7 +258,8 @@ public class GatewayServiceImpl implements GatewayService {
                         inferenceId, "MODEL_SELECTED", "ROUTING",
                         java.util.Map.of(
                                 "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
-                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
+                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel(),
+                                "endpoint", aiRequest.getEndpointId() == null ? "" : aiRequest.getEndpointId()));
             }
 
             stageStart = System.nanoTime();
