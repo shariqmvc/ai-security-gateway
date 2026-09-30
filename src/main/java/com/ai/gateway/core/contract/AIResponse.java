@@ -19,4 +19,7 @@ public class AIResponse {
 
     private String model;
 
+    /** Provider-native generation termination reason, when supplied. */
+    private String finishReason;
+
 }
