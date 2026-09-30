@@ -595,7 +595,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .requestedModel(requestedModel)
                     .provider(aiResponse.getProvider() == null ? null : aiResponse.getProvider().name())
                     .model(aiResponse.getModel())
-                    .endpointId(aiRequest.getEndpointId())
+                    .endpointId(aiResponse.getEndpointId() == null ? aiRequest.getEndpointId() : aiResponse.getEndpointId())
                     .finishReason(aiResponse.getFinishReason())
                     .inputTokens(aiResponse.getUsage() == null ? null : aiResponse.getUsage().getInputTokens())
                     .outputTokens(aiResponse.getUsage() == null ? null : aiResponse.getUsage().getOutputTokens())
