@@ -27,7 +27,7 @@ public abstract class NativeChatCompletionsProvider implements AIProvider, Strea
     private final ProviderCredentialResolver credentialResolver;
 
     protected NativeChatCompletionsProvider(RestTemplate restTemplate, ObjectMapper objectMapper,
-            PerformanceLogger performanceLogger, PersonalProviderCredentialResolver credentialResolver) {
+            PerformanceLogger performanceLogger, ProviderCredentialResolver credentialResolver) {
         this.restTemplate=restTemplate; this.objectMapper=objectMapper;
         this.performanceLogger=performanceLogger; this.credentialResolver=credentialResolver;
     }
