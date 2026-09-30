@@ -669,16 +669,27 @@ public class PolicyBasedRoutingStrategy
                 }
 
                 try {
-                    com.ai.gateway.core.routing.registry.ModelDefinition modelDefinition =
-                            providerModelRegistryService.requireModel(
+                    List<com.ai.gateway.core.routing.registry.ModelDefinition> modelDefinitions =
+                            providerModelRegistryService.requireModels(
                                     provider,
                                     model,
                                     requiredCapabilities);
-                    candidates.add(
-                            new RoutingCandidate(
-                                    provider,
-                                    model,
-                                    modelDefinition.endpointId()));
+
+                    java.util.Set<String> endpointKeys = new java.util.HashSet<>();
+                    for (com.ai.gateway.core.routing.registry.ModelDefinition modelDefinition : modelDefinitions) {
+                        String endpointKey = modelDefinition.endpointId() == null
+                                ? provider.name() + "/" + modelDefinition.modelId()
+                                : provider.name() + "/" + modelDefinition.modelId()
+                                        + "@" + modelDefinition.endpointId();
+
+                        if (endpointKeys.add(endpointKey)) {
+                            candidates.add(
+                                    new RoutingCandidate(
+                                            provider,
+                                            modelDefinition.modelId(),
+                                            modelDefinition.endpointId()));
+                        }
+                    }
                 } catch (BusinessException capabilityMismatch) {
                     logCapabilityMismatch(provider, model, requiredCapabilities);
                 }
