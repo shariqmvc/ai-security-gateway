@@ -80,9 +80,37 @@ public class StreamingProviderFailoverServiceImpl
         Throwable primaryFailure = null;
         Throwable lastFailure = null;
 
-        List<Provider> fallbacks = properties.isEnabled()
-                ? properties.fallbacksFor(primary)
-                : List.of();
+        List<RoutingCandidate> fallbackCandidates = new java.util.ArrayList<>();
+        if (properties.isEnabled() && request.isAllowProviderFallbacks()) {
+            if (request.getRoutingCandidates() != null) {
+                request.getRoutingCandidates().stream()
+                        .filter(candidate -> candidate != null)
+                        .filter(candidate -> !candidate.provider().equals(primary)
+                                || !candidate.model().equals(request.getModel()))
+                        .forEach(fallbackCandidates::add);
+            }
+            java.util.Set<String> routedKeys = fallbackCandidates.stream()
+                    .map(RoutingCandidate::candidateKey)
+                    .collect(java.util.stream.Collectors.toSet());
+            for (Provider fallback : properties.fallbacksFor(primary)) {
+                if (fallback == null) continue;
+                String model;
+                try {
+                    model = providerFactory.getProvider(fallback).defaultModel();
+                } catch (Exception ignored) {
+                    continue;
+                }
+                String key = fallback.name() + "/" + model;
+                if (!routedKeys.contains(key)) {
+                    fallbackCandidates.add(new RoutingCandidate(fallback, model));
+                    routedKeys.add(key);
+                }
+            }
+        }
+        List<Provider> fallbacks = fallbackCandidates.stream()
+                .map(RoutingCandidate::provider)
+                .distinct()
+                .toList();
 
         int maxAttempts = properties.isEnabled()
                 ? Math.max(1, properties.getMaxAttempts())
@@ -145,7 +173,8 @@ public class StreamingProviderFailoverServiceImpl
 
         int fallbackAttempts = 0;
 
-        for (Provider fallback : fallbacks) {
+        for (RoutingCandidate fallbackCandidate : fallbackCandidates) {
+            Provider fallback = fallbackCandidate.provider();
             if (fallback == null || attempted.contains(fallback)) {
                 continue;
             }
@@ -177,7 +206,7 @@ public class StreamingProviderFailoverServiceImpl
             }
 
             AIRequest fallbackRequest =
-                    buildFallbackRequest(request, fallback);
+                    buildFallbackRequest(request, fallbackCandidate);
 
             if (fallbackRequest == null) {
                 continue;
@@ -382,11 +411,11 @@ public class StreamingProviderFailoverServiceImpl
 
     private AIRequest buildFallbackRequest(
             AIRequest primaryRequest,
-            Provider fallback) {
+            RoutingCandidate fallbackCandidate) {
+        Provider fallback = fallbackCandidate.provider();
         try {
             providerModelRegistryService.requireProvider(fallback);
-            String fallbackModelId =
-                    providerFactory.getProvider(fallback).defaultModel();
+            String fallbackModelId = fallbackCandidate.model();
 
             var fallbackModel =
                     providerModelRegistryService.requireModel(
@@ -404,6 +433,7 @@ public class StreamingProviderFailoverServiceImpl
                     .routingDecisionMetadata(
                             primaryRequest.getRoutingDecisionMetadata())
                     .routingStrategy(primaryRequest.getRoutingStrategy())
+                    .routingCandidates(primaryRequest.getRoutingCandidates())
                     .build();
         } catch (Exception ex) {
             log.warn(
