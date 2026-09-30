@@ -245,11 +245,13 @@ public class GatewayServiceImpl implements GatewayService {
             // support images. This prevents a multi-file request from silently
             // dropping DOCUMENT media (or failing in Ollama) while preserving
             // the same AIRequest contract for all providers.
-            aiRequest = attachedDocumentExtractionService.materializeUnsupportedDocuments(
-                    requestId,
-                    inferenceId,
-                    auth,
-                    aiRequest);
+            if (attachedDocumentExtractionService != null) {
+                aiRequest = attachedDocumentExtractionService.materializeUnsupportedDocuments(
+                        requestId,
+                        inferenceId,
+                        auth,
+                        aiRequest);
+            }
 
             performanceLogger.stage("ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
             if (personalInferencePersistenceService != null) {
@@ -849,11 +851,13 @@ public class GatewayServiceImpl implements GatewayService {
             // media only. This must happen in the streaming path as well as the
             // synchronous path; otherwise DIRECT_PROVIDER documents reach the
             // provider unchanged and Ollama rejects them before making a request.
-            aiRequest = attachedDocumentExtractionService.materializeUnsupportedDocuments(
-                    requestId,
-                    inferenceId,
-                    auth,
-                    aiRequest);
+            if (attachedDocumentExtractionService != null) {
+                aiRequest = attachedDocumentExtractionService.materializeUnsupportedDocuments(
+                        requestId,
+                        inferenceId,
+                        auth,
+                        aiRequest);
+            }
 
             performanceLogger.stage(
                     "ROUTING", requestId, elapsedMs(stageStart), "SUCCESS");
