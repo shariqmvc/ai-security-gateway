@@ -133,10 +133,6 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         1, request.getProvider(), request.getModel(),
                         request.getEndpointId(), "FAILED",
                         ex.getClass().getSimpleName()));
-                executionAttempts.add(new AIResponse.ProviderAttempt(
-                        1, request.getProvider(), request.getModel(),
-                        request.getEndpointId(), "FAILED",
-                        ex.getClass().getSimpleName()));
 
                 recordProviderFailure(request, ex);
 
