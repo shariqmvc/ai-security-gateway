@@ -458,6 +458,7 @@ public class StreamingProviderFailoverServiceImpl
                 .providerAttempt(successfulAttempt)
                 .providerAttempts(List.copyOf(attempts))
                 .failoverFromEndpointId(primaryEndpointId)
+                .failoverReason(response.getFailoverReason())
                 .build();
     }
 
