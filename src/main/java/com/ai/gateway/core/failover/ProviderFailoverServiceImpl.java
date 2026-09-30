@@ -593,6 +593,9 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             providerModelRegistryService.requireProvider(fallback);
 
             String fallbackModelId = fallbackCandidate.model();
+            if (fallbackModelId == null || fallbackModelId.isBlank()) {
+                fallbackModelId = defaultModel(fallback);
+            }
 
             var fallbackModel =
                     providerModelRegistryService.requireModel(
@@ -635,14 +638,24 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 .collect(java.util.stream.Collectors.toSet());
 
         for (Provider fallback : properties.fallbacksFor(primary)) {
-            if (fallback == null) {
+            if (fallback == null || fallback == primary) {
                 continue;
             }
 
-            String model = defaultModel(fallback);
-            String key = fallback.name() + "/" + model;
-            if (keys.add(key)) {
-                candidates.add(new RoutingCandidate(fallback, model));
+            /*
+             * Keep configured fallbacks unresolved until execution. Resolving
+             * the provider's default model here invokes providerFactory even
+             * when the fallback will later be skipped by health/circuit/budget
+             * checks, and it also breaks lightweight failover tests that mock
+             * only the provider that is actually executed.
+             */
+            String providerKey = fallback.name() + "/";
+            boolean alreadyConfigured = keys.stream()
+                    .anyMatch(key -> key.equals(providerKey)
+                            || key.startsWith(providerKey));
+            if (!alreadyConfigured) {
+                candidates.add(new RoutingCandidate(fallback, null));
+                keys.add(providerKey);
             }
         }
 
