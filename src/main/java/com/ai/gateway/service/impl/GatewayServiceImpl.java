@@ -1923,6 +1923,9 @@ public class GatewayServiceImpl implements GatewayService {
                     .routingDecisionMetadata(routingDecision.metadata())
                     .routingStrategy(routingDecision.strategy())
                     .routingCandidates(routingDecision.selectedCandidates())
+                    .endpointId(routingDecision.selectedCandidates() == null || routingDecision.selectedCandidates().isEmpty()
+                            ? null
+                            : routingDecision.selectedCandidates().get(0).endpointId())
                     .allowProviderFallbacks(request.isAllowProviderFallbacks())
                     .media(request.getMedia())
                     .fileProcessingMode(request.getFileProcessingMode())
