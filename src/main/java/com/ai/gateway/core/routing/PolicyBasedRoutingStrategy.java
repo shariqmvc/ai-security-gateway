@@ -683,16 +683,15 @@ public class PolicyBasedRoutingStrategy
                      * return endpoint-expanded definitions through requireModels.
                      */
                     if (modelDefinitions == null || modelDefinitions.isEmpty()) {
-                        try {
-                            com.ai.gateway.core.routing.registry.ModelDefinition single =
-                                    providerModelRegistryService.requireModel(
-                                            provider,
-                                            model,
-                                            requiredCapabilities);
-                            modelDefinitions = List.of(single);
-                        } catch (BusinessException ignored) {
+                        com.ai.gateway.core.routing.registry.ModelDefinition single =
+                                providerModelRegistryService.requireModel(
+                                        provider,
+                                        model,
+                                        requiredCapabilities);
+                        if (single == null) {
                             continue;
                         }
+                        modelDefinitions = List.of(single);
                     }
 
                     java.util.Set<String> endpointKeys = new java.util.HashSet<>();
@@ -711,7 +710,20 @@ public class PolicyBasedRoutingStrategy
                         }
                     }
                 } catch (BusinessException capabilityMismatch) {
-                    logCapabilityMismatch(provider, model, requiredCapabilities);
+                    /*
+                     * A capability mismatch means this candidate is not
+                     * eligible and should be filtered. Other registry failures
+                     * must propagate instead of being silently converted into
+                     * an empty candidate set.
+                     */
+                    String message = capabilityMismatch.getMessage();
+                    if (message != null
+                            && (message.contains("with required capabilities")
+                            || message.contains("does not support required capabilities"))) {
+                        logCapabilityMismatch(provider, model, requiredCapabilities);
+                        continue;
+                    }
+                    throw capabilityMismatch;
                 }
             }
         }
