@@ -128,7 +128,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         profile.setAvailability(clamp(availability, 0.0, 1.0));
 
         List<RoutingOutcomeSample> outcomes = outcomeReader
-                .findRecent(profile.getProvider(), profile.getModel());
+                .findRecent(profile.getProvider(), profile.getModel(), profile.getEndpointId());
 
         List<Long> latencies = outcomes.stream()
                 .filter(o -> o != null && o.latencyMs() >= 0)
