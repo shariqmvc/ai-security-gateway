@@ -154,6 +154,10 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         1, request.getProvider(), request.getModel(),
                         request.getEndpointId(), "FAILED",
                         ex.getClass().getSimpleName()));
+                executionAttempts.add(new AIResponse.ProviderAttempt(
+                        1, request.getProvider(), request.getModel(),
+                        request.getEndpointId(), "FAILED",
+                        ex.getClass().getSimpleName()));
 
                 recordProviderFailure(request, ex);
 
@@ -358,6 +362,13 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         invoke(fallbackRequest, fallbackAttempts + 1);
 
                 recordProviderSuccess(fallbackRequest);
+                executionAttempts.add(new AIResponse.ProviderAttempt(
+                        fallbackAttempts + 1,
+                        fallbackRequest.getProvider(),
+                        fallbackRequest.getModel(),
+                        fallbackRequest.getEndpointId(),
+                        "SUCCESS",
+                        null));
                 executionAttempts.add(new AIResponse.ProviderAttempt(
                         fallbackAttempts + 1,
                         fallbackRequest.getProvider(),
@@ -713,6 +724,20 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             List<AIResponse.ProviderAttempt> attempts,
             String primaryEndpointId,
             String successfulEndpointId,
+            int successfulAttempt) {
+        if (response == null) return null;
+        response.setProviderAttempt(successfulAttempt);
+        response.setProviderAttempts(List.copyOf(attempts));
+        if (successfulAttempt > 1) {
+            response.setFailoverFromEndpointId(primaryEndpointId);
+        }
+        return response;
+    }
+
+    private AIResponse enrichAttemptMetadata(
+            AIResponse response,
+            List<AIResponse.ProviderAttempt> attempts,
+            String primaryEndpointId,
             int successfulAttempt) {
         if (response == null) return null;
         response.setProviderAttempt(successfulAttempt);
