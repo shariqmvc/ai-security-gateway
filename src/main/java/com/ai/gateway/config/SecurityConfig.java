@@ -122,7 +122,7 @@ public class SecurityConfig {
                          * HTTP 401 before the controller is reached.
                          */
                         .requestMatchers("/api/chat")
-                        .authenticated()
+                        .permitAll()
                         .anyRequest()
                         .authenticated()
                 )
