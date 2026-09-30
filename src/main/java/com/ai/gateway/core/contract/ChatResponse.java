@@ -27,6 +27,9 @@ public class ChatResponse {
     private String provider;
     private String model;
 
+    /** Executable endpoint that generated the response. */
+    private String endpointId;
+
     /** Non-null only when execution failed over from the requested provider. */
     private String failoverReason;
 
