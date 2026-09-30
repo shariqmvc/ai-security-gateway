@@ -201,7 +201,7 @@ gateway:
     requests-per-minute: 60
   routing:
     failover:
-      enabled: ${GATEWAY_ROUTING_FAILOVER_ENABLED:false}
+      enabled: ${GATEWAY_ROUTING_FAILOVER_ENABLED:true}
       max-attempts: ${GATEWAY_ROUTING_FAILOVER_MAX_ATTEMPTS:2}
       request-time-budget: ${GATEWAY_ROUTING_FAILOVER_REQUEST_TIME_BUDGET:75s}
       minimum-fallback-budget: ${GATEWAY_ROUTING_FAILOVER_MINIMUM_FALLBACK_BUDGET:1s}
