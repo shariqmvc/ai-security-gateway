@@ -39,8 +39,9 @@ public class PersonalSettingsService {
         }
 
         PersonalAccountPolicy policy = policyService.getOrCreate(account.getId());
-        PersonalAccountPreferences preferences = preferencesRepository.findByPersonalAccountId(account.getId())
-                .orElse(null);
+        PersonalAccountPreferences preferences = preferencesRepository == null
+                ? null
+                : preferencesRepository.findByPersonalAccountId(account.getId()).orElse(null);
 
         return new PersonalEffectiveSettingsResponse(
                 new PersonalEffectiveSettingsResponse.Account(
