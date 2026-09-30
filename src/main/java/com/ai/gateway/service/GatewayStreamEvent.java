@@ -13,6 +13,11 @@ public class GatewayStreamEvent {
     String content;
     String provider;
     String model;
+    String endpointId;
+    String failoverFromProvider;
+    String failoverFromEndpointId;
+    Integer providerAttempt;
+    java.util.List<com.ai.gateway.core.provider.AIStreamResult.ProviderAttempt> providerAttempts;
     String requestedProvider;
     String requestedModel;
     String failoverReason;
