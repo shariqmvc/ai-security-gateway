@@ -248,6 +248,17 @@ gateway:
       mistral: ${GATEWAY_MISTRAL_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
 
     # Model-aware context budgets. Exact model entries override provider defaults.
+    # Executable provider endpoints. Endpoint IDs are referenced by routing candidates.
+    endpoints:
+      urls:
+        ollama-default: ${OLLAMA_BASE_URL:http://localhost:11434}
+        openai-default: ${OPENAI_BASE_URL:https://api.openai.com}
+        gemini-default: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+        claude-default: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+        xai-default: ${XAI_BASE_URL:https://api.x.ai/v1}
+        groq-default: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+        mistral-default: ${MISTRAL_BASE_URL:https://api.mistral.ai/v1}
+
     context-windows:
       default-tokens: ${GATEWAY_CONTEXT_DEFAULT_TOKENS:16000}
       providers:
