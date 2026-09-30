@@ -27,6 +27,7 @@ public class AIRequest {
     private String fileProcessingMode;
     private RoutingDecisionMetadata routingDecisionMetadata;
     private RoutingStrategy routingStrategy;
+    private String endpointId;
 
     @Builder.Default
     private boolean allowProviderFallbacks = true;
