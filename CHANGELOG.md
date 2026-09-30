@@ -17,6 +17,12 @@ All notable changes to the AI Security Gateway are documented here.
 - V39 persists endpoint identity for routing outcomes.
 
 ### Test and architecture hardening
+- Failover fallback default models are now resolved through the model registry rather than instantiating provider adapters.
+- Policy routing validates provider availability before endpoint/model resolution.
+- Updated isolated routing tests to stub the endpoint-aware provider/model registry boundary.
+- Updated gateway streaming tests to exercise the StreamingProviderFailoverService boundary and the explicit status/routing SSE events.
+- Restored /api/chat authorization delegation to the mandatory X-API-Key AuthenticationFilter; Spring role authorization does not duplicate that boundary.
+
 - Removed remaining Core provider imports of the Personal credential resolver; Gemini, Groq, Mistral, XAI, and native OpenAI-compatible providers now depend on the Core credential-resolution contract.
 - Configured fallback providers now resolve their default model only when the fallback is actually attempted.
 - Preserved registry exceptions during policy candidate resolution while retaining compatibility with isolated single-model registry tests.
