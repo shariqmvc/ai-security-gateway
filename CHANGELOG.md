@@ -17,6 +17,7 @@ All notable changes to the AI Security Gateway are documented here.
 - V39 persists endpoint identity for routing outcomes.
 
 ### Test and architecture hardening
+- Streaming failover now resolves configured fallback models lazily through the model registry, matching synchronous failover behavior.
 - Failover fallback default models are now resolved through the model registry rather than instantiating provider adapters.
 - Policy routing validates provider availability before endpoint/model resolution.
 - Updated isolated routing tests to stub the endpoint-aware provider/model registry boundary.
