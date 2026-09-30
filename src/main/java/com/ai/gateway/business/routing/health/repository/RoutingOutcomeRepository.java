@@ -8,5 +8,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface RoutingOutcomeRepository extends JpaRepository<RoutingOutcome, UUID> {
-    List<RoutingOutcome> findTop100ByProviderAndModelOrderByCreatedAtDesc(Provider provider, String model);
+    List<RoutingOutcome> findTop100ByProviderAndModelAndEndpointIdOrderByCreatedAtDesc(Provider provider, String model, String endpointId);
 }
