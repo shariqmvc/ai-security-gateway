@@ -42,8 +42,7 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
    .inputTokens(u==null?null:u.getInputTokens()).outputTokens(u==null?null:u.getOutputTokens())
    .totalTokens(u==null?null:u.getTotalTokens()).estimatedInputTokens(estIn)
    .estimatedOptimizedTokens(estOpt).estimatedTokensSaved(saved).contextWindowTokens(window)
-   .latencyMs(latency).providerLatencyMs(providerLatency).cost(actualCost(req, resp)).cacheHit(cacheHit).ragEnabled(rag)
-   .finishReason(resp==null?null:resp.getFinishReason()).build());
+   .latencyMs(latency).providerLatencyMs(providerLatency).cost(actualCost(req, resp)).cacheHit(cacheHit).ragEnabled(rag).build());
  }
  @Override @Transactional
  public void recordFailure(UUID id,AuthenticationContext auth,AIRequest req,String prompt,long latency,long providerLatency,String category){
@@ -153,6 +152,6 @@ public class PersonalRequestHistoryServiceImpl implements PersonalRequestHistory
    .estimatedOptimizedTokens(h.getEstimatedOptimizedTokens()).estimatedTokensSaved(h.getEstimatedTokensSaved())
    .contextWindowTokens(h.getContextWindowTokens()).latencyMs(h.getLatencyMs()).providerLatencyMs(h.getProviderLatencyMs())
    .cost(h.getCost()).cacheHit(h.isCacheHit()).ragEnabled(h.isRagEnabled()).errorCategory(h.getErrorCategory())
-   .createdAt(h.getCreatedAt()).responseRating(responseRating).finishReason(h.getFinishReason()).build();
+   .createdAt(h.getCreatedAt()).responseRating(responseRating).build();
  }
 }
