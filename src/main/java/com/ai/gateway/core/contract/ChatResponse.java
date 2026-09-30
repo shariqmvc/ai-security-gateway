@@ -17,6 +17,12 @@ public class ChatResponse {
 
     private String response;
 
+    private String finishReason;
+
+    private Integer inputTokens;
+    private Integer outputTokens;
+    private Integer totalTokens;
+
     /** Phase 4 RAG execution metadata; null when RAG is disabled. */
     private RagMetadata rag;
 
