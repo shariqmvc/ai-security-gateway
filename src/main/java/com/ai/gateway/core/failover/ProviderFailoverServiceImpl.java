@@ -84,7 +84,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
         int maxAttempts = Math.max(1, properties.getMaxAttempts());
 
-        Set<Provider> attempted = new HashSet<>();
+        Set<String> attempted = new HashSet<>();
         Throwable primaryFailure = null;
         Throwable lastFailure = null;
 
@@ -129,13 +129,13 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         /*
          * Attempt #1: primary provider.
          */
-        attempted.add(primary);
+        attempted.add(new RoutingCandidate(primary, request.getModel(), request.getEndpointId()).candidateKey());
 
         /*
          * Fast-fail a provider/model that is already known to be unhealthy.
          * Subsequent requests should not pay the same provider timeout again.
          */
-        if (!isCircuitOpen(request.getProvider(), request.getModel())) {
+        if (!isCircuitOpen(new RoutingCandidate(request.getProvider(), request.getModel(), request.getEndpointId()))) {
 
             try {
                 AIResponse response = invoke(request, 1);
@@ -249,7 +249,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             Provider fallback = fallbackCandidate.provider();
 
             if (fallback == null
-                    || attempted.contains(fallback)) {
+                    || attempted.contains(fallbackCandidate.candidateKey())) {
                 continue;
             }
 
@@ -295,7 +295,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     && !routingHealthService.isHealthyForRouting(
                             new RoutingCandidate(
                                     fallbackRequest.getProvider(),
-                                    fallbackRequest.getModel()))) {
+                                    fallbackRequest.getModel(),
+                                    fallbackRequest.getEndpointId()))) {
 
                 log.info(
                         "FAILOVER_CANDIDATE_UNHEALTHY requestId={} provider={} model={}",
@@ -306,9 +307,10 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 continue;
             }
 
-            if (isCircuitOpen(
+            if (isCircuitOpen(new RoutingCandidate(
                     fallbackRequest.getProvider(),
-                    fallbackRequest.getModel())) {
+                    fallbackRequest.getModel(),
+                    fallbackRequest.getEndpointId()))) {
 
                 metricsService.increment(
                         MetricsConstants.ROUTING_FAILOVER_CIRCUIT_OPEN);
@@ -325,7 +327,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 continue;
             }
 
-            attempted.add(fallback);
+            attempted.add(fallbackCandidate.candidateKey());
             fallbackAttempts++;
 
             performanceLogger.failover(
@@ -545,7 +547,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             routingHealthService.recordFailure(
                     new RoutingCandidate(
                             request.getProvider(),
-                            request.getModel()),
+                            request.getModel(),
+                            request.getEndpointId()),
                     ex.getClass().getSimpleName());
         }
 
@@ -653,8 +656,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
             if (openDurationMs > 0L) {
                 providerCircuitBreaker.recordFailure(
-                        request.getProvider(),
-                        request.getModel(),
+                        new RoutingCandidate(request.getProvider(), request.getModel(), request.getEndpointId()),
                         category,
                         openDurationMs);
             } else {
@@ -666,9 +668,9 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         }
     }
 
-    private boolean isCircuitOpen(Provider provider, String model) {
+    private boolean isCircuitOpen(RoutingCandidate candidate) {
         return providerCircuitBreaker != null
-                && !providerCircuitBreaker.allowRequest(provider, model);
+                && !providerCircuitBreaker.allowRequest(candidate);
     }
 
     private long circuitRetryAfterMs(Provider provider, String model) {
