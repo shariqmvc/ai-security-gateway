@@ -48,10 +48,10 @@ public class ClaudeProvider implements AIProvider, StreamingAIProvider {
             JsonNode root=rest.postForObject(endpoint(),new HttpEntity<>(body(request,false),headers(request)),JsonNode.class);
             String answer=root.at("/content/0/text").asText("");
             if(answer.isBlank())throw new IllegalStateException("Anthropic returned an empty response.");
-            JsonNode usage=root.path("usage");int input=usage.path("input_tokens").asInt(0),output=usage.path("output_tokens").asInt(0);
+            JsonNode usage=root.path("usage");int input=usage.path("input_tokens").asInt(0),output=usage.path("output_tokens").asInt(0);String finishReason=root.path("stop_reason").asText(null);
             logger.providerCompleted(id,provider().name(),selected,attempt(),elapsed(started),"HTTP_200");
             return AIResponse.builder().response(answer).provider(provider()).model(selected)
-                    .usage(Usage.builder().inputTokens(input).outputTokens(output).totalTokens(input+output).latencyMs(elapsed(started)).build()).build();
+                    .usage(Usage.builder().inputTokens(input).outputTokens(output).totalTokens(input+output).latencyMs(elapsed(started)).build()).finishReason(finishReason).build();
         }catch(RuntimeException ex){logger.providerCompleted(id,provider().name(),selected,attempt(),elapsed(started),"FAILED:"+ex.getClass().getSimpleName());throw ex;}
     }
 
