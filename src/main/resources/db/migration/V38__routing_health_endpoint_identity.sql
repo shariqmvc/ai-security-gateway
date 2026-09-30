@@ -8,7 +8,8 @@ WHERE endpoint_id IS NULL;
 ALTER TABLE ROUTING_HEALTH_PROFILE
     ALTER COLUMN endpoint_id SET NOT NULL;
 
-DROP INDEX IF EXISTS uk_routing_health_provider_model;
+ALTER TABLE ROUTING_HEALTH_PROFILE
+    DROP CONSTRAINT IF EXISTS uk_routing_health_provider_model;
 
 ALTER TABLE ROUTING_HEALTH_PROFILE
     ADD CONSTRAINT uk_routing_health_provider_model_endpoint
