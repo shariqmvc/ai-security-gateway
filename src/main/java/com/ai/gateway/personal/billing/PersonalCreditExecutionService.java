@@ -8,6 +8,9 @@ import com.ai.gateway.core.cost.dto.PreRequestCostRequest;
 import com.ai.gateway.core.cost.service.PreRequestCostEstimator;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservation;
 import com.ai.gateway.personal.credit.service.PersonalCreditService;
+import com.ai.gateway.personal.billing.PersonalBillingSettingsRepository;
+import com.ai.gateway.personal.credit.repository.PersonalCreditLedgerRepository;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +30,8 @@ public class PersonalCreditExecutionService {
     private final PersonalCreditService creditService;
     private final PreRequestCostEstimator costEstimator;
     private final PersonalBillingProperties properties;
+    private final PersonalBillingSettingsRepository billingSettingsRepository;
+    private final PersonalCreditLedgerRepository ledgerRepository;
 
     public ReservationContext reserve(
             AuthenticationContext context,
@@ -68,6 +73,16 @@ public class PersonalCreditExecutionService {
         BigDecimal minimumCreditCharge = minimumCreditCharge();
         if (reserveAmount.compareTo(BigDecimal.ZERO) <= 0) {
             reserveAmount = minimumCreditCharge;
+        }
+
+        var billingSettings=billingSettingsRepository.findByPersonalAccountId(context.getPersonalAccountId()).orElse(null);
+        if(billingSettings!=null && billingSettings.getMonthlySpendCap()!=null){
+            BigDecimal monthSpend=ledgerRepository.sumCapturedSince(
+                    context.getPersonalAccountId(),
+                    LocalDateTime.now().withDayOfMonth(1).toLocalDate().atStartOfDay());
+            if(monthSpend.add(reserveAmount).compareTo(billingSettings.getMonthlySpendCap())>0){
+                throw new PersonalBillingModeException("Monthly Personal credit spend cap would be exceeded.");
+            }
         }
 
         PersonalCreditReservation reservation =
