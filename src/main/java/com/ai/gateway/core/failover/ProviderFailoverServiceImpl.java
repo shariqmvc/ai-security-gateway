@@ -661,8 +661,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         openDurationMs);
             } else {
                 providerCircuitBreaker.recordFailure(
-                        request.getProvider(),
-                        request.getModel(),
+                        new RoutingCandidate(request.getProvider(), request.getModel(), request.getEndpointId()),
                         category);
             }
         }
