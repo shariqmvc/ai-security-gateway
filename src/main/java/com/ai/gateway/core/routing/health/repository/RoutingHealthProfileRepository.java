@@ -9,6 +9,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface RoutingHealthProfileRepository extends JpaRepository<RoutingHealthProfile, UUID> {
-    Optional<RoutingHealthProfile> findByProviderAndModel(Provider provider, String model);
+    Optional<RoutingHealthProfile> findByProviderAndModelAndEndpointId(Provider provider, String model, String endpointId);
     List<RoutingHealthProfile> findAllByOrderByUpdatedAtDesc();
 }
