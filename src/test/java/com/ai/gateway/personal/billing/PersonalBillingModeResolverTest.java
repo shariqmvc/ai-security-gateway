@@ -72,7 +72,7 @@ class PersonalBillingModeResolverTest {
     @Test
     void rejectsNonPersonalAuthentication() {
         var repository = mock(PersonalProviderConnectionRepository.class);
-        var properties = new PersonalBillingProperties();
+        var policyService = mock(PersonalAccountPolicyService.class);
         var resolver = new PersonalBillingModeResolver(repository, policyService);
 
         assertThrows(PersonalBillingModeException.class,
