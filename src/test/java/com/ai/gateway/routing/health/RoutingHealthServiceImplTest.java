@@ -64,7 +64,8 @@ class RoutingHealthServiceImplTest {
     void firstObservationIsUnknown() {
         when(outcomes.findRecent(
                 Provider.OPENAI,
-                "gpt-5"))
+                "gpt-5",
+                "openai-default"))
                 .thenReturn(List.of());
 
         when(profiles.findByProviderAndModelAndEndpointId(
@@ -94,14 +95,16 @@ class RoutingHealthServiceImplTest {
     void consecutiveFailuresMakeHealthyCandidateUnhealthy() {
         RoutingHealthProfile profile = profile(3, 0, 0.0);
 
-        when(profiles.findByProviderAndModel(
+        when(profiles.findByProviderAndModelAndEndpointId(
                 Provider.OPENAI,
-                "gpt-5"))
+                "gpt-5",
+                "openai-default"))
                 .thenReturn(Optional.of(profile));
 
         when(outcomes.findRecent(
                 Provider.OPENAI,
-                "gpt-5"))
+                "gpt-5",
+                "openai-default"))
                 .thenReturn(List.of());
 
         when(profiles.save(any(RoutingHealthProfile.class)))
@@ -138,9 +141,10 @@ class RoutingHealthServiceImplTest {
                 LocalDateTime.now().minusHours(2)
         );
 
-        when(profiles.findByProviderAndModel(
+        when(profiles.findByProviderAndModelAndEndpointId(
                 Provider.OPENAI,
-                "gpt-5"))
+                "gpt-5",
+                "openai-default"))
                 .thenReturn(Optional.of(profile));
 
         assertTrue(
