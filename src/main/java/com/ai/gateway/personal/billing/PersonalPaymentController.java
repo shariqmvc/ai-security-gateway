@@ -18,7 +18,7 @@ public class PersonalPaymentController {
 
  @PostMapping("/intents")
  public PersonalPaymentIntent create(@RequestBody CreateIntentRequest body,HttpServletRequest request){
-  return service.createIntent(context(request).getPersonalAccountId(),body.packageCode(),body.idempotencyKey());
+  return service.createIntent(context(request).getPersonalAccountId(),body.packageCode(),body.idempotencyKey(),body.creditAmount());
  }
 
  @GetMapping("/history")
@@ -50,6 +50,6 @@ public class PersonalPaymentController {
    throw new AccessDeniedException("Personal session authentication is required for billing.");
   return c;
  }
- public record CreateIntentRequest(String packageCode,String idempotencyKey){}
+ public record CreateIntentRequest(String packageCode,String idempotencyKey,java.math.BigDecimal creditAmount){}
  public record WebhookRequest(String provider,String eventId,String eventType,UUID paymentIntentId,String providerPaymentId){}
 }
