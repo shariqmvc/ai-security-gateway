@@ -7,6 +7,7 @@ import com.ai.gateway.exception.BusinessException;
 import com.ai.gateway.core.routing.PolicyBasedRoutingStrategy;
 import com.ai.gateway.core.routing.RoutingContext;
 import com.ai.gateway.core.routing.RoutingDecision;
+import com.ai.gateway.core.routing.RoutingDecisionMetadata;
 import com.ai.gateway.core.routing.RoutingStrategy;
 import com.ai.gateway.core.routing.constraint.CandidateConstraintEvaluator;
 import com.ai.gateway.core.routing.engine.CandidateEligibilityFilter;
@@ -997,6 +998,52 @@ class PolicyBasedRoutingStrategyTest {
                         Provider.GEMINI,
                         policy);
     }
+
+    @Test
+    void shouldRankEndpointCandidatesIndependently() {
+        ChatRequest request = ChatRequest.builder().prompt("hello").build();
+        RoutingContext context = new RoutingContext(request, authenticationContext);
+
+        RoutingPolicy policy = new RoutingPolicy(
+                true,
+                List.of(Provider.OLLAMA),
+                List.of("llama3.2:3b"),
+                Provider.OLLAMA,
+                "llama3.2:3b");
+
+        RoutingCandidate gpu1 =
+                new RoutingCandidate(Provider.OLLAMA, "llama3.2:3b", "ollama-gpu-01");
+        RoutingCandidate gpu2 =
+                new RoutingCandidate(Provider.OLLAMA, "llama3.2:3b", "ollama-gpu-02");
+
+        when(routingPolicyService.resolve(any(), any())).thenReturn(policy);
+        when(candidateProviderResolver.resolve(policy)).thenReturn(List.of(Provider.OLLAMA));
+        when(candidateModelResolver.resolve(Provider.OLLAMA, policy))
+                .thenReturn(List.of("llama3.2:3b"));
+        when(providerModelRegistryService.requireModels(
+                Provider.OLLAMA, "llama3.2:3b", java.util.Set.of()))
+                .thenReturn(List.of(
+                        new com.ai.gateway.core.routing.registry.ModelDefinition(
+                                Provider.OLLAMA, "llama3.2:3b", "llama3.2:3b",
+                                com.ai.gateway.core.routing.registry.ModelStatus.ENABLED,
+                                java.util.Set.of("CHAT"), 4096, "ollama-gpu-01"),
+                        new com.ai.gateway.core.routing.registry.ModelDefinition(
+                                Provider.OLLAMA, "llama3.2:3b", "llama3.2:3b",
+                                com.ai.gateway.core.routing.registry.ModelStatus.ENABLED,
+                                java.util.Set.of("CHAT"), 4096, "ollama-gpu-02")));
+
+        when(candidateEligibilityFilter.filter(anyList(), any())).thenAnswer(i -> i.getArgument(0));
+
+        RoutingDecision decision = strategy.route(context);
+
+        assertEquals(2, decision.metadata().candidateCount());
+        assertEquals(2, decision.metadata().rankedCandidates().size());
+        assertTrue(decision.metadata().rankedCandidates().stream()
+                .map(RoutingDecisionMetadata.RoutingCandidateMetadata::endpointId)
+                .collect(java.util.stream.Collectors.toSet())
+                .containsAll(java.util.Set.of("ollama-gpu-01", "ollama-gpu-02")));
+    }
+
 
     private RoutingCandidate stubCandidate(
             RoutingPolicy policy,
