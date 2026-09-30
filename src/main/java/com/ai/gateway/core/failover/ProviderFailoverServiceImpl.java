@@ -36,6 +36,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
+    private static final String DEFAULT_FALLBACK_MODEL = "__DEFAULT_FALLBACK_MODEL__";
+
     private final AIProviderFactory providerFactory;
     private final ProviderModelRegistryService providerModelRegistryService;
     private final FailoverProperties properties;
@@ -593,7 +595,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             providerModelRegistryService.requireProvider(fallback);
 
             String fallbackModelId = fallbackCandidate.model();
-            if (fallbackModelId == null || fallbackModelId.isBlank()) {
+            if (DEFAULT_FALLBACK_MODEL.equals(fallbackModelId)) {
                 fallbackModelId = defaultModel(fallback);
             }
 
@@ -654,7 +656,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     .anyMatch(key -> key.equals(providerKey)
                             || key.startsWith(providerKey));
             if (!alreadyConfigured) {
-                candidates.add(new RoutingCandidate(fallback, null));
+                candidates.add(new RoutingCandidate(fallback, DEFAULT_FALLBACK_MODEL));
                 keys.add(providerKey);
             }
         }
