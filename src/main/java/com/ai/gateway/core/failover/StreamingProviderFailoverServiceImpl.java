@@ -448,6 +448,8 @@ public class StreamingProviderFailoverServiceImpl
                 .provider(response.getProvider())
                 .model(response.getModel())
                 .endpointId(response.getEndpointId())
+                .failoverFromProvider(response.getFailoverFromProvider())
+                .failoverFromEndpointId(response.getFailoverFromEndpointId())
                 .inputTokens(response.getInputTokens())
                 .outputTokens(response.getOutputTokens())
                 .totalTokens(response.getTotalTokens())
