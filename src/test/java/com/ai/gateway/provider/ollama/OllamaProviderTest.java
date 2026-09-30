@@ -12,6 +12,7 @@ import com.ai.gateway.core.provider.ollama.dto.OllamaMessage;
 import com.ai.gateway.core.provider.ollama.dto.OllamaOptions;
 import com.ai.gateway.core.provider.ollama.dto.OllamaRequest;
 import com.ai.gateway.core.provider.ollama.dto.OllamaResponse;
+import com.ai.gateway.core.routing.registry.ProviderEndpointRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
@@ -41,6 +42,8 @@ class OllamaProviderTest {
         RestTemplate restTemplate = mock(RestTemplate.class);
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = mock(ObjectMapper.class);
+        ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
+        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("llama3.1:8b");
@@ -80,7 +83,8 @@ class OllamaProviderTest {
                 config,
                 performanceLogger,
                 limiter,
-                objectMapper);
+                objectMapper,
+                endpointRegistry);
 
         AIResponse result = provider.chat(
                 AIRequest.builder()
@@ -130,6 +134,8 @@ class OllamaProviderTest {
         RestTemplate restTemplate = mock(RestTemplate.class);
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = new ObjectMapper();
+        ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
+        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("qwen2.5vl:3b");
@@ -162,7 +168,8 @@ class OllamaProviderTest {
                 config,
                 performanceLogger,
                 limiter,
-                objectMapper);
+                objectMapper,
+                endpointRegistry);
 
         provider.chat(
                 AIRequest.builder()
@@ -198,6 +205,8 @@ class OllamaProviderTest {
         RestTemplate restTemplate = mock(RestTemplate.class);
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = new ObjectMapper();
+        ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
+        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("llama3.2:3b");
@@ -217,7 +226,8 @@ class OllamaProviderTest {
                 config,
                 performanceLogger,
                 limiter,
-                objectMapper);
+                objectMapper,
+                endpointRegistry);
         ReflectionTestUtils.setField(provider, "baseUrl", "http://localhost:11434");
 
         when(restTemplate.execute(
@@ -265,6 +275,8 @@ class OllamaProviderTest {
         RestTemplate restTemplate = mock(RestTemplate.class);
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = new ObjectMapper();
+        ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
+        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("llama3.2:3b");
@@ -281,7 +293,8 @@ class OllamaProviderTest {
                 config,
                 performanceLogger,
                 limiter,
-                objectMapper);
+                objectMapper,
+                endpointRegistry);
 
         ResourceAccessException timeout = new ResourceAccessException(
                 "Read timed out",
