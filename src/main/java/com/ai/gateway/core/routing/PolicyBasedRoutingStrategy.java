@@ -676,6 +676,25 @@ public class PolicyBasedRoutingStrategy
                                     model,
                                     requiredCapabilities);
 
+                    /*
+                     * Compatibility fallback for isolated routing tests and
+                     * lightweight registry adapters that implement only the
+                     * original single-definition contract. Production registries
+                     * return endpoint-expanded definitions through requireModels.
+                     */
+                    if (modelDefinitions == null || modelDefinitions.isEmpty()) {
+                        try {
+                            com.ai.gateway.core.routing.registry.ModelDefinition single =
+                                    providerModelRegistryService.requireModel(
+                                            provider,
+                                            model,
+                                            requiredCapabilities);
+                            modelDefinitions = List.of(single);
+                        } catch (BusinessException ignored) {
+                            continue;
+                        }
+                    }
+
                     java.util.Set<String> endpointKeys = new java.util.HashSet<>();
                     for (com.ai.gateway.core.routing.registry.ModelDefinition modelDefinition : modelDefinitions) {
                         String endpointKey = modelDefinition.endpointId() == null
