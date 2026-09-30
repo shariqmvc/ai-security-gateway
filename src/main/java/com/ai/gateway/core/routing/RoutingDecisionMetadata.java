@@ -50,6 +50,7 @@ public record RoutingDecisionMetadata(
     public record RoutingCandidateMetadata(
             String provider,
             String model,
+            String endpointId,
             double score,
             int rank,
             List<RoutingScoreComponentMetadata> scoreComponents) {
@@ -66,11 +67,17 @@ public record RoutingDecisionMetadata(
 
         public RoutingCandidateMetadata(
                 String provider, String model, double score, int rank) {
-            this(provider, model, score, rank, List.of());
+            this(provider, model, null, score, rank, List.of());
+        }
+
+        public RoutingCandidateMetadata(
+                String provider, String model, String endpointId,
+                double score, int rank) {
+            this(provider, model, endpointId, score, rank, List.of());
         }
 
         public static RoutingCandidateMetadata from(
-                String provider, String model, double score, int rank,
+                String provider, String model, String endpointId, double score, int rank,
                 List<CandidateScoreComponent> components) {
             List<RoutingScoreComponentMetadata> metadata = components == null
                     ? List.of()
@@ -82,7 +89,7 @@ public record RoutingDecisionMetadata(
                                     component.weight(),
                                     component.weightedScore()))
                             .toList();
-            return new RoutingCandidateMetadata(provider, model, score, rank, metadata);
+            return new RoutingCandidateMetadata(provider, model, endpointId, score, rank, metadata);
         }
     }
 
