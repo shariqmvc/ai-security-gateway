@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class PersonalCreditServiceImpl implements PersonalCreditService {
 
     public PersonalCreditServiceImpl(
@@ -24,6 +23,18 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
             PersonalCreditLedgerRepository ledgerRepository,
             PersonalCreditReservationRepository reservationRepository) {
         this(walletRepository, ledgerRepository, reservationRepository, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public PersonalCreditServiceImpl(
+            PersonalCreditWalletRepository walletRepository,
+            PersonalCreditLedgerRepository ledgerRepository,
+            PersonalCreditReservationRepository reservationRepository,
+            PersonalLowBalanceAlertService lowBalanceAlertService) {
+        this.walletRepository=walletRepository;
+        this.ledgerRepository=ledgerRepository;
+        this.reservationRepository=reservationRepository;
+        this.lowBalanceAlertService=lowBalanceAlertService;
     }
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
