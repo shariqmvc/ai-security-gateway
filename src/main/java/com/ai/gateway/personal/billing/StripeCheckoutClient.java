@@ -31,7 +31,7 @@ public class StripeCheckoutClient {
   form.add("line_items[0][price_data][product_data][name]","AIRouter Credits");
   form.add("line_items[0][price_data][product_data][description]",intent.getCredits().stripTrailingZeros().toPlainString()+" credits + platform fee");
   form.add("line_items[0][quantity]","1");
-  form.add("invoice_creation[enabled]","true");
+  form.add("invoice_creation[enabled]",Boolean.toString(properties.isInvoiceCreationEnabled()));
   form.add("metadata[intent_id]",intent.getId().toString());
   form.add("metadata[personal_account_id]",intent.getPersonalAccountId().toString());
   form.add("metadata[package_code]",intent.getPackageCode());
