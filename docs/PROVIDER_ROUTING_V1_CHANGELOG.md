@@ -200,3 +200,45 @@ This removes the previous boundary where routing could select multiple candidate
 - `c86e629faee1f12dfc485a4a4ebd049af56266bd` — carry fallback policy into AIRequest
 - `81ac70788e3df62d9fbf6e43d5ffd64bb21e48fe` — propagate fallback policy to execution
 - `cad202735b80372cab2a5255d7bab3d55ad2d72d` — execute selected streaming candidates before configured failover
+
+## Change set: Capability-aware candidate resolution
+
+### Candidate construction
+
+Policy-based candidate construction now validates each resolved provider/model pair against the request's `requiredCapabilities` before the candidate enters eligibility filtering, hard constraints, health filtering, cost evaluation, scoring, or selection.
+
+The registry remains the source of truth for model capabilities. A capability mismatch is treated as candidate rejection rather than a routing failure. If every candidate is rejected, the existing routing error reports that no eligible model/candidate satisfies the request.
+
+This is intentionally an early filter: the routing engine does not spend scoring/health/cost work on candidates that cannot execute the requested workload.
+
+### Capability flow
+
+```
+ChatRequest.requiredCapabilities
+        |
+        v
+RoutingRequest
+        |
+        v
+PolicyBasedRoutingStrategy
+        |
+        +--> provider resolution
+        |
+        +--> model resolution
+        |
+        +--> registry capability validation  <-- new
+        |
+        +--> eligibility
+        |
+        +--> constraints / health / cost
+        |
+        +--> scoring / selection
+```
+
+### Endpoint architecture note
+
+Provider endpoints remain owned by the provider adapters/configuration at this stage. A separate endpoint registry will be introduced only when endpoint selection is executable (multiple endpoints per provider, endpoint-specific health/cost/capability state). This avoids creating a metadata-only registry that duplicates the existing provider configuration without affecting execution.
+
+## Capability resolution commit
+
+- `03c2e3b0b8262b06078743214c278b83842a51c4` — filter candidates by required model capabilities
