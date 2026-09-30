@@ -39,10 +39,10 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         }
 
         RoutingHealthSnapshot snapshot = profileRepository
-                .findByProviderAndModel(candidate.provider(), candidate.model())
+                .findByProviderAndModelAndEndpointId(candidate.provider(), candidate.model(), endpointId(candidate))
                 .map(this::toSnapshot)
                 .orElseGet(() -> new RoutingHealthSnapshot(
-                        candidate.provider(), candidate.model(),
+                        candidate.provider(), candidate.model(), candidate.endpointId(),
                         RoutingHealthStatus.UNKNOWN, 0, 0, 0,
                         1.0, 0.0, 0.0, null, false));
         snapshotCache.put(candidate, snapshot);
@@ -78,7 +78,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         profile.setLastObservedAt(now);
         refreshDerivedHealth(profile);
         profileRepository.save(profile);
-        snapshotCache.put(new RoutingCandidate(profile.getProvider(), profile.getModel()), toSnapshot(profile));
+        snapshotCache.put(new RoutingCandidate(profile.getProvider(), profile.getModel(), profile.getEndpointId()), toSnapshot(profile));
     }
 
     @Override
@@ -107,10 +107,11 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
     }
 
     private RoutingHealthProfile getOrCreate(RoutingCandidate candidate) {
-        return profileRepository.findByProviderAndModel(candidate.provider(), candidate.model())
+        return profileRepository.findByProviderAndModel(candidatecandidate.provider(), candidate.model(), endpointId(candidate))
                 .orElseGet(() -> RoutingHealthProfile.builder()
                         .provider(candidate.provider())
                         .model(candidate.model())
+                        .endpointId(endpointId(candidate))
                         .healthStatus(RoutingHealthStatus.UNKNOWN)
                         .availability(1.0)
                         .successCount(0)
@@ -183,6 +184,12 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
                 profile.getP95LatencyMs() == null ? 0.0 : profile.getP95LatencyMs(),
                 profile.getLastObservedAt(),
                 fresh);
+    }
+
+    private String endpointId(RoutingCandidate candidate) {
+        return candidate.endpointId() == null || candidate.endpointId().isBlank()
+                ? candidate.provider().name().toLowerCase(java.util.Locale.ROOT) + "-default"
+                : candidate.endpointId();
     }
 
     private double clamp(double value, double min, double max) {
