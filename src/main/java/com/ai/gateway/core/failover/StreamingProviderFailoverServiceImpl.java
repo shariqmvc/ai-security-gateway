@@ -453,7 +453,8 @@ public class StreamingProviderFailoverServiceImpl
             routingHealthService.recordSuccess(
                     new RoutingCandidate(
                             request.getProvider(),
-                            request.getModel()),
+                            request.getModel(),
+                            request.getEndpointId()),
                     latencyMs);
         }
         if (providerCircuitBreaker != null) {
@@ -500,8 +501,7 @@ public class StreamingProviderFailoverServiceImpl
                         openDurationMs);
             } else {
                 providerCircuitBreaker.recordFailure(
-                        request.getProvider(),
-                        request.getModel(),
+                        new RoutingCandidate(request.getProvider(), request.getModel(), request.getEndpointId()),
                         category);
             }
         }
