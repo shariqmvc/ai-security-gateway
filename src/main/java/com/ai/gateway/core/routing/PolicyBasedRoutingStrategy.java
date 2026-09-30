@@ -295,7 +295,8 @@ public class PolicyBasedRoutingStrategy
         List<RoutingCandidate> candidates =
                 buildCandidates(
                         providers,
-                        policy);
+                        policy,
+                        context.request().getRequiredCapabilities());
 
         if (candidates.isEmpty()) {
 
@@ -638,7 +639,8 @@ public class PolicyBasedRoutingStrategy
 
     private List<RoutingCandidate> buildCandidates(
             List<Provider> providers,
-            RoutingPolicy policy) {
+            RoutingPolicy policy,
+            java.util.Set<String> requiredCapabilities) {
 
         List<RoutingCandidate> candidates =
                 new ArrayList<>();
@@ -666,10 +668,18 @@ public class PolicyBasedRoutingStrategy
                     continue;
                 }
 
-                candidates.add(
-                        new RoutingCandidate(
-                                provider,
-                                model));
+                try {
+                    providerModelRegistryService.requireModel(
+                            provider,
+                            model,
+                            requiredCapabilities);
+                    candidates.add(
+                            new RoutingCandidate(
+                                    provider,
+                                    model));
+                } catch (BusinessException capabilityMismatch) {
+                    logCapabilityMismatch(provider, model, requiredCapabilities);
+                }
             }
         }
 
@@ -678,6 +688,18 @@ public class PolicyBasedRoutingStrategy
 
 
     
+    private void logCapabilityMismatch(
+            Provider provider,
+            String model,
+            java.util.Set<String> requiredCapabilities) {
+        org.slf4j.LoggerFactory.getLogger(PolicyBasedRoutingStrategy.class)
+                .debug(
+                        "ROUTING_CANDIDATE_CAPABILITY_REJECT provider={} model={} requiredCapabilities={}",
+                        provider,
+                        model,
+                        requiredCapabilities);
+    }
+
     /**
      * Compatibility-only scorer used by the legacy six-argument constructor.
      * Spring never uses this path.
