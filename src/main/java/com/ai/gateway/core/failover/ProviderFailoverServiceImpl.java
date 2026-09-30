@@ -85,6 +85,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         int maxAttempts = Math.max(1, properties.getMaxAttempts());
 
         Set<String> attempted = new HashSet<>();
+        List<AIResponse.ProviderAttempt> executionAttempts = new java.util.ArrayList<>();
         Throwable primaryFailure = null;
         Throwable lastFailure = null;
 
@@ -140,12 +141,19 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             try {
                 AIResponse response = invoke(request, 1);
                 recordProviderSuccess(request);
-                return response;
+                executionAttempts.add(new AIResponse.ProviderAttempt(
+                        1, request.getProvider(), request.getModel(),
+                        request.getEndpointId(), "SUCCESS", null));
+                return enrichAttemptMetadata(response, executionAttempts, null, null, 1);
 
             } catch (Exception ex) {
 
                 primaryFailure = ex;
                 lastFailure = ex;
+                executionAttempts.add(new AIResponse.ProviderAttempt(
+                        1, request.getProvider(), request.getModel(),
+                        request.getEndpointId(), "FAILED",
+                        ex.getClass().getSimpleName()));
 
                 recordProviderFailure(request, ex);
 
@@ -350,6 +358,13 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         invoke(fallbackRequest, fallbackAttempts + 1);
 
                 recordProviderSuccess(fallbackRequest);
+                executionAttempts.add(new AIResponse.ProviderAttempt(
+                        fallbackAttempts + 1,
+                        fallbackRequest.getProvider(),
+                        fallbackRequest.getModel(),
+                        fallbackRequest.getEndpointId(),
+                        "SUCCESS",
+                        null));
 
                 /*
                  * Failover succeeded.
@@ -359,11 +374,23 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
                 routingAnalyticsService.recordFailoverSuccess();
 
-                return response;
+                return enrichAttemptMetadata(
+                        response,
+                        executionAttempts,
+                        request.getEndpointId(),
+                        fallbackRequest.getEndpointId(),
+                        fallbackAttempts + 1);
 
             } catch (Exception ex) {
 
                 lastFailure = ex;
+                executionAttempts.add(new AIResponse.ProviderAttempt(
+                        fallbackAttempts + 1,
+                        fallbackRequest.getProvider(),
+                        fallbackRequest.getModel(),
+                        fallbackRequest.getEndpointId(),
+                        "FAILED",
+                        ex.getClass().getSimpleName()));
 
                 recordProviderFailure(
                         fallbackRequest,
@@ -522,7 +549,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         routingHealthService.recordSuccess(
                 new RoutingCandidate(
                         request.getProvider(),
-                        request.getModel()),
+                        request.getModel(),
+                        request.getEndpointId()),
                 latencyMs);
     }
 
@@ -621,8 +649,10 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         }
 
         providerCircuitBreaker.recordSuccess(
-                request.getProvider(),
-                request.getModel());
+                new RoutingCandidate(
+                        request.getProvider(),
+                        request.getModel(),
+                        request.getEndpointId()));
     }
 
     private void recordProviderCircuitFailure(
@@ -675,7 +705,22 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     private long circuitRetryAfterMs(Provider provider, String model) {
         return providerCircuitBreaker == null
                 ? 0L
-                : providerCircuitBreaker.retryAfterMs(provider, model);
+                : providerCircuitBreaker.retryAfterMs(new RoutingCandidate(provider, model));
+    }
+
+    private AIResponse enrichAttemptMetadata(
+            AIResponse response,
+            List<AIResponse.ProviderAttempt> attempts,
+            String primaryEndpointId,
+            String successfulEndpointId,
+            int successfulAttempt) {
+        if (response == null) return null;
+        response.setProviderAttempt(successfulAttempt);
+        response.setProviderAttempts(List.copyOf(attempts));
+        if (successfulAttempt > 1) {
+            response.setFailoverFromEndpointId(primaryEndpointId);
+        }
+        return response;
     }
 
     private RuntimeException propagate(
