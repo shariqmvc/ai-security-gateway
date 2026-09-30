@@ -162,7 +162,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
                 <= properties.getSignalTtlSeconds();
         if (fresh == snapshot.fresh()) return snapshot;
         return new RoutingHealthSnapshot(
-                snapshot.provider(), snapshot.model(), snapshot.status(),
+                snapshot.provider(), snapshot.model(), snapshot.endpointId(), snapshot.status(),
                 snapshot.successCount(), snapshot.failureCount(), snapshot.consecutiveFailures(),
                 snapshot.availability(), snapshot.ewmaLatencyMs(), snapshot.p95LatencyMs(),
                 snapshot.lastObservedAt(), fresh);
@@ -175,6 +175,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         return new RoutingHealthSnapshot(
                 profile.getProvider(),
                 profile.getModel(),
+                profile.getEndpointId(),
                 profile.getHealthStatus(),
                 profile.getSuccessCount(),
                 profile.getFailureCount(),
