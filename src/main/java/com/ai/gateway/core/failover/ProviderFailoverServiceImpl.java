@@ -592,7 +592,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
 
             String fallbackModelId = fallbackCandidate.model();
             if (DEFAULT_FALLBACK_MODEL.equals(fallbackModelId)) {
-                fallbackModelId = defaultModel(fallback);
+                fallbackModelId = providerModelRegistryService.defaultModel(fallback);
             }
 
             var fallbackModel =
@@ -661,9 +661,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     }
 
     private String defaultModel(Provider provider) {
-        return providerFactory
-                .getProvider(provider)
-                .defaultModel();
+        return providerModelRegistryService.defaultModel(provider);
     }
 
     /**
