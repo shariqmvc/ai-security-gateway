@@ -43,7 +43,7 @@ class OllamaProviderTest {
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = mock(ObjectMapper.class);
         ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
-        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
+        when(endpointRegistry.requireUrl(eq(Provider.OLLAMA), anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("llama3.1:8b");
@@ -135,7 +135,7 @@ class OllamaProviderTest {
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = new ObjectMapper();
         ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
-        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
+        when(endpointRegistry.requireUrl(eq(Provider.OLLAMA), anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("qwen2.5vl:3b");
@@ -206,7 +206,7 @@ class OllamaProviderTest {
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = new ObjectMapper();
         ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
-        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
+        when(endpointRegistry.requireUrl(eq(Provider.OLLAMA), anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("llama3.2:3b");
@@ -276,7 +276,7 @@ class OllamaProviderTest {
         PerformanceLogger performanceLogger = mock(PerformanceLogger.class);
         ObjectMapper objectMapper = new ObjectMapper();
         ProviderEndpointRegistry endpointRegistry = mock(ProviderEndpointRegistry.class);
-        when(endpointRegistry.requireUrl(Provider.OLLAMA, anyString())).thenReturn("http://localhost:11434");
+        when(endpointRegistry.requireUrl(eq(Provider.OLLAMA), anyString())).thenReturn("http://localhost:11434");
 
         OllamaConfig config = new OllamaConfig();
         config.setModel("llama3.2:3b");
