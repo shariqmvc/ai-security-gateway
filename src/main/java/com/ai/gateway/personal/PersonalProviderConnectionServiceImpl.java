@@ -169,6 +169,7 @@ public class PersonalProviderConnectionServiceImpl
                 case CLAUDE -> validateAnthropic(apiKey);
                 case XAI -> validateOpenAiCompatible(apiKey, "https://api.x.ai/v1/models");
                 case GROQ -> validateOpenAiCompatible(apiKey, "https://api.groq.com/openai/v1/models");
+                case MISTRAL -> validateOpenAiCompatible(apiKey, mistralBaseUrl + "/v1/models");
                 case OLLAMA -> throw new PersonalProviderConnectionException(
                         "OLLAMA is local infrastructure and is not a Personal BYOK provider.");
                 default -> throw new PersonalProviderConnectionException(
