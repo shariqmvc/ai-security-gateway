@@ -107,7 +107,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
     }
 
     private RoutingHealthProfile getOrCreate(RoutingCandidate candidate) {
-        return profileRepository.findByProviderAndModel(candidate.provider(), candidate.model(), endpointId(candidate))
+        return profileRepository.findByProviderAndModelAndEndpointId(candidate.provider(), candidate.model(), endpointId(candidate))
                 .orElseGet(() -> RoutingHealthProfile.builder()
                         .provider(candidate.provider())
                         .model(candidate.model())
