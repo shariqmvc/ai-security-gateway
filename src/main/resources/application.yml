@@ -388,13 +388,32 @@ alroute:
       monthly-free-compute-credit-cap: ${ALROUTE_PERSONAL_MONTHLY_FREE_COMPUTE_CREDIT_CAP:0}
 
     payment:
-      provider: ${ALROUTE_PERSONAL_PAYMENT_PROVIDER:EXTERNAL}
+      provider: ${ALROUTE_PERSONAL_PAYMENT_PROVIDER:STRIPE}
       currency: ${ALROUTE_PERSONAL_PAYMENT_CURRENCY:USD}
       webhook-secret: ${ALROUTE_PERSONAL_PAYMENT_WEBHOOK_SECRET:change-me-local-only}
+      secret-key: ${ALROUTE_PERSONAL_STRIPE_SECRET_KEY:}
+      api-base-url: ${ALROUTE_PERSONAL_STRIPE_API_BASE_URL:https://api.stripe.com}
+      success-url: ${ALROUTE_PERSONAL_PAYMENT_SUCCESS_URL:http://localhost:5173/billing}
+      cancel-url: ${ALROUTE_PERSONAL_PAYMENT_CANCEL_URL:http://localhost:5173/billing}
+      platform-fee-rate: ${ALROUTE_PERSONAL_PLATFORM_FEE_RATE:0.055}
+      minimum-platform-fee: ${ALROUTE_PERSONAL_MINIMUM_PLATFORM_FEE:0.80}
+      invoice-creation-enabled: ${ALROUTE_PERSONAL_STRIPE_INVOICE_CREATION_ENABLED:true}
+      credits-policy: ${ALROUTE_PERSONAL_CREDITS_POLICY:Credits do not expire.}
+      refund-policy: ${ALROUTE_PERSONAL_REFUND_POLICY:Refunds are handled under the published AIRouter refund policy.}
+      tax-policy: ${ALROUTE_PERSONAL_TAX_POLICY:USD billing; taxes are determined by the configured Stripe tax setup.}
       packages:
-        starter:
-          amount: ${ALROUTE_PERSONAL_STARTER_PACKAGE_AMOUNT:5}
-          credits: ${ALROUTE_PERSONAL_STARTER_PACKAGE_CREDITS:5}
+        starter10:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_10_AMOUNT:10}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_10_CREDITS:10}
+        starter25:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_25_AMOUNT:25}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_25_CREDITS:25}
+        starter50:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_50_AMOUNT:50}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_50_CREDITS:50}
+        starter100:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_100_AMOUNT:100}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_100_CREDITS:100}
 
     providers:
       # Provider endpoints are system-level infrastructure configuration.
