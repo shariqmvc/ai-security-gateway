@@ -19,6 +19,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PersonalCreditServiceImpl implements PersonalCreditService {
 
+    public PersonalCreditServiceImpl(
+            PersonalCreditWalletRepository walletRepository,
+            PersonalCreditLedgerRepository ledgerRepository,
+            PersonalCreditReservationRepository reservationRepository) {
+        this(walletRepository, ledgerRepository, reservationRepository, null);
+    }
+
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     private final PersonalCreditWalletRepository walletRepository;
@@ -185,9 +192,11 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
                     .build());
         }
 
-        lowBalanceAlertService.notifyIfNeeded(
-                reservation.getPersonalAccountId(),
-                wallet.getAvailableBalance());
+        if (lowBalanceAlertService != null) {
+            lowBalanceAlertService.notifyIfNeeded(
+                    reservation.getPersonalAccountId(),
+                    wallet.getAvailableBalance());
+        }
 
         return reservation;
     }
