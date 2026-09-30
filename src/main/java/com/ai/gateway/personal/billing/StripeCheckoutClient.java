@@ -64,7 +64,7 @@ public class StripeCheckoutClient {
     .header(HttpHeaders.AUTHORIZATION,basicAuth(properties.getSecretKey())).retrieve().body(JsonNode.class);
  }
  private String basicAuth(String secret){return "Basic "+Base64.getEncoder().encodeToString((secret+":").getBytes(StandardCharsets.UTF_8));}
- private long minor(BigDecimal amount){return amount.movePointRight(2).setScale(0,java.math.RoundingMode.HALF_UP).longValueExact();}
+ private long minor(BigDecimal amount){return amount.movePointRight(2).longValueExact();}
  private String text(JsonNode n,String field){JsonNode v=n==null?null:n.get(field);return v==null||v.isNull()?null:v.asText();}
  private void requireConfigured(){if(properties.getSecretKey()==null||properties.getSecretKey().isBlank())throw new IllegalStateException("Stripe secret key is not configured.");}
 }
