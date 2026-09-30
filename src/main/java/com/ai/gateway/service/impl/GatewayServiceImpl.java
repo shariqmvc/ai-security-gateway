@@ -1887,7 +1887,7 @@ public class GatewayServiceImpl implements GatewayService {
                     routingDecision.model();
 
             log.info(
-                    "Routing decision: requestId={} tenant={} strategy={} provider={} model={}",
+                    "Routing decision: requestId={} tenant={} strategy={} provider={} model={} endpoint={} candidates={}",
                     requestId,
                     auth.getTenantCode(),
                     routingDecision.strategy(),
