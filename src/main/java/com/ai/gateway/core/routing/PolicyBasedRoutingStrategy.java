@@ -477,6 +477,7 @@ public class PolicyBasedRoutingStrategy
                     RoutingDecisionMetadata.RoutingCandidateMetadata.from(
                             candidate.candidate().provider().name(),
                             candidate.candidate().model(),
+                            candidate.candidate().endpointId(),
                             candidate.totalScore(),
                             index + 1,
                             candidate.components()));
