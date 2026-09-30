@@ -27,10 +27,17 @@ public class StripeCheckoutClient {
   form.add("cancel_url",properties.getCancelUrl()+"?topup=canceled&intent="+intent.getId());
   form.add("client_reference_id",intent.getId().toString());
   form.add("line_items[0][price_data][currency]",properties.getCurrency().toLowerCase());
-  form.add("line_items[0][price_data][unit_amount]",minor(intent.getAmount()).toString());
+  form.add("line_items[0][price_data][unit_amount]",minor(intent.getBaseAmount()).toString());
   form.add("line_items[0][price_data][product_data][name]","AIRouter Credits");
-  form.add("line_items[0][price_data][product_data][description]",intent.getCredits().stripTrailingZeros().toPlainString()+" credits + platform fee");
+  form.add("line_items[0][price_data][product_data][description]",intent.getCredits().stripTrailingZeros().toPlainString()+" credits");
   form.add("line_items[0][quantity]","1");
+  if(intent.getFeeAmount()!=null && intent.getFeeAmount().signum()>0){
+   form.add("line_items[1][price_data][currency]",properties.getCurrency().toLowerCase());
+   form.add("line_items[1][price_data][unit_amount]",minor(intent.getFeeAmount()).toString());
+   form.add("line_items[1][price_data][product_data][name]","AIRouter platform fee");
+   form.add("line_items[1][price_data][product_data][description]","5.5% platform fee, $0.80 minimum");
+   form.add("line_items[1][quantity]","1");
+  }
   form.add("invoice_creation[enabled]",Boolean.toString(properties.isInvoiceCreationEnabled()));
   form.add("metadata[intent_id]",intent.getId().toString());
   form.add("metadata[personal_account_id]",intent.getPersonalAccountId().toString());
