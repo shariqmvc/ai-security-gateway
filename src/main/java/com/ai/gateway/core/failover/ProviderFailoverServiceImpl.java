@@ -89,8 +89,35 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         Throwable lastFailure = null;
 
         Provider primary = request.getProvider();
-        List<Provider> fallbacks =
-                properties.fallbacksFor(primary);
+        List<RoutingCandidate> routedFallbacks = request.getRoutingCandidates() == null
+                ? List.of()
+                : request.getRoutingCandidates().stream()
+                        .filter(candidate -> candidate != null)
+                        .filter(candidate -> !candidate.provider().equals(primary)
+                                || !candidate.model().equals(request.getModel()))
+                        .toList();
+
+        List<Provider> configuredFallbacks = properties.fallbacksFor(primary);
+        List<RoutingCandidate> fallbackCandidates = new java.util.ArrayList<>();
+        if (request.isAllowProviderFallbacks()) {
+            fallbackCandidates.addAll(routedFallbacks);
+            java.util.Set<String> routedKeys = fallbackCandidates.stream()
+                    .map(RoutingCandidate::candidateKey)
+                    .collect(java.util.stream.Collectors.toSet());
+            for (Provider fallback : configuredFallbacks) {
+                if (fallback == null) continue;
+                String model = defaultModel(fallback);
+                String key = fallback.name() + "/" + model;
+                if (!routedKeys.contains(key)) {
+                    fallbackCandidates.add(new RoutingCandidate(fallback, model));
+                    routedKeys.add(key);
+                }
+            }
+        }
+        List<Provider> fallbacks = fallbackCandidates.stream()
+                .map(RoutingCandidate::provider)
+                .distinct()
+                .toList();
         log.info(
                 "FAILOVER_PLAN requestId={} primary={} enabled={} maxAttempts={} configuredFallbacks={}",
                 requestId(),
@@ -188,7 +215,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
          */
         int fallbackAttempts = 0;
 
-        for (Provider fallback : fallbacks) {
+        for (RoutingCandidate fallbackCandidate : fallbackCandidates) {
 
             long remainingBudgetMs =
                     ProviderRequestBudget.remainingMillis();
@@ -219,6 +246,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
              * - duplicate providers
              * - the primary provider
              */
+            Provider fallback = fallbackCandidate.provider();
+
             if (fallback == null
                     || attempted.contains(fallback)) {
                 continue;
@@ -248,7 +277,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             AIRequest fallbackRequest =
                     buildFallbackRequest(
                             request,
-                            fallback);
+                            fallbackCandidate);
 
             if (fallbackRequest == null) {
 
@@ -524,14 +553,15 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     }
     private AIRequest buildFallbackRequest(
             AIRequest primaryRequest,
-            Provider fallback) {
+            RoutingCandidate fallbackCandidate) {
+
+        Provider fallback = fallbackCandidate.provider();
 
         try {
 
             providerModelRegistryService.requireProvider(fallback);
 
-            String fallbackModelId =
-                    defaultModel(fallback);
+            String fallbackModelId = fallbackCandidate.model();
 
             var fallbackModel =
                     providerModelRegistryService.requireModel(
@@ -545,6 +575,7 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     .media(primaryRequest.getMedia())
                     .routingDecisionMetadata(primaryRequest.getRoutingDecisionMetadata())
                     .routingStrategy(primaryRequest.getRoutingStrategy())
+                    .routingCandidates(primaryRequest.getRoutingCandidates())
                     .build();
 
         } catch (Exception ex) {
