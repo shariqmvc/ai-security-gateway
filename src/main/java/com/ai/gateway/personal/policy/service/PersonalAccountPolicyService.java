@@ -104,7 +104,7 @@ public class PersonalAccountPolicyService {
     private Set<Feature> defaultFeatures() {
         return Set.of(
                 Feature.OPENAI, Feature.GEMINI, Feature.CLAUDE, Feature.XAI, Feature.GROQ,
-                Feature.OLLAMA, Feature.CHAT, Feature.STREAMING, Feature.EMBEDDING,
+                Feature.OLLAMA, Feature.MISTRAL, Feature.CHAT, Feature.STREAMING, Feature.EMBEDDING,
                 Feature.PROMPT_FIREWALL, Feature.POLICY_ENGINE, Feature.PII_DETECTION,
                 Feature.AUDIT, Feature.METRICS, Feature.TOKEN_ANALYTICS, Feature.COST_ANALYTICS,
                 Feature.RATE_LIMITING, Feature.QUOTA, Feature.RAG, Feature.MCP,
