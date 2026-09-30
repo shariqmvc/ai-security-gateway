@@ -1922,6 +1922,7 @@ public class GatewayServiceImpl implements GatewayService {
                             : null)
                     .routingDecisionMetadata(routingDecision.metadata())
                     .routingStrategy(routingDecision.strategy())
+                    .routingCandidates(routingDecision.selectedCandidates())
                     .media(request.getMedia())
                     .fileProcessingMode(request.getFileProcessingMode())
                     .build();
