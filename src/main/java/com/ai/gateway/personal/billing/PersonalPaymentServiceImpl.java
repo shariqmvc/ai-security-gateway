@@ -47,6 +47,8 @@ public class PersonalPaymentServiceImpl implements PersonalPaymentService {
   BigDecimal creditsAmount=pack==null?null:pack.credits();
   BigDecimal baseAmount=pack==null?null:pack.amount();
   if("custom".equalsIgnoreCase(packageCode)){
+   if(requestedCredits==null || requestedCredits.compareTo(properties.getCustomMinimumCredits())<0 || requestedCredits.compareTo(properties.getCustomMaximumCredits())>0)
+    throw new PersonalCreditException("Custom top-up amount is outside the configured limits.");
    creditsAmount=requestedCredits;
    baseAmount=requestedCredits;
   }
