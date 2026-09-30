@@ -67,9 +67,10 @@ class RoutingHealthServiceImplTest {
                 "gpt-5"))
                 .thenReturn(List.of());
 
-        when(profiles.findByProviderAndModel(
+        when(profiles.findByProviderAndModelAndEndpointId(
                 Provider.OPENAI,
-                "gpt-5"))
+                "gpt-5",
+                "openai-default"))
                 .thenReturn(Optional.empty());
 
         when(profiles.save(any(RoutingHealthProfile.class)))
@@ -155,6 +156,7 @@ class RoutingHealthServiceImplTest {
         return RoutingHealthProfile.builder()
                 .provider(Provider.OPENAI)
                 .model("gpt-5")
+                .endpointId("openai-default")
                 .healthStatus(RoutingHealthStatus.UNKNOWN)
                 .successCount(success)
                 .failureCount(failures)
