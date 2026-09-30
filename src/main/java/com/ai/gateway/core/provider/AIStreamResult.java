@@ -14,4 +14,10 @@ public class AIStreamResult {
     Integer totalTokens;
     Long latencyMs;
     String finishReason;
+
+    /** Provider requested by the caller before streaming failover, when failover occurred. */
+    com.ai.gateway.core.model.Provider failoverFromProvider;
+
+    /** Classified reason for the primary provider failure that triggered failover. */
+    String failoverReason;
 }
