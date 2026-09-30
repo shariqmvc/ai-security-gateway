@@ -377,7 +377,7 @@ class GatewayServiceImplTest {
                     invocation.getArgument(1);
             consumer.accept("partial ");
             throw new ResourceAccessException("Read timed out");
-        }).when(streamingProvider).stream(any(AIRequest.class), any());
+        }).when(streamingProviderFailoverService).stream(any(AIRequest.class), any());
 
         java.util.List<GatewayStreamEvent> events = new java.util.ArrayList<>();
 
@@ -431,7 +431,7 @@ class GatewayServiceImplTest {
                     .totalTokens(2)
                     .latencyMs(1L)
                     .build();
-        }).when(streamingProvider).stream(any(AIRequest.class), any());
+        }).when(streamingProviderFailoverService).stream(any(AIRequest.class), any());
 
         java.util.List<GatewayStreamEvent> events = new java.util.ArrayList<>();
         java.util.function.Consumer<GatewayStreamEvent> consumer = event -> {
