@@ -135,6 +135,9 @@ class GatewayServiceImplTest {
     @Mock
     private AIProviderFactory providerFactory;
 
+    @Mock
+    private com.ai.gateway.core.failover.StreamingProviderFailoverService streamingProviderFailoverService;
+
     @InjectMocks
     private GatewayServiceImpl gatewayService;
 
@@ -309,14 +312,6 @@ class GatewayServiceImplTest {
         mockSuccessfulPreProviderFlow();
         mockOllamaRouting();
 
-        AIProvider provider = mock(
-                AIProvider.class,
-                withSettings().extraInterfaces(StreamingAIProvider.class));
-        StreamingAIProvider streamingProvider =
-                (StreamingAIProvider) provider;
-        when(providerFactory.getProvider(Provider.OLLAMA))
-                .thenReturn(provider);
-
         lenient().when(restoreService.restore(anyString(), any(UUID.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -336,7 +331,7 @@ class GatewayServiceImplTest {
             consumer.accept("hello ");
             consumer.accept("world");
             return result;
-        }).when(streamingProvider).stream(any(AIRequest.class), any());
+        }).when(streamingProviderFailoverService).stream(any(AIRequest.class), any());
 
         java.util.List<GatewayStreamEvent> events = new java.util.ArrayList<>();
 
@@ -349,11 +344,11 @@ class GatewayServiceImplTest {
                 events::add);
 
         assertEquals(
-                java.util.List.of("start", "delta", "delta", "done"),
+                java.util.List.of("status", "start", "status", "delta", "delta", "routing", "done"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
-        assertEquals("hello ", events.get(1).getContent());
-        assertEquals("world", events.get(2).getContent());
-        assertEquals(6, events.get(3).getTotalTokens());
+        assertEquals("hello ", events.get(3).getContent());
+        assertEquals("world", events.get(4).getContent());
+        assertEquals(6, events.get(6).getTotalTokens());
 
         verify(postProviderPersistenceService).persistSuccess(
                 any(UUID.class),
@@ -373,14 +368,6 @@ class GatewayServiceImplTest {
 
         mockSuccessfulPreProviderFlow();
         mockOllamaRouting();
-
-        AIProvider provider = mock(
-                AIProvider.class,
-                withSettings().extraInterfaces(StreamingAIProvider.class));
-        StreamingAIProvider streamingProvider =
-                (StreamingAIProvider) provider;
-        when(providerFactory.getProvider(Provider.OLLAMA))
-                .thenReturn(provider);
 
         when(restoreService.restore(anyString(), any(UUID.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -403,10 +390,10 @@ class GatewayServiceImplTest {
                 events::add);
 
         assertEquals(
-                java.util.List.of("start", "delta", "error"),
+                java.util.List.of("status", "start", "status", "delta", "error"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
-        assertEquals("partial ", events.get(1).getContent());
-        assertEquals("Provider request timed out.", events.get(2).getError());
+        assertEquals("partial ", events.get(3).getContent());
+        assertEquals("Provider request timed out.", events.get(4).getError());
 
         verify(postProviderPersistenceService, never()).persistSuccess(
                 any(), any(), any(), any(), any(), anyLong(), anyString(), anyLong());
@@ -427,14 +414,6 @@ class GatewayServiceImplTest {
 
         mockSuccessfulPreProviderFlow();
         mockOllamaRouting();
-
-        AIProvider provider = mock(
-                AIProvider.class,
-                withSettings().extraInterfaces(StreamingAIProvider.class));
-        StreamingAIProvider streamingProvider =
-                (StreamingAIProvider) provider;
-        when(providerFactory.getProvider(Provider.OLLAMA))
-                .thenReturn(provider);
 
         when(restoreService.restore(anyString(), any(UUID.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -472,7 +451,7 @@ class GatewayServiceImplTest {
                 consumer);
 
         assertEquals(
-                java.util.List.of("start", "delta"),
+                java.util.List.of("status", "start", "status", "delta"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
         verify(postProviderPersistenceService, never()).persistSuccess(
                 any(), any(), any(), any(), any(), anyLong(), anyString(), anyLong());
