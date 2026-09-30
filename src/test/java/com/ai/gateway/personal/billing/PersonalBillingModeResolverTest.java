@@ -4,6 +4,7 @@ import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.personal.entity.PersonalProviderConnection;
 import com.ai.gateway.personal.repository.PersonalProviderConnectionRepository;
+import com.ai.gateway.personal.policy.service.PersonalAccountPolicyService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -17,12 +18,12 @@ class PersonalBillingModeResolverTest {
     @Test
     void autoUsesByokWhenActiveConnectionExists() {
         var repository = mock(PersonalProviderConnectionRepository.class);
-        var properties = new PersonalBillingProperties();
+        var policyService = mock(PersonalAccountPolicyService.class);
         var accountId = UUID.randomUUID();
         when(repository.findByPersonalAccountIdAndProvider(accountId, Provider.OPENAI))
                 .thenReturn(Optional.of(activeConnection()));
 
-        var resolver = new PersonalBillingModeResolver(repository, properties);
+        var resolver = new PersonalBillingModeResolver(repository, policyService);
 
         assertEquals(PersonalBillingMode.BYOK,
                 resolver.resolve(personalContext(accountId), Provider.OPENAI, "gpt-5", "AUTO"));
