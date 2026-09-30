@@ -19,9 +19,11 @@ import java.util.Base64;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class PersonalPaymentServiceImpl implements PersonalPaymentService {
- private final PersonalPaymentIntentRepository intents;
+ @org.springframework.beans.factory.annotation.Autowired
+ public PersonalPaymentServiceImpl(PersonalPaymentIntentRepository intents,PersonalPaymentWebhookEventRepository events,PersonalPaymentProperties properties,PersonalCreditService credits,StripeCheckoutClient stripe,ObjectMapper mapper){
+  this.intents=intents;this.events=events;this.properties=properties;this.credits=credits;this.stripe=stripe;this.mapper=mapper;
+ }
  private final PersonalPaymentWebhookEventRepository events;
  private final PersonalPaymentProperties properties;
  private final PersonalCreditService credits;
