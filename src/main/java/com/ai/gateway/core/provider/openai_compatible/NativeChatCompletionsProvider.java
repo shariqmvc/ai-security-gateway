@@ -48,11 +48,11 @@ public abstract class NativeChatCompletionsProvider implements AIProvider, Strea
             String answer=text(root.at("/choices/0/message/content"));
             if(answer.isBlank()) throw new IllegalStateException(provider()+" returned an empty response.");
             JsonNode usage=root.path("usage");
-            int input=usage.path("prompt_tokens").asInt(0), output=usage.path("completion_tokens").asInt(0);
+            int input=usage.path("prompt_tokens").asInt(0), output=usage.path("completion_tokens").asInt(0); String finishReason=text(root.at("/choices/0/finish_reason"));
             performanceLogger.providerCompleted(id,provider().name(),selected,attempt(),elapsed(started),"HTTP_200");
             return AIResponse.builder().response(answer).provider(provider()).model(selected)
                     .usage(Usage.builder().inputTokens(input).outputTokens(output).totalTokens(usage.path("total_tokens").asInt(input+output))
-                            .latencyMs(elapsed(started)).build()).build();
+                            .latencyMs(elapsed(started)).build()).finishReason(finishReason.isBlank()?null:finishReason).build();
         } catch(RuntimeException ex) {
             performanceLogger.providerCompleted(id,provider().name(),selected,attempt(),elapsed(started),"FAILED:"+ex.getClass().getSimpleName());
             throw ex;
