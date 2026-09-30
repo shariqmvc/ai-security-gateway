@@ -4,7 +4,14 @@ import com.ai.gateway.core.model.Provider;
 
 public record RoutingCandidate(
         Provider provider,
-        String model) {
+        String model,
+        String endpointId) {
+
+    public RoutingCandidate(
+            Provider provider,
+            String model) {
+        this(provider, model, null);
+    }
 
     public RoutingCandidate {
         if (provider == null) {
@@ -17,6 +24,7 @@ public record RoutingCandidate(
 
     /** Stable provider/model identity for routing metadata and diagnostics. */
     public String candidateKey() {
-        return provider.name() + "/" + model;
+        return provider.name() + "/" + model
+                + (endpointId == null || endpointId.isBlank() ? "" : "@" + endpointId);
     }
 }
