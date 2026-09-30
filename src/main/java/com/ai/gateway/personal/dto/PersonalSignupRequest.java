@@ -11,4 +11,7 @@ public record PersonalSignupRequest(
         @jakarta.validation.constraints.NotBlank
         @jakarta.validation.constraints.Pattern(regexp = "^\\+[1-9]\\d{7,14}$", message = "Use an international phone number, e.g. +919876543210")
         String phoneNumber) {
+    public PersonalSignupRequest(String email, String password, String displayName) {
+        this(email, password, displayName, null);
+    }
 }
