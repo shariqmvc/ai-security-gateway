@@ -31,6 +31,11 @@ public class PersonalPaymentServiceImpl implements PersonalPaymentService {
  private final StripeCheckoutClient stripe;
  private final ObjectMapper mapper;
 
+ @org.springframework.beans.factory.annotation.Autowired
+ public PersonalPaymentServiceImpl(PersonalPaymentIntentRepository intents,PersonalPaymentWebhookEventRepository events,PersonalPaymentProperties properties,PersonalCreditService credits){
+  this(intents,events,properties,credits,null,null);
+ }
+
  @Override
  @Transactional
  public PersonalPaymentIntent createIntent(UUID accountId,String packageCode,String idempotencyKey){return createIntent(accountId,packageCode,idempotencyKey,null);}
