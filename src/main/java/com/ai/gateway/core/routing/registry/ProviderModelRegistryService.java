@@ -27,6 +27,13 @@ public class ProviderModelRegistryService {
                                         " provider is not available."));
     }
 
+    public String defaultModel(Provider provider) {
+        if (provider == null) {
+            return null;
+        }
+        return modelRegistry.defaultModel(provider);
+    }
+
     public ModelDefinition requireModel(
             Provider provider,
             String modelId) {
