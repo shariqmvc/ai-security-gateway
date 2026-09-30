@@ -669,14 +669,16 @@ public class PolicyBasedRoutingStrategy
                 }
 
                 try {
-                    providerModelRegistryService.requireModel(
-                            provider,
-                            model,
-                            requiredCapabilities);
+                    com.ai.gateway.core.routing.registry.ModelDefinition modelDefinition =
+                            providerModelRegistryService.requireModel(
+                                    provider,
+                                    model,
+                                    requiredCapabilities);
                     candidates.add(
                             new RoutingCandidate(
                                     provider,
-                                    model));
+                                    model,
+                                    modelDefinition.endpointId()));
                 } catch (BusinessException capabilityMismatch) {
                     logCapabilityMismatch(provider, model, requiredCapabilities);
                 }
