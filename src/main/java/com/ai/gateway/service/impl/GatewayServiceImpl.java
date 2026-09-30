@@ -958,6 +958,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .phase("PROVIDER_CONNECTING")
                     .provider(aiRequest.getProvider().name())
                     .model(aiRequest.getModel())
+                    .endpointId(aiRequest.getEndpointId())
                     .requestedProvider(requestedStreamProvider.name())
                     .requestedModel(requestedStreamModel)
                     .content("Connecting to " + providerLabel(aiRequest.getProvider()) + "…")
@@ -968,6 +969,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .type("start")
                     .provider(aiRequest.getProvider().name())
                     .model(aiRequest.getModel())
+                    .endpointId(aiRequest.getEndpointId())
                     .requestedProvider(requestedStreamProvider.name())
                     .requestedModel(requestedStreamModel)
                     .build());
@@ -1118,6 +1120,25 @@ public class GatewayServiceImpl implements GatewayService {
             currentModel[0] = result.getModel() == null
                     ? aiRequest.getModel()
                     : result.getModel();
+
+            eventConsumer.accept(GatewayStreamEvent.builder()
+                    .requestId(requestId)
+                    .type("routing")
+                    .provider(currentProvider[0] == null ? null : currentProvider[0].name())
+                    .model(currentModel[0])
+                    .endpointId(result.getEndpointId() == null
+                            ? aiRequest.getEndpointId()
+                            : result.getEndpointId())
+                    .requestedProvider(aiRequest.getProvider() == null ? null : aiRequest.getProvider().name())
+                    .requestedModel(aiRequest.getModel())
+                    .failoverFromProvider(result.getFailoverFromProvider() == null
+                            ? null : result.getFailoverFromProvider().name())
+                    .failoverFromEndpointId(result.getFailoverFromEndpointId())
+                    .failoverReason(result.getFailoverReason())
+                    .providerAttempt(result.getProviderAttempt())
+                    .providerAttempts(result.getProviderAttempts())
+                    .phase("ROUTING_COMPLETE")
+                    .build());
 
             providerInvocationSucceeded = true;
 
