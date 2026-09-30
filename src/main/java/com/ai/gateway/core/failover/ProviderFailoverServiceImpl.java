@@ -98,35 +98,12 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                                 || !candidate.model().equals(request.getModel()))
                         .toList();
 
-        List<Provider> configuredFallbacks = properties.fallbacksFor(primary);
+        /*
+         * Fallback candidates are resolved lazily. In particular, resolving a
+         * configured fallback must not call that provider's factory merely to
+         * determine its default model when the primary request succeeds.
+         */
         List<RoutingCandidate> fallbackCandidates = new java.util.ArrayList<>();
-        if (request.isAllowProviderFallbacks()) {
-            fallbackCandidates.addAll(routedFallbacks);
-            java.util.Set<String> routedKeys = fallbackCandidates.stream()
-                    .map(RoutingCandidate::candidateKey)
-                    .collect(java.util.stream.Collectors.toSet());
-            for (Provider fallback : configuredFallbacks) {
-                if (fallback == null) continue;
-                String model = defaultModel(fallback);
-                String key = fallback.name() + "/" + model;
-                if (!routedKeys.contains(key)) {
-                    fallbackCandidates.add(new RoutingCandidate(fallback, model));
-                    routedKeys.add(key);
-                }
-            }
-        }
-        List<Provider> fallbacks = fallbackCandidates.stream()
-                .map(RoutingCandidate::provider)
-                .distinct()
-                .toList();
-        log.info(
-                "FAILOVER_PLAN requestId={} primary={} enabled={} maxAttempts={} configuredFallbacks={}",
-                requestId(),
-                primary,
-                properties.isEnabled(),
-                maxAttempts,
-                fallbacks
-        );
         /*
          * Attempt #1: primary provider.
          */
@@ -196,6 +173,24 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     request.getModel(),
                     retryAfterMs);
         }
+
+        if (request.isAllowProviderFallbacks()) {
+            fallbackCandidates.addAll(buildFallbackCandidates(primary, routedFallbacks));
+        }
+
+        List<Provider> fallbacks = fallbackCandidates.stream()
+                .map(RoutingCandidate::provider)
+                .distinct()
+                .toList();
+
+        log.info(
+                "FAILOVER_PLAN requestId={} primary={} enabled={} maxAttempts={} configuredFallbacks={}",
+                requestId(),
+                primary,
+                properties.isEnabled(),
+                maxAttempts,
+                fallbacks
+        );
 
         log.info(
                 "FAILOVER_DECISION requestId={} primary={} primaryFailure={} maxAttempts={} fallbackCount={}",
@@ -636,6 +631,31 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     }
 
 
+    private List<RoutingCandidate> buildFallbackCandidates(
+            Provider primary,
+            List<RoutingCandidate> routedFallbacks) {
+        List<RoutingCandidate> candidates = new java.util.ArrayList<>();
+        candidates.addAll(routedFallbacks == null ? List.of() : routedFallbacks);
+
+        java.util.Set<String> keys = candidates.stream()
+                .map(RoutingCandidate::candidateKey)
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (Provider fallback : properties.fallbacksFor(primary)) {
+            if (fallback == null) {
+                continue;
+            }
+
+            String model = defaultModel(fallback);
+            String key = fallback.name() + "/" + model;
+            if (keys.add(key)) {
+                candidates.add(new RoutingCandidate(fallback, model));
+            }
+        }
+
+        return candidates;
+    }
+
     private String defaultModel(Provider provider) {
         return providerFactory
                 .getProvider(provider)
@@ -710,14 +730,22 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     }
 
     private boolean isCircuitOpen(RoutingCandidate candidate) {
-        return providerCircuitBreaker != null
-                && !providerCircuitBreaker.allowRequest(candidate);
+        if (providerCircuitBreaker == null) {
+            return false;
+        }
+        if (candidate != null && candidate.endpointId() == null) {
+            return !providerCircuitBreaker.allowRequest(
+                    candidate.provider(),
+                    candidate.model());
+        }
+        return !providerCircuitBreaker.allowRequest(candidate);
     }
 
     private long circuitRetryAfterMs(Provider provider, String model) {
-        return providerCircuitBreaker == null
-                ? 0L
-                : providerCircuitBreaker.retryAfterMs(new RoutingCandidate(provider, model));
+        if (providerCircuitBreaker == null) {
+            return 0L;
+        }
+        return providerCircuitBreaker.retryAfterMs(provider, model);
     }
 
     private AIResponse enrichAttemptMetadata(
