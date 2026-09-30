@@ -118,3 +118,37 @@ Adapt candidate resolution and provider preference handling to consume the canon
 - `677b3ca33592c3f19bb86992d3bd937b670cb631` — add `RoutingRequest`
 - `d9d4b0b54a753ffcd14671adf07af15969292596` — expose canonical routing request from context
 - `e2ad9c2215ea9914d5081d7b302732baf0c2f3e1` — add stable candidate identity
+
+## Change set: Provider preference propagation
+
+### Added to ChatRequest / OpenAI-compatible API
+
+The routing request can now carry:
+
+- `preferredProviders`: ordered provider preference
+- `excludedProviders`: providers removed before candidate construction
+- `allowProviderFallbacks`: request-level fallback intent retained in the canonical routing request
+
+The OpenAI-compatible endpoint maps these fields into the core `ChatRequest`.
+
+### Candidate resolution behavior
+
+Policy-based routing now applies provider preferences after policy provider resolution and before model candidate construction:
+
+1. null/excluded providers are removed;
+2. explicitly ordered preferred providers are placed first when eligible;
+3. remaining eligible providers retain their existing resolver order;
+4. model resolution still occurs per provider, so invalid provider/model pairs are not fabricated.
+
+This keeps policy eligibility and provider preference distinct: preferences do not re-admit a provider excluded by policy.
+
+### Fallback semantics
+
+`allowProviderFallbacks` is now part of the canonical routing request and API contract. This increment does not yet override the execution-layer failover configuration; that will be wired when the routing decision is propagated into provider execution. Existing Mistral/Ollama failover behavior is therefore unchanged.
+
+## Additional commits
+
+- `e4cabfdff146817af11ca00e292065941ee42758` — add provider preferences to ChatRequest
+- `c75fab47bff7f16416cbaf08e08ee144f0aea86a` — expose provider routing preferences in OpenAI-compatible API
+- `fdd27ce2e12fc1cf921398b788bdb0052b9fb859` — normalize provider preferences in RoutingRequest
+- `cb44c8355e3d44d04b9195161893f7cc4178e735` — apply provider preferences to policy candidates
