@@ -123,6 +123,13 @@ class ProviderFailoverServiceImplTest {
     private void allowPrimaryCircuit() {
         when(providerCircuitBreaker.allowRequest(any(), any()))
                 .thenReturn(true);
+        lenient().when(routingHealthService.isHealthyForRouting(any()))
+                .thenReturn(true);
+        lenient().when(registry.defaultModel(any()))
+                .thenAnswer(invocation -> {
+                    Provider provider = invocation.getArgument(0);
+                    return provider == Provider.OPENAI ? "gpt-test" : null;
+                });
     }
 
 
