@@ -11,7 +11,7 @@ import com.ai.gateway.core.multimodal.MediaSourceType;
 import com.ai.gateway.core.multimodal.MediaTypeKind;
 import com.ai.gateway.core.observability.PerformanceLogger;
 import com.ai.gateway.core.provider.*;
-import com.ai.gateway.personal.PersonalProviderCredentialResolver;
+import com.ai.gateway.core.provider.ProviderCredentialResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,10 +31,10 @@ public class ClaudeProvider implements AIProvider, StreamingAIProvider {
 
     private final ObjectMapper mapper;
     private final PerformanceLogger logger;
-    private final PersonalProviderCredentialResolver credentials;
+    private final ProviderCredentialResolver credentials;
     private final RestTemplate rest=new RestTemplate();
 
-    public ClaudeProvider(ObjectMapper mapper,PerformanceLogger logger,PersonalProviderCredentialResolver credentials,ProviderHttpProperties httpProperties){
+    public ClaudeProvider(ObjectMapper mapper,PerformanceLogger logger,ProviderCredentialResolver credentials,ProviderHttpProperties httpProperties){
         this.mapper=mapper;this.logger=logger;this.credentials=credentials;
         this.rest.setRequestFactory(new ProviderHttpRequestFactory(Provider.CLAUDE,httpProperties.forProvider(Provider.CLAUDE)));
     }
