@@ -233,6 +233,15 @@ public class StreamingProviderFailoverServiceImpl
                 lastFailure = ex;
                 recordFailure(fallbackRequest, ex);
 
+                if (ex instanceof StreamingProviderFailureException
+                        && ex.partialOutputEmitted()) {
+                    log.info(
+                            "STREAM_FAILOVER_STOP_PARTIAL_OUTPUT requestId={} provider={}",
+                            requestId(),
+                            fallbackRequest.getProvider());
+                    break;
+                }
+
                 if (!ProviderFailureClassifier.isRetryable(ex)) {
                     log.info(
                             "STREAM_FAILOVER_FALLBACK_NOT_RETRYABLE requestId={} provider={} failureType={}",
@@ -312,14 +321,13 @@ public class StreamingProviderFailoverServiceImpl
         } catch (Exception ex) {
             /*
              * A provider may have emitted partial output and then failed.
-             * At that point the stream is irrevocably owned by that provider;
-             * do not invoke another provider because the caller has already
-             * received content from this attempt.
+             * Once content has been emitted, failover is unsafe because the
+             * caller already has a prefix from this provider.
              *
-             * The provider adapters expose deltas through the callback only,
-             * so partial-output state is intentionally local to this attempt.
+             * Preserve that state in the exception so the outer executor can
+             * terminate rather than invoking another provider.
              */
-            throw new StreamingProviderFailureException(ex);
+            throw new StreamingProviderFailureException(ex, emitted[0]);
         } finally {
             if (previousAttempt == null) {
                 MDC.remove("providerAttempt");
@@ -497,8 +505,17 @@ public class StreamingProviderFailoverServiceImpl
 
     public static class StreamingProviderFailureException
             extends RuntimeException {
-        public StreamingProviderFailureException(Throwable cause) {
+        private final boolean partialOutputEmitted;
+
+        public StreamingProviderFailureException(
+                Throwable cause,
+                boolean partialOutputEmitted) {
             super(cause);
+            this.partialOutputEmitted = partialOutputEmitted;
+        }
+
+        public boolean partialOutputEmitted() {
+            return partialOutputEmitted;
         }
     }
 }
