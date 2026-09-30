@@ -33,7 +33,8 @@ public class RoutingRuntimeSignalService {
             healthService.snapshots().stream()
                     .filter(s -> s.fresh())
                     .forEach(s -> {
-                        String key = s.provider().name() + ":" + s.model();
+                        String key = s.provider().name() + ":" + s.model()
+                                + (s.endpointId() == null || s.endpointId().isBlank() ? "" : "@" + s.endpointId());
                         latency.put(key, s.ewmaLatencyMs());
                         availability.put(key, s.availability());
                     });
@@ -111,7 +112,8 @@ public class RoutingRuntimeSignalService {
     }
 
     private String key(RoutingCandidate candidate) {
-        return candidate.provider().name() + ":" + candidate.model();
+        return candidate.provider().name() + ":" + candidate.model()
+                + (candidate.endpointId() == null || candidate.endpointId().isBlank() ? "" : "@" + candidate.endpointId());
     }
 
     private static final class SignalState {
