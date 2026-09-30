@@ -18,10 +18,14 @@ public class PersonalPaymentIntent {
  @Column(name="credits", nullable=false, precision=19, scale=8) private BigDecimal credits;
  @Column(name="provider", nullable=false, length=64) private String provider;
  @Column(name="provider_payment_id", length=255) private String providerPaymentId;
+ @Column(name="checkout_session_id",length=255) private String checkoutSessionId;
+ @Column(name="receipt_url",length=1000) private String receiptUrl;
+ @Column(name="invoice_url",length=1000) private String invoiceUrl;
  @Enumerated(EnumType.STRING) @Column(name="status", nullable=false, length=32) private PersonalPaymentStatus status;
  @Column(name="idempotency_key", nullable=false, unique=true, length=128) private String idempotencyKey;
  @Column(name="created_at", nullable=false) private LocalDateTime createdAt;
  @Column(name="updated_at", nullable=false) private LocalDateTime updatedAt;
  @Column(name="completed_at") private LocalDateTime completedAt;
+ @Transient private String checkoutUrl;
  @Transient private String checkoutUrl;
 }
