@@ -100,6 +100,19 @@ public class StreamingProviderFailoverServiceImpl
                 lastFailure = ex;
                 recordFailure(request, ex);
 
+                /*
+                 * Never switch providers after the primary has emitted even
+                 * one delta. The caller already owns that response prefix.
+                 */
+                if (ex instanceof StreamingProviderFailureException
+                        && ex.partialOutputEmitted()) {
+                    log.info(
+                            "STREAM_FAILOVER_STOP_PRIMARY_PARTIAL_OUTPUT requestId={} provider={}",
+                            requestId(),
+                            request.getProvider());
+                    throw propagate(primary, primaryFailure, lastFailure);
+                }
+
                 if (!ProviderFailureClassifier.isRetryable(ex)
                         || maxAttempts <= 1) {
                     throw propagate(primary, primaryFailure, lastFailure);
