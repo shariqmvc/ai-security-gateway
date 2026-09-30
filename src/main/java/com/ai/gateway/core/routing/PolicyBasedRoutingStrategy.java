@@ -274,7 +274,9 @@ public class PolicyBasedRoutingStrategy
          * 6.5 Candidate Provider Resolution
          */
         List<Provider> providers =
-                candidateProviderResolver.resolve(policy);
+                applyProviderPreferences(
+                        candidateProviderResolver.resolve(policy),
+                        context.routingRequest().providerPreferences());
 
         if (providers == null
                 || providers.isEmpty()) {
@@ -599,6 +601,39 @@ public class PolicyBasedRoutingStrategy
                     request.getRoutingOptimizationProfile(),
                     request.getRoutingEscalationProfile());
         };
+    }
+
+    private List<Provider> applyProviderPreferences(
+            List<Provider> providers,
+            ProviderPreferences preferences) {
+
+        if (providers == null || providers.isEmpty()) {
+            return List.of();
+        }
+
+        java.util.LinkedHashSet<Provider> filtered = new java.util.LinkedHashSet<>();
+        for (Provider provider : providers) {
+            if (provider != null && !preferences.excludes(provider)) {
+                filtered.add(provider);
+            }
+        }
+
+        if (preferences.orderedProviders().isEmpty()) {
+            return List.copyOf(filtered);
+        }
+
+        java.util.List<Provider> ordered = new java.util.ArrayList<>();
+        for (Provider preferred : preferences.orderedProviders()) {
+            if (preferred != null && filtered.contains(preferred)) {
+                ordered.add(preferred);
+            }
+        }
+        for (Provider provider : filtered) {
+            if (!ordered.contains(provider)) {
+                ordered.add(provider);
+            }
+        }
+        return List.copyOf(ordered);
     }
 
     private List<RoutingCandidate> buildCandidates(
