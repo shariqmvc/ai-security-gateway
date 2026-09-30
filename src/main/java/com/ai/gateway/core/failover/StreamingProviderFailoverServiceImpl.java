@@ -283,10 +283,9 @@ public class StreamingProviderFailoverServiceImpl
         MDC.put("providerAttempt", String.valueOf(attempt));
 
         long startedAtNanos = System.nanoTime();
+        final boolean[] emitted = {false};
 
         try {
-            final boolean[] emitted = {false};
-
             AIStreamResult result =
                     streamingProvider.stream(
                             request,
@@ -311,12 +310,24 @@ public class StreamingProviderFailoverServiceImpl
                             ? latencyMs
                             : result.getLatencyMs());
 
-            if (result != null) {
-                result.setProvider(request.getProvider());
-                result.setModel(request.getModel());
+            if (result == null) {
+                return null;
             }
 
-            return result;
+            /*
+             * AIStreamResult is immutable (@Value), so preserve the provider
+             * and model selected by the attempt by creating a new result.
+             */
+            return AIStreamResult.builder()
+                    .response(result.getResponse())
+                    .provider(request.getProvider())
+                    .model(request.getModel())
+                    .inputTokens(result.getInputTokens())
+                    .outputTokens(result.getOutputTokens())
+                    .totalTokens(result.getTotalTokens())
+                    .latencyMs(result.getLatencyMs())
+                    .finishReason(result.getFinishReason())
+                    .build();
 
         } catch (Exception ex) {
             /*
