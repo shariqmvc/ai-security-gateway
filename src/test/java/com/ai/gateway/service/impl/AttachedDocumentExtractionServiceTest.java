@@ -92,7 +92,7 @@ class AttachedDocumentExtractionServiceTest {
         assertEquals(2, result.getMedia().size());
         assertEquals(MediaTypeKind.DOCUMENT, result.getMedia().get(0).getType());
         assertEquals(MediaTypeKind.DOCUMENT, result.getMedia().get(1).getType());
-        assertEquals("Document A content", result.getPrompt());
+        assertEquals("Analyze both documents.", result.getPrompt());
         verifyNoInteractions(piiDetectionService);
     }
 
