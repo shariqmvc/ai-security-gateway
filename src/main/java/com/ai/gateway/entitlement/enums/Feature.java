@@ -8,6 +8,7 @@ public enum Feature {
     CLAUDE,
     XAI,
     GROQ,
+    MISTRAL,
 
     // Core Gateway
     CHAT,
