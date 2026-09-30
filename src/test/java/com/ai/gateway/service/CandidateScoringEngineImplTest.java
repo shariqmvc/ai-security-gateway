@@ -306,6 +306,50 @@ class CandidateScoringEngineImplTest {
     }
 
     @Test
+    void endpointSpecificRuntimeSignalsAreScoredIndependently() {
+        stubPricing();
+
+        RoutingCandidate gpu1 =
+                new RoutingCandidate(Provider.OLLAMA, "llama3.2:3b", "ollama-gpu-01");
+        RoutingCandidate gpu2 =
+                new RoutingCandidate(Provider.OLLAMA, "llama3.2:3b", "ollama-gpu-02");
+
+        RoutingRuntimeSignals signals = new RoutingRuntimeSignals(
+                java.util.Map.of(
+                        gpu1.candidateKey(), 900.0,
+                        gpu2.candidateKey(), 200.0),
+                java.util.Map.of(
+                        gpu1.candidateKey(), 0.80,
+                        gpu2.candidateKey(), 0.99));
+
+        CandidateScoringContext context =
+                new CandidateScoringContext(
+                        policy(), 1_000, 1_000, false, null,
+                        null, java.util.Map.of(), signals);
+
+        List<ScoredCandidate> result =
+                engine.score(List.of(gpu1, gpu2), context);
+
+        ScoredCandidate first = result.stream()
+                .filter(c -> c.candidate().equals(gpu1))
+                .findFirst()
+                .orElseThrow();
+        ScoredCandidate second = result.stream()
+                .filter(c -> c.candidate().equals(gpu2))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(900.0,
+                component(first, CandidateScoreDimension.LATENCY).rawValue());
+        assertEquals(200.0,
+                component(second, CandidateScoreDimension.LATENCY).rawValue());
+        assertEquals(0.80,
+                component(first, CandidateScoreDimension.AVAILABILITY).rawValue());
+        assertEquals(0.99,
+                component(second, CandidateScoreDimension.AVAILABILITY).rawValue());
+    }
+
+    @Test
     void emptyCandidatesReturnEmptyResult() {
         List<ScoredCandidate> result = engine.score(
                 List.of(),
