@@ -17,6 +17,19 @@ public class ChatResponse {
 
     private String response;
 
+    /** Provider requested by the caller. */
+    private String requestedProvider;
+
+    /** Model requested by the caller. */
+    private String requestedModel;
+
+    /** Provider/model that actually generated the response. */
+    private String provider;
+    private String model;
+
+    /** Non-null only when execution failed over from the requested provider. */
+    private String failoverReason;
+
     private String finishReason;
 
     private Integer inputTokens;
