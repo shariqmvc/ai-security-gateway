@@ -184,6 +184,9 @@ public class OpenAiCompatibleChatController {
                 .routingSelectionMode(request.getRoutingSelectionMode())
                 .routingTopN(request.getRoutingTopN())
                 .routingEscalationProfile(request.getRoutingEscalationProfile())
+                .preferredProviders(request.getPreferredProviders())
+                .excludedProviders(request.getExcludedProviders())
+                .allowProviderFallbacks(request.isAllowProviderFallbacks())
                 .maximumRequestCost(request.getMaximumRequestCost())
                 .remainingWorkflowBudget(request.getRemainingWorkflowBudget())
                 .build();
@@ -205,6 +208,9 @@ public class OpenAiCompatibleChatController {
         @Builder.Default private String routingSelectionMode = "SINGLE";
         @Builder.Default private int routingTopN = 1;
         private String routingEscalationProfile;
+        private java.util.List<Provider> preferredProviders;
+        private java.util.Set<Provider> excludedProviders;
+        @Builder.Default private boolean allowProviderFallbacks = true;
         private java.math.BigDecimal maximumRequestCost;
         private java.math.BigDecimal remainingWorkflowBudget;
     }
