@@ -20,6 +20,8 @@ public class PersonalPaymentProperties {
  private BigDecimal platformFeeRate=BigDecimal.valueOf(0.055);
  private BigDecimal minimumPlatformFee=BigDecimal.valueOf(0.80);
  private boolean invoiceCreationEnabled=true;
+ private BigDecimal customMinimumCredits=BigDecimal.TEN;
+ private BigDecimal customMaximumCredits=BigDecimal.valueOf(1000);
  private String creditsPolicy="Credits do not expire.";
  private String refundPolicy="Refunds are handled under AIRouter's published refund policy.";
  private String taxPolicy="USD billing; taxes are determined by the configured payment/tax setup.";
