@@ -2,6 +2,8 @@ package com.ai.gateway.core.provider;
 
 import lombok.Builder;
 import lombok.Value;
+import java.util.List;
+import com.ai.gateway.core.model.Provider;
 
 @Value
 @Builder
