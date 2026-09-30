@@ -30,7 +30,11 @@ public class PersonalPaymentServiceImpl implements PersonalPaymentService {
 
  @Override
  @Transactional
- public PersonalPaymentIntent createIntent(UUID accountId,String packageCode,String idempotencyKey){
+ public PersonalPaymentIntent createIntent(UUID accountId,String packageCode,String idempotencyKey){return createIntent(accountId,packageCode,idempotencyKey,null);}
+
+ @Override
+ @Transactional
+ public PersonalPaymentIntent createIntent(UUID accountId,String packageCode,String idempotencyKey,BigDecimal requestedCredits){
   if(accountId==null) throw new PersonalCreditException("Personal account id is required.");
   if(idempotencyKey==null||idempotencyKey.isBlank()||idempotencyKey.length()>128) throw new PersonalCreditException("A valid idempotency key is required.");
   var existing=intents.findByIdempotencyKey(idempotencyKey);
@@ -43,7 +47,8 @@ public class PersonalPaymentServiceImpl implements PersonalPaymentService {
   BigDecimal creditsAmount=pack==null?null:pack.credits();
   BigDecimal baseAmount=pack==null?null:pack.amount();
   if("custom".equalsIgnoreCase(packageCode)){
-   throw new PersonalCreditException("Custom top-ups must include a credit amount.");
+   creditsAmount=requestedCredits;
+   baseAmount=requestedCredits;
   }
   validateAmount(baseAmount,creditsAmount);
 
