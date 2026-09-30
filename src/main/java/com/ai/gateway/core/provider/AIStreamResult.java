@@ -17,9 +17,35 @@ public class AIStreamResult {
     Long latencyMs;
     String finishReason;
 
+    /** Actual executable endpoint used for this stream. */
+    String endpointId;
+
+    /** Provider requested by the caller before streaming failover. */
+    com.ai.gateway.core.model.Provider failoverFromProvider;
+
+    /** Endpoint requested before streaming failover. */
+    String failoverFromEndpointId;
+
+    /** Classified reason for the primary provider failure. */
+    String failoverReason;
+
+    /** Successful provider attempt number, where 1 is primary. */
+    Integer providerAttempt;
+
+    /** Ordered execution attempts. */
+    @Builder.Default
+    java.util.List<ProviderAttempt> providerAttempts = java.util.Collections.emptyList();
+
+    public record ProviderAttempt(
+            int attempt,
+            com.ai.gateway.core.model.Provider provider,
+            String model,
+            String endpointId,
+            String status,
+            String failureType) {
+    }
+
     /** Provider requested by the caller before streaming failover, when failover occurred. */
     com.ai.gateway.core.model.Provider failoverFromProvider;
 
-    /** Classified reason for the primary provider failure that triggered failover. */
-    String failoverReason;
 }
