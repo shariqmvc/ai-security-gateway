@@ -6,5 +6,6 @@ public enum Provider {
     CLAUDE,
     XAI,
     GROQ,
+    MISTRAL,
     OLLAMA
 }
