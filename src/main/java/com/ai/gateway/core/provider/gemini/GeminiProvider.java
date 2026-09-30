@@ -61,6 +61,15 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
     private final ObjectMapper objectMapper;
     private final PersonalProviderCredentialResolver credentials;
 
+    public GeminiProvider(
+            RestTemplate restTemplate,
+            GeminiConfig geminiConfig,
+            PerformanceLogger performanceLogger,
+            MediaUrlFetcher mediaUrlFetcher,
+            ObjectMapper objectMapper) {
+        this(restTemplate, geminiConfig, performanceLogger, mediaUrlFetcher, objectMapper, null);
+    }
+
     @Value("${gemini.api.key}")
     private String apiKey;
 
