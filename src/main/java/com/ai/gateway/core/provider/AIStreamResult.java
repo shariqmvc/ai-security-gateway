@@ -21,7 +21,6 @@ public class AIStreamResult {
     String endpointId;
 
     /** Provider requested by the caller before streaming failover. */
-    com.ai.gateway.core.model.Provider failoverFromProvider;
 
     /** Endpoint requested before streaming failover. */
     String failoverFromEndpointId;
