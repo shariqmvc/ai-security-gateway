@@ -377,7 +377,11 @@ public class StreamingProviderFailoverServiceImpl
                     .provider(fallback)
                     .model(fallbackModel.modelId())
                     .prompt(primaryRequest.getPrompt())
+                    .billingMode(primaryRequest.getBillingMode())
+                    .maximumRequestCost(primaryRequest.getMaximumRequestCost())
+                    .personalAccountId(primaryRequest.getPersonalAccountId())
                     .media(primaryRequest.getMedia())
+                    .fileProcessingMode(primaryRequest.getFileProcessingMode())
                     .routingDecisionMetadata(
                             primaryRequest.getRoutingDecisionMetadata())
                     .routingStrategy(primaryRequest.getRoutingStrategy())
