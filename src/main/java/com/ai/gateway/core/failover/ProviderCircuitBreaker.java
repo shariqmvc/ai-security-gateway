@@ -147,7 +147,7 @@ public class ProviderCircuitBreaker {
             return;
         }
 
-        Key key = new Key(provider, model);
+        Key key = key(candidate);
 
         states.compute(key, (ignored, previous) -> {
 
@@ -200,7 +200,7 @@ public class ProviderCircuitBreaker {
             return;
         }
 
-        Key key = new Key(provider, model);
+        Key key = key(candidate);
 
         states.compute(key, (ignored, previous) -> {
 
