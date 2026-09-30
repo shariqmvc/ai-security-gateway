@@ -62,6 +62,13 @@ class PersonalPreferencesServiceTest {
         when(preferencesRepository.findByPersonalAccountId(accountId)).thenReturn(Optional.of(preferences));
         when(preferencesRepository.save(any(PersonalAccountPreferences.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(modelRegistry.find(Provider.OLLAMA, "llama3.2:3b"))
+                .thenReturn(Optional.of(new ModelDefinition(
+                        Provider.OLLAMA,
+                        "llama3.2:3b",
+                        "Llama 3.2 3B",
+                        com.ai.gateway.core.routing.registry.ModelStatus.ENABLED,
+                        java.util.Set.of())));
 
         AuthenticationContext context = AuthenticationContext.builder()
                 .personalPrincipal(true)
