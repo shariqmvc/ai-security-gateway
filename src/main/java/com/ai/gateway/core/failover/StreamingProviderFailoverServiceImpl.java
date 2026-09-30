@@ -37,6 +37,8 @@ import java.util.function.Consumer;
 public class StreamingProviderFailoverServiceImpl
         implements StreamingProviderFailoverService {
 
+    private static final String DEFAULT_FALLBACK_MODEL = "__DEFAULT_FALLBACK_MODEL__";
+
     private final AIProviderFactory providerFactory;
     private final ProviderModelRegistryService providerModelRegistryService;
     private final FailoverProperties properties;
@@ -94,16 +96,14 @@ public class StreamingProviderFailoverServiceImpl
                     .map(RoutingCandidate::candidateKey)
                     .collect(java.util.stream.Collectors.toSet());
             for (Provider fallback : properties.fallbacksFor(primary)) {
-                if (fallback == null) continue;
-                String model;
-                try {
-                    model = providerFactory.getProvider(fallback).defaultModel();
-                } catch (Exception ignored) {
-                    continue;
-                }
-                String key = fallback.name() + "/" + model;
-                if (!routedKeys.contains(key)) {
-                    fallbackCandidates.add(new RoutingCandidate(fallback, model));
+                if (fallback == null || fallback == primary) continue;
+                String key = fallback.name() + "/";
+                boolean alreadyConfigured = routedKeys.stream()
+                        .anyMatch(candidateKey -> candidateKey.equals(key)
+                                || candidateKey.startsWith(key));
+                if (!alreadyConfigured) {
+                    fallbackCandidates.add(
+                            new RoutingCandidate(fallback, DEFAULT_FALLBACK_MODEL));
                     routedKeys.add(key);
                 }
             }
@@ -469,6 +469,9 @@ public class StreamingProviderFailoverServiceImpl
         try {
             providerModelRegistryService.requireProvider(fallback);
             String fallbackModelId = fallbackCandidate.model();
+            if (DEFAULT_FALLBACK_MODEL.equals(fallbackModelId)) {
+                fallbackModelId = providerModelRegistryService.defaultModel(fallback);
+            }
 
             var fallbackModel =
                     providerModelRegistryService.requireModel(
