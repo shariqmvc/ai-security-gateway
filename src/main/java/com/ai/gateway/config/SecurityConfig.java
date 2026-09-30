@@ -93,7 +93,7 @@ public class SecurityConfig {
                                 "/api/health",
                                 "/actuator/health",
                                 "/public/**",
-                                "/api/personal/billing/webhooks"
+                                "/api/personal/billing/webhooks/**"
                         )
                         .permitAll()
                         /*
