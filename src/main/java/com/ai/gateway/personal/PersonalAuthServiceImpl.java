@@ -91,7 +91,9 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 .build();
 
         account = accountRepository.save(account);
-        policyService.ensurePolicy(account);
+        if (policyService != null) {
+            policyService.ensurePolicy(account);
+        }
 
         String verificationToken = null;
 
