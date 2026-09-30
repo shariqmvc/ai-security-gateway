@@ -576,6 +576,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     .routingDecisionMetadata(primaryRequest.getRoutingDecisionMetadata())
                     .routingStrategy(primaryRequest.getRoutingStrategy())
                     .routingCandidates(primaryRequest.getRoutingCandidates())
+                    .endpointId(fallbackCandidate.endpointId())
+                    .allowProviderFallbacks(primaryRequest.isAllowProviderFallbacks())
                     .build();
 
         } catch (Exception ex) {
