@@ -18,9 +18,9 @@ public class BusinessRoutingOutcomeReader implements RoutingOutcomeReader {
     private final RoutingOutcomeRepository repository;
 
     @Override
-    public List<RoutingOutcomeSample> findRecent(Provider provider, String model) {
+    public List<RoutingOutcomeSample> findRecent(Provider provider, String model, String endpointId) {
         return repository
-                .findTop100ByProviderAndModelOrderByCreatedAtDesc(provider, model)
+                .findTop100ByProviderAndModelAndEndpointIdOrderByCreatedAtDesc(provider, model, endpointId)
                 .stream()
                 .filter(outcome -> outcome.getLatencyMs() != null && outcome.getLatencyMs() >= 0)
                 .map(outcome -> new RoutingOutcomeSample(
