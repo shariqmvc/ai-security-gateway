@@ -13,6 +13,9 @@ public class GatewayStreamEvent {
     String content;
     String provider;
     String model;
+    String requestedProvider;
+    String requestedModel;
+    String failoverReason;
     Integer inputTokens;
     Integer outputTokens;
     Integer totalTokens;
