@@ -168,7 +168,7 @@ public class PersonalPaymentServiceImpl implements PersonalPaymentService {
  }
  private void enrichReceipt(PersonalPaymentIntent intent){
   try{
-   if(intent.getProviderPaymentId()==null)return;
+   if(stripe==null||intent.getProviderPaymentId()==null)return;
    JsonNode pi=stripe.retrieve("/v1/payment_intents/"+intent.getProviderPaymentId());
    String charge=text(pi,"latest_charge");
    if(charge!=null){JsonNode c=stripe.retrieve("/v1/charges/"+charge);intent.setReceiptUrl(text(c,"receipt_url"));}
