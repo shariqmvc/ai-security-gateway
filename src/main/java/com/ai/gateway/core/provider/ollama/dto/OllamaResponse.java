@@ -36,4 +36,23 @@ public class OllamaResponse {
 
     @JsonProperty("eval_duration")
     private Long evalDuration;
+
+    public OllamaResponse(
+            OllamaMessage message,
+            Long totalDuration,
+            Long loadDuration,
+            Integer promptEvalCount,
+            Long promptEvalDuration,
+            Integer evalCount,
+            Long evalDuration) {
+        this.message = message;
+        this.done = null;
+        this.doneReason = null;
+        this.totalDuration = totalDuration;
+        this.loadDuration = loadDuration;
+        this.promptEvalCount = promptEvalCount;
+        this.promptEvalDuration = promptEvalDuration;
+        this.evalCount = evalCount;
+        this.evalDuration = evalDuration;
+    }
 }
