@@ -116,7 +116,8 @@ public class ModelRegistryImpl implements ModelRegistry {
                                     groqCapabilities),
                             contextWindowProperties.resolve(
                                     provider.name(),
-                                    model));
+                                    model),
+                            endpointIdFor(provider, model));
 
                     definitions.add(definition);
 
@@ -134,6 +135,18 @@ public class ModelRegistryImpl implements ModelRegistry {
 
         this.modelsByProvider = Map.copyOf(byProvider);
         this.modelsById = Map.copyOf(byId);
+    }
+
+    /**
+     * Endpoint identity is derived from the provider's existing endpoint
+     * configuration. It is metadata only until a provider exposes multiple
+     * independently executable endpoints.
+     */
+    private String endpointIdFor(Provider provider, String model) {
+        return switch (provider) {
+            case OLLAMA -> "ollama-default";
+            default -> provider.name().toLowerCase() + "-default";
+        };
     }
 
     private List<String> modelsFor(
