@@ -9,6 +9,7 @@ import com.ai.gateway.core.routing.registry.ModelCapabilities;
 import com.ai.gateway.core.routing.registry.ModelDefinition;
 import com.ai.gateway.core.routing.registry.ModelContextWindowProperties;
 import com.ai.gateway.core.routing.registry.ModelRegistry;
+import com.ai.gateway.core.routing.registry.ProviderEndpointRegistry;
 import com.ai.gateway.core.routing.registry.ModelStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,7 +48,8 @@ public class ModelRegistryImpl implements ModelRegistry {
                 "VISION,AUDIO,TOOLS,REASONING",
                 "VISION,TOOLS,REASONING",
                 "TOOLS,REASONING",
-                new ModelContextWindowProperties());
+                new ModelContextWindowProperties(),
+                new ProviderEndpointRegistry(new com.ai.gateway.core.routing.registry.ProviderEndpointProperties()));
     }
 
     /**
@@ -65,7 +67,8 @@ public class ModelRegistryImpl implements ModelRegistry {
                 providerFactory, ollamaConfig, openAiCapabilities, geminiCapabilities,
                 ollamaCapabilities, claudeCapabilities,
                 "VISION,TOOLS,REASONING", "TOOLS,REASONING",
-                new ModelContextWindowProperties());
+                new ModelContextWindowProperties(),
+                new ProviderEndpointRegistry(new com.ai.gateway.core.routing.registry.ProviderEndpointProperties()));
     }
 
     @Autowired
@@ -78,7 +81,8 @@ public class ModelRegistryImpl implements ModelRegistry {
             @Value("${gateway.routing.model-capabilities.claude:VISION,TOOLS,REASONING}") String claudeCapabilities,
             @Value("${gateway.routing.model-capabilities.xai:VISION,TOOLS,REASONING}") String xaiCapabilities,
             @Value("${gateway.routing.model-capabilities.groq:TOOLS,REASONING}") String groqCapabilities,
-            ModelContextWindowProperties contextWindowProperties) {
+            ModelContextWindowProperties contextWindowProperties,
+            ProviderEndpointRegistry endpointRegistry) {
 
         EnumMap<Provider, List<ModelDefinition>> byProvider =
                 new EnumMap<>(Provider.class);
@@ -142,11 +146,8 @@ public class ModelRegistryImpl implements ModelRegistry {
      * configuration. It is metadata only until a provider exposes multiple
      * independently executable endpoints.
      */
-    private String endpointIdFor(Provider provider, String model) {
-        return switch (provider) {
-            case OLLAMA -> "ollama-default";
-            default -> provider.name().toLowerCase() + "-default";
-        };
+    private String endpointIdFor(Provider provider, String model, ProviderEndpointRegistry endpointRegistry) {
+        return endpointRegistry.defaultEndpointId(provider);
     }
 
     private List<String> modelsFor(
