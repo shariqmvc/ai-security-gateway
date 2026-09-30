@@ -11,7 +11,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "ROUTING_OUTCOME",
         indexes = {
-                @Index(name = "idx_routing_outcome_provider_model", columnList = "provider,model"),
+                @Index(name = "idx_routing_outcome_provider_model_endpoint", columnList = "provider,model,endpoint_id"),
                 @Index(name = "idx_routing_outcome_created_at", columnList = "created_at"),
                 @Index(name = "idx_routing_outcome_tenant", columnList = "tenant_id")
         })
@@ -38,6 +38,9 @@ public class RoutingOutcome {
 
     @Column(nullable = false, length = 255)
     private String model;
+
+    @Column(name = "endpoint_id", nullable = false, length = 255)
+    private String endpointId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "routing_strategy", length = 64)
