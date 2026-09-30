@@ -237,6 +237,25 @@ public class StreamingProviderFailoverServiceImpl
                                 deltaConsumer,
                                 fallbackAttempts + 1);
 
+                /*
+                 * Preserve the original requested provider and the classified
+                 * failure that caused the successful fallback. The gateway
+                 * exposes this to the client so a manual provider selection
+                 * never looks like it silently changed providers.
+                 */
+                response = AIStreamResult.builder()
+                        .response(response.getResponse())
+                        .provider(response.getProvider())
+                        .model(response.getModel())
+                        .inputTokens(response.getInputTokens())
+                        .outputTokens(response.getOutputTokens())
+                        .totalTokens(response.getTotalTokens())
+                        .latencyMs(response.getLatencyMs())
+                        .finishReason(response.getFinishReason())
+                        .failoverFromProvider(primary)
+                        .failoverReason(ProviderFailureClassifier.classify(primaryFailure).name())
+                        .build();
+
                 metricsService.increment(
                         MetricsConstants.ROUTING_FAILOVER_SUCCESS);
                 routingAnalyticsService.recordFailoverSuccess();
