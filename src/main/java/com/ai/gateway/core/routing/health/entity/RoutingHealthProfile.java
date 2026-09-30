@@ -10,8 +10,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "ROUTING_HEALTH_PROFILE",
-        uniqueConstraints = @UniqueConstraint(name = "uk_routing_health_provider_model",
-                columnNames = {"provider", "model"}))
+        uniqueConstraints = @UniqueConstraint(name = "uk_routing_health_provider_model_endpoint",
+                columnNames = {"provider", "model", "endpoint_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,6 +29,9 @@ public class RoutingHealthProfile {
 
     @Column(nullable = false, length = 255)
     private String model;
+
+    @Column(name = "endpoint_id", nullable = false, length = 255)
+    private String endpointId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "health_status", nullable = false, length = 32)
