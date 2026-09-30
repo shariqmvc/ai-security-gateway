@@ -10,5 +10,5 @@ import java.util.List;
  * product store without making the Core depend on product/domain packages.
  */
 public interface RoutingOutcomeReader {
-    List<RoutingOutcomeSample> findRecent(Provider provider, String model);
+    List<RoutingOutcomeSample> findRecent(Provider provider, String model, String endpointId);
 }
