@@ -238,6 +238,20 @@ public class ModelRegistryImpl implements ModelRegistry {
     }
 
     @Override
+    public List<ModelDefinition> findAll(
+            Provider provider,
+            String modelId) {
+        if (provider == null || modelId == null || modelId.isBlank()) {
+            return List.of();
+        }
+        return modelsByProvider
+                .getOrDefault(provider, List.of())
+                .stream()
+                .filter(definition -> modelId.equals(definition.modelId()))
+                .toList();
+    }
+
+    @Override
     public Optional<ModelDefinition> findByModel(String modelId) {
         return modelId == null || modelId.isBlank()
                 ? Optional.empty()
