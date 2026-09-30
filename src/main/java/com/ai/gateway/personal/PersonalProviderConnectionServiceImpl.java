@@ -36,6 +36,9 @@ public class PersonalProviderConnectionServiceImpl
     @Value("${alroute.personal.providers.anthropic.base-url:https://api.anthropic.com}")
     private String anthropicBaseUrl;
 
+    @Value("${alroute.personal.providers.mistral.base-url:https://api.mistral.ai}")
+    private String mistralBaseUrl;
+
     @Override
     @Transactional(readOnly = true)
     public List<PersonalProviderConnectionResponse> list(AuthenticationContext context) {
