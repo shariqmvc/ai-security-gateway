@@ -65,7 +65,7 @@ public abstract class NativeChatCompletionsProvider implements AIProvider, Strea
         Map<String,Object> body=new LinkedHashMap<>();
         body.put("model",selected); body.put("messages",List.of(buildMessage(request))); body.put("stream",true);
         body.put("stream_options",Map.of("include_usage",true));
-        StringBuilder full=new StringBuilder(); int[] input={0},output={0},total={0};
+        StringBuilder full=new StringBuilder(); int[] input={0},output={0},total={0}; String[] finishReason={null};
         try {
             restTemplate.execute(endpoint(),HttpMethod.POST,req->{
                 req.getHeaders().putAll(headers(request));
@@ -78,6 +78,8 @@ public abstract class NativeChatCompletionsProvider implements AIProvider, Strea
                         String data=line.substring(5).trim();
                         if(data.isEmpty()||"[DONE]".equals(data)) continue;
                         JsonNode root=objectMapper.readTree(data);
+                        String reason=text(root.at("/choices/0/finish_reason"));
+                        if(!reason.isBlank()) finishReason[0]=reason;
                         String piece=text(root.at("/choices/0/delta/content"));
                         if(!piece.isBlank()){full.append(piece);consumer.accept(piece);}
                         JsonNode usage=root.path("usage");
@@ -94,7 +96,7 @@ public abstract class NativeChatCompletionsProvider implements AIProvider, Strea
         long latency=elapsed(started);
         performanceLogger.providerCompleted(id,provider().name(),selected,attempt(),latency,"HTTP_200");
         return AIStreamResult.builder().response(full.toString()).provider(provider()).model(selected)
-                .inputTokens(input[0]).outputTokens(output[0]).totalTokens(total[0]).latencyMs(latency).build();
+                .inputTokens(input[0]).outputTokens(output[0]).totalTokens(total[0]).latencyMs(latency).finishReason(finishReason[0]).build();
     }
 
     private HttpHeaders headers(AIRequest request){
