@@ -11,7 +11,7 @@ import com.ai.gateway.core.observability.PerformanceLogger;
 import com.ai.gateway.core.provider.AIProvider;
 import com.ai.gateway.core.provider.AIStreamResult;
 import com.ai.gateway.core.provider.StreamingAIProvider;
-import com.ai.gateway.personal.PersonalProviderCredentialResolver;
+import com.ai.gateway.core.provider.ProviderCredentialResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.*;
@@ -24,7 +24,7 @@ public abstract class NativeChatCompletionsProvider implements AIProvider, Strea
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final PerformanceLogger performanceLogger;
-    private final PersonalProviderCredentialResolver credentialResolver;
+    private final ProviderCredentialResolver credentialResolver;
 
     protected NativeChatCompletionsProvider(RestTemplate restTemplate, ObjectMapper objectMapper,
             PerformanceLogger performanceLogger, PersonalProviderCredentialResolver credentialResolver) {
