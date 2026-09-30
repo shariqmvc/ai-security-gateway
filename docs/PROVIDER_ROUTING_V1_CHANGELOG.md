@@ -242,3 +242,19 @@ Provider endpoints remain owned by the provider adapters/configuration at this s
 ## Capability resolution commit
 
 - `03c2e3b0b8262b06078743214c278b83842a51c4` — filter candidates by required model capabilities
+
+
+## Endpoint-aware candidate identity
+
+Routing candidates now carry an optional endpoint identity in addition to provider and model. Existing two-argument candidate construction remains compatible and represents provider/model-only routing.
+
+The model registry can supply an endpoint identity through ModelDefinition.endpointId. Policy-based candidate construction propagates that identity into RoutingCandidate, and runtime latency/availability lookups first use the endpoint-aware candidate key. Existing provider/model configuration remains the fallback when no endpoint-specific signal exists.
+
+This makes endpoint-specific runtime signals possible without changing provider execution semantics yet. Actual endpoint selection/execution remains intentionally unchanged until providers expose multiple independently routable endpoints.
+
+Commits:
+- cfa97985144c0117ffe4e28d6e94c42b93059224 — add optional model endpoint identity
+- a90c4aec1879ed96645249ce9129543530a7f657 — carry endpoint identity in routing candidates
+- 18cc07a5dbef499c6fe46d3b661711a7ca814e26 — propagate endpoint identity during candidate construction
+- 00635b9b66fb5fb083cf0a77e3184aaba712ff3b / ff6fc8e36d8d86de6f14a533e085e8cba6b0af71 — endpoint-aware runtime signal lookup
+- bbd7bfabb080bd9000437ea2d21f66c8a786de37 / 91c1610033671a77f3d07d34164e4444b57b9d0c — preserve legacy configuration fallback
