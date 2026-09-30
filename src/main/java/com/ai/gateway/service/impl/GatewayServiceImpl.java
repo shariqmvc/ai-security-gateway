@@ -9,6 +9,7 @@ import com.ai.gateway.entitlement.enums.Feature;
 import com.ai.gateway.entitlement.mapper.ProviderFeatureMapper;
 import com.ai.gateway.entitlement.service.EntitlementService;
 import com.ai.gateway.core.failover.ProviderFailoverService;
+import com.ai.gateway.core.failover.StreamingProviderFailoverService;
 import com.ai.gateway.core.provider.AIStreamResult;
 import com.ai.gateway.core.provider.StreamingAIProvider;
 import com.ai.gateway.core.provider.AIProviderFactory;
@@ -102,6 +103,7 @@ public class GatewayServiceImpl implements GatewayService {
     private final RoutingAnalyticsService routingAnalyticsService;
 
     private final ProviderFailoverService providerFailoverService;
+    private final StreamingProviderFailoverService streamingProviderFailoverService;
 
     private final PerformanceLogger performanceLogger;
 
@@ -1027,15 +1029,6 @@ public class GatewayServiceImpl implements GatewayService {
                 }
             }
 
-            var provider = providerFactory.getProvider(aiRequest.getProvider());
-            if (!(provider instanceof StreamingAIProvider streamingProvider)) {
-                throw new UnsupportedOperationException(
-                        "Streaming is not supported by provider "
-                                + aiRequest.getProvider()
-                                + " / "
-                                + aiRequest.getModel());
-            }
-
             providerStart = System.nanoTime();
             providerInvocationStarted = true;
             if (personalInferencePersistenceService != null) {
@@ -1045,13 +1038,14 @@ public class GatewayServiceImpl implements GatewayService {
                                 "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
                                 "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
             }
-            final Provider currentProvider = aiRequest.getProvider();
-            final String currentModel = aiRequest.getModel();
+
+            final Provider[] currentProvider = {aiRequest.getProvider()};
+            final String[] currentModel = {aiRequest.getModel()};
             StringBuilder restoredSoFar = new StringBuilder();
             String[] lastEmitted = {""};
             boolean[] firstDelta = {true};
 
-            AIStreamResult result = streamingProvider.stream(
+            AIStreamResult result = streamingProviderFailoverService.stream(
                     aiRequest,
                     delta -> {
                         if (delta == null || delta.isEmpty()) {
@@ -1065,9 +1059,9 @@ public class GatewayServiceImpl implements GatewayService {
                                     .requestId(requestId)
                                     .type("status")
                                     .phase("PROVIDER_GENERATING")
-                                    .provider(currentProvider.name())
-                                    .model(currentModel)
-                                    .content(providerLabel(currentProvider) + " is generating…")
+                                    .provider(currentProvider[0].name())
+                                    .model(currentModel[0])
+                                    .content(providerLabel(currentProvider[0]) + " is generating…")
                                     .build());
                         }
                         String restored = restoreService.restore(
@@ -1096,6 +1090,18 @@ public class GatewayServiceImpl implements GatewayService {
                                             .build());
                         }
                     });
+
+            if (result == null) {
+                throw new IllegalStateException("Streaming provider returned no result.");
+            }
+
+            currentProvider[0] = result.getProvider() == null
+                    ? aiRequest.getProvider()
+                    : result.getProvider();
+            currentModel[0] = result.getModel() == null
+                    ? aiRequest.getModel()
+                    : result.getModel();
+
             providerInvocationSucceeded = true;
 
             long providerLatency = elapsedMs(providerStart);
