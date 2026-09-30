@@ -3,6 +3,7 @@ package com.ai.gateway.personal.credit.service;
 import com.ai.gateway.personal.credit.entity.*;
 import com.ai.gateway.personal.credit.exception.PersonalCreditException;
 import com.ai.gateway.personal.credit.exception.PersonalInsufficientCreditsException;
+import com.ai.gateway.personal.billing.PersonalLowBalanceAlertService;
 import com.ai.gateway.personal.credit.repository.PersonalCreditLedgerRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditWalletRepository;
@@ -23,6 +24,7 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
     private final PersonalCreditWalletRepository walletRepository;
     private final PersonalCreditLedgerRepository ledgerRepository;
     private final PersonalCreditReservationRepository reservationRepository;
+    private final PersonalLowBalanceAlertService lowBalanceAlertService;
 
     @Override
     @Transactional
@@ -182,6 +184,10 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
                     .createdAt(LocalDateTime.now())
                     .build());
         }
+
+        lowBalanceAlertService.notifyIfNeeded(
+                reservation.getPersonalAccountId(),
+                wallet.getAvailableBalance());
 
         return reservation;
     }
