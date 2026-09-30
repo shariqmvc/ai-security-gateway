@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public record RoutingHealthSnapshot(
         Provider provider,
         String model,
+        String endpointId,
         RoutingHealthStatus status,
         long successCount,
         long failureCount,
