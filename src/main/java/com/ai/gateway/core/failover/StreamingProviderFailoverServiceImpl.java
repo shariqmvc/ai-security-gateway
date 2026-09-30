@@ -105,7 +105,7 @@ public class StreamingProviderFailoverServiceImpl
                  * one delta. The caller already owns that response prefix.
                  */
                 if (ex instanceof StreamingProviderFailureException
-                        && ex.partialOutputEmitted()) {
+                        && ((StreamingProviderFailureException) ex).partialOutputEmitted()) {
                     log.info(
                             "STREAM_FAILOVER_STOP_PRIMARY_PARTIAL_OUTPUT requestId={} provider={}",
                             requestId(),
@@ -247,7 +247,7 @@ public class StreamingProviderFailoverServiceImpl
                 recordFailure(fallbackRequest, ex);
 
                 if (ex instanceof StreamingProviderFailureException
-                        && ex.partialOutputEmitted()) {
+                        && ((StreamingProviderFailureException) ex).partialOutputEmitted()) {
                     log.info(
                             "STREAM_FAILOVER_STOP_PARTIAL_OUTPUT requestId={} provider={}",
                             requestId(),
