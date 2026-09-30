@@ -110,7 +110,9 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                             .build();
 
             verificationTokenRepository.save(token);
-            verificationDeliveryService.sendEmailVerification(user.getEmail(), verificationToken);
+            if (verificationDeliveryService != null) {
+                verificationDeliveryService.sendEmailVerification(user.getEmail(), verificationToken);
+            }
         }
 
         return new PersonalSignupResponse(
@@ -321,7 +323,9 @@ public class PersonalAuthServiceImpl implements PersonalAuthService {
                 .attempts(0)
                 .build();
         phoneVerificationCodeRepository.save(entity);
-        verificationDeliveryService.sendPhoneVerification(user.getPhoneNumber(), code);
+        if (verificationDeliveryService != null) {
+            verificationDeliveryService.sendPhoneVerification(user.getPhoneNumber(), code);
+        }
 
         return new PersonalVerificationResponse(
                 false, true, "Verification code generated. Deliver it through your SMS adapter.",
