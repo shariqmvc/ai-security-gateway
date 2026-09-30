@@ -45,7 +45,6 @@ public class AIStreamResult {
             String failureType) {
     }
 
-    /** Provider requested by the caller before streaming failover, when failover occurred. */
     com.ai.gateway.core.model.Provider failoverFromProvider;
 
 }
