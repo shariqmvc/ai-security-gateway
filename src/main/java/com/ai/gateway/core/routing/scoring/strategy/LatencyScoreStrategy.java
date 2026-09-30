@@ -24,7 +24,7 @@ public class LatencyScoreStrategy implements CandidateScoreStrategy {
             RoutingCandidate candidate,
             CandidateScoringContext context) {
 
-        Double runtime = context.runtimeSignals().latencyMs().get(key(candidate));
+        Double runtime = context.runtimeSignals().latencyMs().get(candidate.candidateKey());
         if (runtime != null) return runtime;
         return properties.getLatencyMs().getOrDefault(
                 key(candidate),
