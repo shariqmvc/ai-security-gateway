@@ -18,4 +18,5 @@ public class PersonalBillingSettings {
  @Column(name="auto_top_up_amount",nullable=false,precision=19,scale=8) @Builder.Default private BigDecimal autoTopUpAmount=BigDecimal.TEN;
  @Column(name="monthly_spend_cap",precision=19,scale=8) private BigDecimal monthlySpendCap;
  @Column(name="updated_at",nullable=false) private LocalDateTime updatedAt;
+ @Column(name="last_low_balance_alert_at") private LocalDateTime lastLowBalanceAlertAt;
 }
