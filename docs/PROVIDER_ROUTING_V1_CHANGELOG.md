@@ -258,3 +258,21 @@ Commits:
 - 18cc07a5dbef499c6fe46d3b661711a7ca814e26 — propagate endpoint identity during candidate construction
 - 00635b9b66fb5fb083cf0a77e3184aaba712ff3b / ff6fc8e36d8d86de6f14a533e085e8cba6b0af71 — endpoint-aware runtime signal lookup
 - bbd7bfabb080bd9000437ea2d21f66c8a786de37 / 91c1610033671a77f3d07d34164e4444b57b9d0c — preserve legacy configuration fallback
+
+
+## Executable endpoint registry
+
+Provider endpoint identities are now backed by a system-level executable endpoint registry. Routing propagates the selected endpoint into AIRequest, and the Ollama adapter resolves that endpoint at execution time. Failover requests preserve the fallback candidate endpoint identity.
+
+Configured endpoint URLs live under gateway.routing.endpoints.urls and are environment-overridable. Existing provider/model routing remains compatible because endpoint IDs are optional on RoutingCandidate and the default endpoint identities map to the current provider URLs.
+
+The endpoint registry is deliberately separate from personal provider credentials: endpoint infrastructure is controlled by deployment configuration, while user/provider credentials remain governed by the existing provider authentication flow.
+
+Commits:
+- feac2630aa234f7de2e6674db6bfd322c72dcf7d — executable endpoint properties
+- 5045d79b71997147024f4ca4d8664fe9a738f482 — endpoint registry service
+- 1f75a1a3672eb93e2c60c70d53a42e05665b9b1 — carry endpoint in AIRequest
+- b48a1d834af2e5f6775e0034ff67804e69a90c77 — propagate selected endpoint from routing
+- 90f5577d61f5ffca4be91ac60068b2f9804a065e — Ollama executes against selected endpoint
+- 3cf7f78a689df2783ea79f5fad30d18e2a591951 — configure executable endpoint URLs
+- 787cc07ea9dfdfd44c3e7182552d3d7556e695ec — preserve endpoint identity during failover
