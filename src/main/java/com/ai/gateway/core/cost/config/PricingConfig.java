@@ -60,6 +60,13 @@ public class PricingConfig {
                             new BigDecimal("6.00"))
                     .build();
 
+            case MISTRAL -> ModelPricing.builder()
+                    .provider(provider)
+                    .model(model)
+                    .inputPricePerMillionTokens(new BigDecimal("0.15"))
+                    .outputPricePerMillionTokens(new BigDecimal("0.60"))
+                    .build();
+
             case GROQ -> {
                 // Groq pricing varies by model. Use the current GPT-OSS
                 // 120B default as the provider-level fallback.
