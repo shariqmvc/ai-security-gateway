@@ -28,6 +28,9 @@ public class AIRequest {
     private RoutingDecisionMetadata routingDecisionMetadata;
     private RoutingStrategy routingStrategy;
 
+    @Builder.Default
+    private boolean allowProviderFallbacks = true;
+
     /** Ordered candidates selected by the routing engine, including primary. */
     @Builder.Default
     private List<RoutingCandidate> routingCandidates = Collections.emptyList();
