@@ -17,7 +17,9 @@ public record ModelDefinition(
 
         Set<String> capabilities,
 
-        int contextWindowTokens
+        int contextWindowTokens,
+
+        String endpointId
 
 ) {
 
@@ -27,7 +29,17 @@ public record ModelDefinition(
             String displayName,
             ModelStatus status,
             Set<String> capabilities) {
-        this(provider, modelId, displayName, status, capabilities, 16000);
+        this(provider, modelId, displayName, status, capabilities, 16000, null);
+    }
+
+    public ModelDefinition(
+            Provider provider,
+            String modelId,
+            String displayName,
+            ModelStatus status,
+            Set<String> capabilities,
+            int contextWindowTokens) {
+        this(provider, modelId, displayName, status, capabilities, contextWindowTokens, null);
     }
 
     public ModelDefinition {
