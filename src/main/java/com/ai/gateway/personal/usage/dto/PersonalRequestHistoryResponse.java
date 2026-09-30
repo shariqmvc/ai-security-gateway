@@ -13,5 +13,5 @@ public class PersonalRequestHistoryResponse {
  private Integer inputTokens; private Integer outputTokens; private Integer totalTokens;
  private Integer estimatedInputTokens; private Integer estimatedOptimizedTokens; private Integer estimatedTokensSaved;
  private Integer contextWindowTokens; private Long latencyMs; private Long providerLatencyMs; private BigDecimal cost;
- private boolean cacheHit; private boolean ragEnabled; private String errorCategory; private LocalDateTime createdAt; private PersonalResponseRating responseRating;
+ private boolean cacheHit; private boolean ragEnabled; private String errorCategory; private String finishReason; private LocalDateTime createdAt; private PersonalResponseRating responseRating;
 }
