@@ -584,6 +584,10 @@ public class GatewayServiceImpl implements GatewayService {
             return ChatResponse.builder()
                     .requestId(requestId)
                     .response(restored)
+                    .finishReason(aiResponse.getFinishReason())
+                    .inputTokens(aiResponse.getUsage() == null ? null : aiResponse.getUsage().getInputTokens())
+                    .outputTokens(aiResponse.getUsage() == null ? null : aiResponse.getUsage().getOutputTokens())
+                    .totalTokens(aiResponse.getUsage() == null ? null : aiResponse.getUsage().getTotalTokens())
                     .rag(buildRagMetadata(request.getRag(), ragResult))
                     .build();
 
