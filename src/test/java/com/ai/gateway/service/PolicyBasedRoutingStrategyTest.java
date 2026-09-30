@@ -72,6 +72,25 @@ class PolicyBasedRoutingStrategyTest {
                 any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
+        lenient().when(providerModelRegistryService.requireProvider(any()))
+                .thenAnswer(invocation -> new com.ai.gateway.core.routing.registry.ProviderDefinition(
+                        invocation.getArgument(0),
+                        invocation.getArgument(0).toString(),
+                        com.ai.gateway.core.routing.registry.ProviderStatus.ENABLED,
+                        java.util.Set.of("CHAT")));
+
+        lenient().when(providerModelRegistryService.requireModels(
+                any(),
+                anyString(),
+                any()))
+                .thenAnswer(invocation -> java.util.List.of(
+                        new ModelDefinition(
+                                invocation.getArgument(0),
+                                invocation.getArgument(1),
+                                invocation.getArgument(1),
+                                com.ai.gateway.core.routing.registry.ModelStatus.ENABLED,
+                                java.util.Set.of("CHAT"))));
+
         authenticationContext =
                 AuthenticationContext.builder()
                         .tenantCode("TEST")
@@ -224,9 +243,10 @@ class PolicyBasedRoutingStrategyTest {
                         Provider.GEMINI);
 
         verify(providerModelRegistryService)
-                .requireModel(
+                .requireModels(
                         Provider.GEMINI,
-                        "gemini-test");
+                        "gemini-test",
+                        java.util.Set.of());
     }
 
     @Test
@@ -538,9 +558,10 @@ class PolicyBasedRoutingStrategyTest {
                 new BusinessException(
                         "Model gemini-test is not available."))
                 .when(providerModelRegistryService)
-                .requireModel(
+                .requireModels(
                         Provider.GEMINI,
-                        "gemini-test");
+                        "gemini-test",
+                        java.util.Set.of());
 
         assertThrows(
                 BusinessException.class,
