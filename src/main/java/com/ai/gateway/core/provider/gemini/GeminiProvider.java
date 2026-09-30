@@ -39,6 +39,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
 
     private static final int STREAM_MAX_OUTPUT_TOKENS = 8192;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public GeminiProvider(
             @Qualifier("geminiRestTemplate") RestTemplate restTemplate,
             GeminiConfig geminiConfig,
