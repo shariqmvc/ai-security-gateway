@@ -75,6 +75,7 @@ public class StreamingProviderFailoverServiceImpl
 
         Provider primary = request.getProvider();
         Set<String> attempted = new HashSet<>();
+        List<AIStreamResult.ProviderAttempt> executionAttempts = new java.util.ArrayList<>();
         attempted.add(new RoutingCandidate(primary, request.getModel(), request.getEndpointId()).candidateKey());
 
         Throwable primaryFailure = null;
@@ -122,10 +123,16 @@ public class StreamingProviderFailoverServiceImpl
 
         if (!isCircuitOpen(new RoutingCandidate(primary, request.getModel(), request.getEndpointId()))) {
             try {
-                return invoke(request, deltaConsumer, 1);
+                AIStreamResult response = invoke(request, deltaConsumer, 1);
+                executionAttempts.add(new AIStreamResult.ProviderAttempt(1, request.getProvider(), request.getModel(), request.getEndpointId(), "SUCCESS", null));
+                return enrichAttemptMetadata(response, executionAttempts, null, 1);
             } catch (Exception ex) {
                 primaryFailure = ex;
                 lastFailure = ex;
+                executionAttempts.add(new AIStreamResult.ProviderAttempt(
+                        1, request.getProvider(), request.getModel(),
+                        request.getEndpointId(), "FAILED",
+                        ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName()));
                 recordFailure(request, ex);
 
                 /*
@@ -274,16 +281,27 @@ public class StreamingProviderFailoverServiceImpl
                  * exposes this to the client so a manual provider selection
                  * never looks like it silently changed providers.
                  */
+                executionAttempts.add(new AIStreamResult.ProviderAttempt(
+                        fallbackAttempts + 1,
+                        fallbackRequest.getProvider(),
+                        fallbackRequest.getModel(),
+                        fallbackRequest.getEndpointId(),
+                        "SUCCESS", null));
+
                 response = AIStreamResult.builder()
                         .response(response.getResponse())
                         .provider(response.getProvider())
                         .model(response.getModel())
+                        .endpointId(fallbackRequest.getEndpointId())
                         .inputTokens(response.getInputTokens())
                         .outputTokens(response.getOutputTokens())
                         .totalTokens(response.getTotalTokens())
                         .latencyMs(response.getLatencyMs())
                         .finishReason(response.getFinishReason())
                         .failoverFromProvider(primary)
+                        .failoverFromEndpointId(request.getEndpointId())
+                        .providerAttempt(fallbackAttempts + 1)
+                        .providerAttempts(List.copyOf(executionAttempts))
                         .failoverReason(ProviderFailureClassifier.classify(primaryFailure).name())
                         .build();
 
@@ -294,6 +312,13 @@ public class StreamingProviderFailoverServiceImpl
 
             } catch (Exception ex) {
                 lastFailure = ex;
+                executionAttempts.add(new AIStreamResult.ProviderAttempt(
+                        fallbackAttempts + 1,
+                        fallbackRequest.getProvider(),
+                        fallbackRequest.getModel(),
+                        fallbackRequest.getEndpointId(),
+                        "FAILED",
+                        ex.getCause() == null ? ex.getClass().getSimpleName() : ex.getCause().getClass().getSimpleName()));
                 recordFailure(fallbackRequest, ex);
 
                 if (ex instanceof StreamingProviderFailureException
@@ -390,6 +415,7 @@ public class StreamingProviderFailoverServiceImpl
                     .totalTokens(result.getTotalTokens())
                     .latencyMs(result.getLatencyMs())
                     .finishReason(result.getFinishReason())
+                    .endpointId(request.getEndpointId())
                     .build();
 
         } catch (Exception ex) {
@@ -409,6 +435,28 @@ public class StreamingProviderFailoverServiceImpl
                 MDC.put("providerAttempt", previousAttempt);
             }
         }
+    }
+
+    private AIStreamResult enrichAttemptMetadata(
+            AIStreamResult response,
+            List<AIStreamResult.ProviderAttempt> attempts,
+            String primaryEndpointId,
+            int successfulAttempt) {
+        if (response == null) return null;
+        return AIStreamResult.builder()
+                .response(response.getResponse())
+                .provider(response.getProvider())
+                .model(response.getModel())
+                .endpointId(response.getEndpointId())
+                .inputTokens(response.getInputTokens())
+                .outputTokens(response.getOutputTokens())
+                .totalTokens(response.getTotalTokens())
+                .latencyMs(response.getLatencyMs())
+                .finishReason(response.getFinishReason())
+                .providerAttempt(successfulAttempt)
+                .providerAttempts(List.copyOf(attempts))
+                .failoverFromEndpointId(primaryEndpointId)
+                .build();
     }
 
     private AIRequest buildFallbackRequest(
@@ -479,7 +527,8 @@ public class StreamingProviderFailoverServiceImpl
             routingHealthService.recordFailure(
                     new RoutingCandidate(
                             request.getProvider(),
-                            request.getModel()),
+                            request.getModel(),
+                            request.getEndpointId()),
                     ProviderFailureClassifier.classify(failure).name());
         }
 
