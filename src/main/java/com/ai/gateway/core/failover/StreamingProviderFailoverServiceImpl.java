@@ -74,8 +74,8 @@ public class StreamingProviderFailoverServiceImpl
             Consumer<String> deltaConsumer) {
 
         Provider primary = request.getProvider();
-        Set<Provider> attempted = new HashSet<>();
-        attempted.add(primary);
+        Set<String> attempted = new HashSet<>();
+        attempted.add(new RoutingCandidate(primary, request.getModel(), request.getEndpointId()).candidateKey());
 
         Throwable primaryFailure = null;
         Throwable lastFailure = null;
@@ -120,7 +120,7 @@ public class StreamingProviderFailoverServiceImpl
                 "STREAM_FAILOVER_PLAN requestId={} primary={} enabled={} maxAttempts={} configuredFallbacks={}",
                 requestId(), primary, properties.isEnabled(), maxAttempts, fallbacks);
 
-        if (!isCircuitOpen(primary, request.getModel())) {
+        if (!isCircuitOpen(new RoutingCandidate(primary, request.getModel(), request.getEndpointId()))) {
             try {
                 return invoke(request, deltaConsumer, 1);
             } catch (Exception ex) {
@@ -175,7 +175,7 @@ public class StreamingProviderFailoverServiceImpl
 
         for (RoutingCandidate fallbackCandidate : fallbackCandidates) {
             Provider fallback = fallbackCandidate.provider();
-            if (fallback == null || attempted.contains(fallback)) {
+            if (fallback == null || attempted.contains(fallbackCandidate.candidateKey())) {
                 continue;
             }
 
@@ -215,7 +215,8 @@ public class StreamingProviderFailoverServiceImpl
             RoutingCandidate candidate =
                     new RoutingCandidate(
                             fallbackRequest.getProvider(),
-                            fallbackRequest.getModel());
+                            fallbackRequest.getModel(),
+                            fallbackRequest.getEndpointId());
 
             if (routingHealthService != null
                     && !routingHealthService.isHealthyForRouting(candidate)) {
@@ -227,9 +228,10 @@ public class StreamingProviderFailoverServiceImpl
                 continue;
             }
 
-            if (isCircuitOpen(
+            if (isCircuitOpen(new RoutingCandidate(
                     fallbackRequest.getProvider(),
-                    fallbackRequest.getModel())) {
+                    fallbackRequest.getModel(),
+                    fallbackRequest.getEndpointId()))) {
 
                 metricsService.increment(
                         MetricsConstants.ROUTING_FAILOVER_CIRCUIT_OPEN);
@@ -247,7 +249,7 @@ public class StreamingProviderFailoverServiceImpl
                 continue;
             }
 
-            attempted.add(fallback);
+            attempted.add(fallbackCandidate.candidateKey());
             fallbackAttempts++;
 
             performanceLogger.failover(
@@ -434,6 +436,7 @@ public class StreamingProviderFailoverServiceImpl
                             primaryRequest.getRoutingDecisionMetadata())
                     .routingStrategy(primaryRequest.getRoutingStrategy())
                     .routingCandidates(primaryRequest.getRoutingCandidates())
+                    .endpointId(fallbackCandidate.endpointId())
                     .build();
         } catch (Exception ex) {
             log.warn(
@@ -455,8 +458,7 @@ public class StreamingProviderFailoverServiceImpl
         }
         if (providerCircuitBreaker != null) {
             providerCircuitBreaker.recordSuccess(
-                    request.getProvider(),
-                    request.getModel());
+                    new RoutingCandidate(request.getProvider(), request.getModel(), request.getEndpointId()));
         }
     }
 
@@ -493,8 +495,7 @@ public class StreamingProviderFailoverServiceImpl
 
             if (openDurationMs > 0L) {
                 providerCircuitBreaker.recordFailure(
-                        request.getProvider(),
-                        request.getModel(),
+                        new RoutingCandidate(request.getProvider(), request.getModel(), request.getEndpointId()),
                         category,
                         openDurationMs);
             } else {
@@ -526,9 +527,9 @@ public class StreamingProviderFailoverServiceImpl
         }
     }
 
-    private boolean isCircuitOpen(Provider provider, String model) {
+    private boolean isCircuitOpen(RoutingCandidate candidate) {
         return providerCircuitBreaker != null
-                && !providerCircuitBreaker.allowRequest(provider, model);
+                && !providerCircuitBreaker.allowRequest(candidate);
     }
 
     private UUID requestId() {
