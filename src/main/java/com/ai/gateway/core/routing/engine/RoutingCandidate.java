@@ -8,13 +8,15 @@ public record RoutingCandidate(
 
     public RoutingCandidate {
         if (provider == null) {
-            throw new IllegalArgumentException(
-                    "Provider is required.");
+            throw new IllegalArgumentException("Provider is required.");
         }
-
         if (model == null || model.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Model is required.");
+            throw new IllegalArgumentException("Model is required.");
         }
+    }
+
+    /** Stable provider/model identity for routing metadata and diagnostics. */
+    public String candidateKey() {
+        return provider.name() + "/" + model;
     }
 }
