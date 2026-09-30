@@ -103,32 +103,39 @@ public class ModelRegistryImpl implements ModelRegistry {
                 List<ModelDefinition> definitions = new ArrayList<>();
 
                 for (String model : configuredModels) {
-                    ModelDefinition definition = new ModelDefinition(
-                            provider,
-                            model,
-                            model,
-                            ModelStatus.ENABLED,
-                            capabilitiesFor(
-                                    provider,
-                                    model,
-                                    ollamaConfig,
-                                    openAiCapabilities,
-                                    geminiCapabilities,
-                                    ollamaCapabilities,
-                                    claudeCapabilities,
-                                    xaiCapabilities,
-                                    groqCapabilities),
-                            contextWindowProperties.resolve(
-                                    provider.name(),
-                                    model),
-                            endpointIdFor(provider, model));
+                    List<String> endpointIds = endpointRegistry.endpointIds(provider);
+                    if (endpointIds.isEmpty()) {
+                        endpointIds = List.of(endpointRegistry.defaultEndpointId(provider));
+                    }
 
-                    definitions.add(definition);
+                    for (String endpointId : endpointIds) {
+                        ModelDefinition definition = new ModelDefinition(
+                                provider,
+                                model,
+                                model,
+                                ModelStatus.ENABLED,
+                                capabilitiesFor(
+                                        provider,
+                                        model,
+                                        ollamaConfig,
+                                        openAiCapabilities,
+                                        geminiCapabilities,
+                                        ollamaCapabilities,
+                                        claudeCapabilities,
+                                        xaiCapabilities,
+                                        groqCapabilities),
+                                contextWindowProperties.resolve(
+                                        provider.name(),
+                                        model),
+                                endpointId);
 
-                    // Explicit model-only requests need a globally unique
-                    // model lookup. Preserve the existing first-registration
-                    // behavior if two providers expose the same model ID.
-                    byId.putIfAbsent(model, definition);
+                        definitions.add(definition);
+
+                        // Explicit model-only requests need a globally unique
+                        // model lookup. Preserve the existing first-registration
+                        // behavior if two providers expose the same model ID.
+                        byId.putIfAbsent(model, definition);
+                    }
                 }
 
                 byProvider.put(provider, List.copyOf(definitions));
@@ -141,14 +148,6 @@ public class ModelRegistryImpl implements ModelRegistry {
         this.modelsById = Map.copyOf(byId);
     }
 
-    /**
-     * Endpoint identity is derived from the provider's existing endpoint
-     * configuration. It is metadata only until a provider exposes multiple
-     * independently executable endpoints.
-     */
-    private String endpointIdFor(Provider provider, String model, ProviderEndpointRegistry endpointRegistry) {
-        return endpointRegistry.defaultEndpointId(provider);
-    }
 
     private List<String> modelsFor(
             Provider provider,
