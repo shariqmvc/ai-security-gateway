@@ -58,7 +58,7 @@ public class ClaudeProvider implements AIProvider, StreamingAIProvider {
     @Override public AIStreamResult stream(AIRequest request,Consumer<String> consumer){
         UUID id=id();long started=System.nanoTime();String selected=selectedModel(request);
         logger.providerStart(id,provider().name(),selected,attempt());
-        StringBuilder full=new StringBuilder();int[] input={0},output={0};
+        StringBuilder full=new StringBuilder();int[] input={0},output={0};String[] finishReason={null};
         try{
             rest.execute(endpoint(),HttpMethod.POST,req->{req.getHeaders().putAll(headers(request));req.getBody().write(mapper.writeValueAsBytes(body(request,true)));},response->{
                 try(var reader=new java.io.BufferedReader(new java.io.InputStreamReader(response.getBody(),StandardCharsets.UTF_8))){
@@ -71,14 +71,14 @@ public class ClaudeProvider implements AIProvider, StreamingAIProvider {
                             String piece=root.at("/delta/text").asText("");
                             if(!piece.isBlank()){full.append(piece);consumer.accept(piece);}
                         }else if("message_start".equals(type)){input[0]=root.at("/message/usage/input_tokens").asInt(0);}
-                        else if("message_delta".equals(type)){output[0]=root.at("/usage/output_tokens").asInt(output[0]);}
+                        else if("message_delta".equals(type)){output[0]=root.at("/usage/output_tokens").asInt(output[0]);finishReason[0]=root.at("/delta/stop_reason").asText(finishReason[0]);}
                     }
                 }return null;
             });
         }catch(Exception ex){logger.providerCompleted(id,provider().name(),selected,attempt(),elapsed(started),"FAILED:"+ex.getClass().getSimpleName());throw new RuntimeException("Streaming Anthropic request failed.",ex);}
         if(full.isEmpty())throw new IllegalStateException("Anthropic returned an empty streaming response.");
         long latency=elapsed(started);logger.providerCompleted(id,provider().name(),selected,attempt(),latency,"HTTP_200");
-        return AIStreamResult.builder().response(full.toString()).provider(provider()).model(selected).inputTokens(input[0]).outputTokens(output[0]).totalTokens(input[0]+output[0]).latencyMs(latency).build();
+        return AIStreamResult.builder().response(full.toString()).provider(provider()).model(selected).inputTokens(input[0]).outputTokens(output[0]).totalTokens(input[0]+output[0]).latencyMs(latency).finishReason(finishReason[0]).build();
     }
 
     private HttpHeaders headers(AIRequest request){HttpHeaders h=new HttpHeaders();h.setContentType(MediaType.APPLICATION_JSON);h.setAccept(List.of(MediaType.APPLICATION_JSON,MediaType.TEXT_EVENT_STREAM));h.set("x-api-key",key(request));h.set("anthropic-version","2023-06-01");return h;}
