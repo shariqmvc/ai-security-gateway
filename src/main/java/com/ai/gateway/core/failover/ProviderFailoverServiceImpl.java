@@ -364,13 +364,6 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                         fallbackRequest.getEndpointId(),
                         "SUCCESS",
                         null));
-                executionAttempts.add(new AIResponse.ProviderAttempt(
-                        fallbackAttempts + 1,
-                        fallbackRequest.getProvider(),
-                        fallbackRequest.getModel(),
-                        fallbackRequest.getEndpointId(),
-                        "SUCCESS",
-                        null));
 
                 /*
                  * Failover succeeded.
