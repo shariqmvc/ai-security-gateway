@@ -9,7 +9,7 @@ import com.ai.gateway.core.observability.PerformanceLogger;
 import com.ai.gateway.core.provider.AIProvider;
 import com.ai.gateway.core.provider.AIStreamResult;
 import com.ai.gateway.core.provider.StreamingAIProvider;
-import com.ai.gateway.personal.PersonalProviderCredentialResolver;
+import com.ai.gateway.core.provider.ProviderCredentialResolver;
 import com.ai.gateway.core.provider.gemini.dto.GeminiContent;
 import com.ai.gateway.core.provider.gemini.dto.GeminiPart;
 import com.ai.gateway.core.provider.gemini.dto.GeminiRequest;
@@ -46,7 +46,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
             PerformanceLogger performanceLogger,
             MediaUrlFetcher mediaUrlFetcher,
             ObjectMapper objectMapper,
-            PersonalProviderCredentialResolver credentials) {
+            ProviderCredentialResolver credentials) {
         this.restTemplate = restTemplate;
         this.geminiConfig = geminiConfig;
         this.performanceLogger = performanceLogger;
@@ -60,7 +60,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
     private final PerformanceLogger performanceLogger;
     private final MediaUrlFetcher mediaUrlFetcher;
     private final ObjectMapper objectMapper;
-    private final PersonalProviderCredentialResolver credentials;
+    private final ProviderCredentialResolver credentials;
 
     public GeminiProvider(
             RestTemplate restTemplate,
