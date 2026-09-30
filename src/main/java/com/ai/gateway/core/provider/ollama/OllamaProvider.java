@@ -228,6 +228,7 @@ public class OllamaProvider implements AIProvider, StreamingAIProvider {
                 .response(answer)
                 .provider(provider())
                 .model(selectedModel)
+                .finishReason(body.getDoneReason())
                 .usage(
                         Usage.builder()
                                 .inputTokens(inputTokens == null ? 0 : inputTokens)
