@@ -152,3 +152,51 @@ This keeps policy eligibility and provider preference distinct: preferences do n
 - `c75fab47bff7f16416cbaf08e08ee144f0aea86a` — expose provider routing preferences in OpenAI-compatible API
 - `fdd27ce2e12fc1cf921398b788bdb0052b9fb859` — normalize provider preferences in RoutingRequest
 - `cb44c8355e3d44d04b9195161893f7cc4178e735` — apply provider preferences to policy candidates
+
+## Change set: RoutingDecision execution integration
+
+### Execution propagation
+
+The selected `RoutingCandidate` list from `RoutingDecision` is now carried through `AIRequest` as `routingCandidates`. The request-level `allowProviderFallbacks` flag is also propagated to the execution layer.
+
+### Failover behavior
+
+When provider failover is enabled and request-level fallback is allowed:
+
+1. The primary routing decision executes first.
+2. Additional selected routing candidates are attempted before configured provider failover entries.
+3. Selected candidates retain their exact provider/model pair rather than being replaced with the provider's default model.
+4. Configured failover entries remain available as an additional fallback layer.
+5. Duplicate provider/model candidates are suppressed.
+6. Existing health checks, circuit breakers, retry classification, request budgets, and partial-stream safety remain active.
+
+When `allowProviderFallbacks=false`, no fallback candidate is executed after the primary request. Global failover-disabled behavior remains unchanged.
+
+### Streaming
+
+The same candidate propagation and ordering now apply to `StreamingProviderFailoverServiceImpl`. Partial output still prevents provider switching after a stream has emitted content.
+
+### Architectural result
+
+The routing pipeline now has a single decision that survives into execution:
+
+```
+RoutingRequest
+  -> RoutingStrategy
+  -> RoutingDecision
+  -> AIRequest.routingCandidates
+  -> Provider execution
+  -> selected-candidate fallback
+  -> configured failover
+```
+
+This removes the previous boundary where routing could select multiple candidates but provider execution only knew the primary provider plus an independently configured failover list.
+
+## Execution integration commits
+
+- `38ab4f51c97467e2f43b838b926c8994db6b6026` — carry selected candidates into AIRequest
+- `273f1e9b6e3a092f5d508fc459dd3c3897d9e734` — propagate selected candidates from RoutingDecision
+- `d85180520628c9e7430cfa4fe625d7abc3b96498` — execute selected synchronous candidates before configured failover
+- `c86e629faee1f12dfc485a4a4ebd049af56266bd` — carry fallback policy into AIRequest
+- `81ac70788e3df62d9fbf6e43d5ffd64bb21e48fe` — propagate fallback policy to execution
+- `cad202735b80372cab2a5255d7bab3d55ad2d72d` — execute selected streaming candidates before configured failover
