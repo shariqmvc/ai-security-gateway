@@ -176,6 +176,7 @@ public class GeminiProvider implements AIProvider, StreamingAIProvider {
                 .usage(
                         usage
                 )
+                .finishReason(response.getBody().getCandidates().getFirst().getFinishReason())
                 .build();
     }
 
