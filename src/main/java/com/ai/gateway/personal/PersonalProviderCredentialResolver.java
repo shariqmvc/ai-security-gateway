@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-public class PersonalProviderCredentialResolver {
+public class PersonalProviderCredentialResolver implements com.ai.gateway.core.provider.ProviderCredentialResolver {
 
     private final PersonalProviderConnectionRepository repository;
     private final EncryptionUtil encryptionUtil;
