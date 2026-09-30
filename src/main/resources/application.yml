@@ -79,6 +79,11 @@ groq:
   base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
   model: ${GROQ_MODEL:openai/gpt-oss-120b}
 
+mistral:
+  api-key: ${MISTRAL_API_KEY:}
+  base-url: ${MISTRAL_BASE_URL:https://api.mistral.ai/v1}
+  model: ${MISTRAL_MODEL:mistral-small-latest}
+
 ollama:
   base:
     url: http://localhost:11434
@@ -174,6 +179,10 @@ gateway:
           connect-timeout: ${GATEWAY_GROQ_CONNECT_TIMEOUT:5s}
           read-timeout: ${GATEWAY_GROQ_READ_TIMEOUT:60s}
 
+        MISTRAL:
+          connect-timeout: ${GATEWAY_MISTRAL_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_MISTRAL_READ_TIMEOUT:60s}
+
         OPENAI:
           connect-timeout: ${GATEWAY_OPENAI_CONNECT_TIMEOUT:5s}
           read-timeout: ${GATEWAY_OPENAI_READ_TIMEOUT:30s}
@@ -234,6 +243,7 @@ gateway:
       claude: ${GATEWAY_CLAUDE_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
       xai: ${GATEWAY_XAI_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
       groq: ${GATEWAY_GROQ_MODEL_CAPABILITIES:TOOLS,REASONING}
+      mistral: ${GATEWAY_MISTRAL_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
 
     # Model-aware context budgets. Exact model entries override provider defaults.
     context-windows:
@@ -245,6 +255,7 @@ gateway:
         CLAUDE: ${GATEWAY_CLAUDE_CONTEXT_WINDOW:200000}
         XAI: ${GATEWAY_XAI_CONTEXT_WINDOW:500000}
         GROQ: ${GATEWAY_GROQ_CONTEXT_WINDOW:131072}
+        MISTRAL: ${GATEWAY_MISTRAL_CONTEXT_WINDOW:131072}
       models: {}
 
     scoring:
@@ -346,6 +357,7 @@ alroute:
         - CLAUDE
         - XAI
         - GROQ
+        - MISTRAL
         - OLLAMA
         - CHAT
         - STREAMING
@@ -395,3 +407,5 @@ alroute:
         base-url: ${ALROUTE_PERSONAL_XAI_BASE_URL:https://api.x.ai}
       groq:
         base-url: ${ALROUTE_PERSONAL_GROQ_BASE_URL:https://api.groq.com}
+      mistral:
+        base-url: ${ALROUTE_PERSONAL_MISTRAL_BASE_URL:https://api.mistral.ai}
