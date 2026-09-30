@@ -1,6 +1,7 @@
 package com.ai.gateway.core.failover;
 
 import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -42,11 +43,17 @@ public class ProviderCircuitBreaker {
      * probe closes the circuit; a failed probe opens it again.
      */
     public boolean allowRequest(Provider provider, String model) {
+        return allowRequest(new RoutingCandidate(provider, model));
+    }
+
+    public boolean allowRequest(RoutingCandidate candidate) {
+        Provider provider = candidate == null ? null : candidate.provider();
+        String model = candidate == null ? null : candidate.model();
         if (!properties.isEnabled() || provider == null || model == null || model.isBlank()) {
             return true;
         }
 
-        Key key = new Key(provider, model);
+        Key key = key(candidate);
         State state = states.get(key);
         if (state == null) {
             return true;
@@ -92,7 +99,11 @@ public class ProviderCircuitBreaker {
     }
 
     public long retryAfterMs(Provider provider, String model) {
-        State state = states.get(new Key(provider, model));
+        return retryAfterMs(new RoutingCandidate(provider, model));
+    }
+
+    public long retryAfterMs(RoutingCandidate candidate) {
+        State state = states.get(key(candidate));
         if (state == null) {
             return 0L;
         }
@@ -103,16 +114,30 @@ public class ProviderCircuitBreaker {
     }
 
     public void recordSuccess(Provider provider, String model) {
+        recordSuccess(new RoutingCandidate(provider, model));
+    }
+
+    public void recordSuccess(RoutingCandidate candidate) {
+        Provider provider = candidate == null ? null : candidate.provider();
+        String model = candidate == null ? null : candidate.model();
         if (provider == null || model == null || model.isBlank()) {
             return;
         }
-        states.remove(new Key(provider, model));
+        states.remove(key(candidate));
     }
 
     public void recordFailure(
             Provider provider,
             String model,
             ProviderFailureCategory category) {
+        recordFailure(new RoutingCandidate(provider, model), category);
+    }
+
+    public void recordFailure(
+            RoutingCandidate candidate,
+            ProviderFailureCategory category) {
+        Provider provider = candidate == null ? null : candidate.provider();
+        String model = candidate == null ? null : candidate.model();
 
         if (!properties.isEnabled()
                 || provider == null
@@ -157,6 +182,15 @@ public class ProviderCircuitBreaker {
             String model,
             ProviderFailureCategory category,
             long openDurationMs) {
+        recordFailure(new RoutingCandidate(provider, model), category, openDurationMs);
+    }
+
+    public void recordFailure(
+            RoutingCandidate candidate,
+            ProviderFailureCategory category,
+            long openDurationMs) {
+        Provider provider = candidate == null ? null : candidate.provider();
+        String model = candidate == null ? null : candidate.model();
 
         if (!properties.isEnabled()
                 || provider == null
@@ -195,7 +229,11 @@ public class ProviderCircuitBreaker {
     }
 
     public int consecutiveFailures(Provider provider, String model) {
-        State state = states.get(new Key(provider, model));
+        return consecutiveFailures(new RoutingCandidate(provider, model));
+    }
+
+    public int consecutiveFailures(RoutingCandidate candidate) {
+        State state = states.get(key(candidate));
         return state == null ? 0 : state.consecutiveFailures;
     }
 
@@ -207,6 +245,12 @@ public class ProviderCircuitBreaker {
      * health before scoring without reserving a probe that may never execute.</p>
      */
     public boolean isCurrentlyOpen(Provider provider, String model) {
+        return isCurrentlyOpen(new RoutingCandidate(provider, model));
+    }
+
+    public boolean isCurrentlyOpen(RoutingCandidate candidate) {
+        Provider provider = candidate == null ? null : candidate.provider();
+        String model = candidate == null ? null : candidate.model();
         if (!properties.isEnabled()
                 || provider == null
                 || model == null
@@ -214,7 +258,7 @@ public class ProviderCircuitBreaker {
             return false;
         }
 
-        State state = states.get(new Key(provider, model));
+        State state = states.get(key(candidate));
         if (state == null) {
             return false;
         }
@@ -223,14 +267,20 @@ public class ProviderCircuitBreaker {
     }
 
     public boolean isOpen(Provider provider, String model) {
-        return !allowRequest(provider, model);
+        return !allowRequest(new RoutingCandidate(provider, model));
+    }
+
+    private Key key(RoutingCandidate candidate) {
+        return candidate == null
+                ? new Key(null, null, null)
+                : new Key(candidate.provider(), candidate.model(), candidate.endpointId());
     }
 
     public void reset() {
         states.clear();
     }
 
-    private record Key(Provider provider, String model) {
+    private record Key(Provider provider, String model, String endpointId) {
     }
 
     private record State(
