@@ -94,7 +94,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
         profile.setLastObservedAt(now);
         refreshDerivedHealth(profile);
         profileRepository.save(profile);
-        snapshotCache.put(new RoutingCandidate(profile.getProvider(), profile.getModel()), toSnapshot(profile));
+        snapshotCache.put(new RoutingCandidate(profile.getProvider(), profile.getModel(), profile.getEndpointId()), toSnapshot(profile));
     }
 
     @Override
@@ -107,7 +107,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
     }
 
     private RoutingHealthProfile getOrCreate(RoutingCandidate candidate) {
-        return profileRepository.findByProviderAndModel(candidatecandidate.provider(), candidate.model(), endpointId(candidate))
+        return profileRepository.findByProviderAndModel(candidate.provider(), candidate.model(), endpointId(candidate))
                 .orElseGet(() -> RoutingHealthProfile.builder()
                         .provider(candidate.provider())
                         .model(candidate.model())
