@@ -14,4 +14,8 @@ public class Candidate {
     private String finishReason;
 
     private String finishMessage;
+
+    public Candidate(CandidateContent content, String finishReason) {
+        this(content, finishReason, null);
+    }
 }
