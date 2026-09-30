@@ -15,6 +15,15 @@ public record RoutingContext(
         this(request, authenticationContext, null);
     }
 
+    /**
+     * Canonical routing view of the gateway request. Keeping this derived from
+     * ChatRequest avoids duplicating request state while giving the routing
+     * engine a stable domain contract.
+     */
+    public RoutingRequest routingRequest() {
+        return RoutingRequest.from(request);
+    }
+
     public RoutingCostContext effectiveCostContext() {
         if (costContext != null) {
             return costContext;
