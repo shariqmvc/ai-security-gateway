@@ -452,7 +452,8 @@ public class GatewayServiceImpl implements GatewayService {
                         inferenceId, "PROVIDER_REQUEST_STARTED", "PROVIDER",
                         java.util.Map.of(
                                 "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
-                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
+                                "model", aiRequest.getModel() == null ? "" : aiRequest.getModel(),
+                                "endpoint", aiRequest.getEndpointId() == null ? "" : aiRequest.getEndpointId()));
             }
 
             Provider requestedProvider = aiRequest.getProvider();
