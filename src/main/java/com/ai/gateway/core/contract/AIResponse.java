@@ -22,6 +22,9 @@ public class AIResponse {
 
     private String model;
 
+    /** Actual endpoint that generated this response. */
+    private String endpointId;
+
     /** Provider-native generation termination reason, when supplied. */
     private String finishReason;
 
