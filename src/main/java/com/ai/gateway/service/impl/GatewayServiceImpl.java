@@ -1131,6 +1131,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .response(result.getResponse())
                     .provider(result.getProvider())
                     .model(result.getModel())
+                    .finishReason(result.getFinishReason())
                     .usage(Usage.builder()
                             .inputTokens(result.getInputTokens() == null ? 0 : result.getInputTokens())
                             .outputTokens(result.getOutputTokens() == null ? 0 : result.getOutputTokens())
