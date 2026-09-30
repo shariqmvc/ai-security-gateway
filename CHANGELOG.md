@@ -17,6 +17,12 @@ All notable changes to the AI Security Gateway are documented here.
 - V39 persists endpoint identity for routing outcomes.
 
 ### Test and architecture hardening
+- Removed remaining Core provider imports of the Personal credential resolver; Gemini, Groq, Mistral, XAI, and native OpenAI-compatible providers now depend on the Core credential-resolution contract.
+- Configured fallback providers now resolve their default model only when the fallback is actually attempted.
+- Preserved registry exceptions during policy candidate resolution while retaining compatibility with isolated single-model registry tests.
+- Chat remains authenticated through the mandatory API-key authentication filter while Spring Security performs only the final authenticated check.
+- Personal verification delivery is optional for isolated service construction; production delivery remains invoked when configured.
+
 - Removed the duplicate circuit-breaker regression test left by the endpoint migration.
 - Updated Ollama provider tests for endpoint-registry injection and corrected Mockito matcher usage.
 - Preserved backward-compatible provider/model circuit-breaker calls when no endpoint is specified.
