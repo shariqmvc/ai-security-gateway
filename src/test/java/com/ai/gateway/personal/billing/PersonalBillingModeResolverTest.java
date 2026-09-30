@@ -32,12 +32,12 @@ class PersonalBillingModeResolverTest {
     @Test
     void autoFallsBackToCreditWithoutByokConnection() {
         var repository = mock(PersonalProviderConnectionRepository.class);
-        var properties = new PersonalBillingProperties();
+        var policyService = mock(PersonalAccountPolicyService.class);
         var accountId = UUID.randomUUID();
         when(repository.findByPersonalAccountIdAndProvider(accountId, Provider.GEMINI))
                 .thenReturn(Optional.empty());
 
-        var resolver = new PersonalBillingModeResolver(repository, properties);
+        var resolver = new PersonalBillingModeResolver(repository, policyService);
 
         assertEquals(PersonalBillingMode.CREDIT,
                 resolver.resolve(personalContext(accountId), Provider.GEMINI, "gemini-3.6-flash", "AUTO"));
@@ -46,12 +46,12 @@ class PersonalBillingModeResolverTest {
     @Test
     void explicitByokRequiresActiveConnection() {
         var repository = mock(PersonalProviderConnectionRepository.class);
-        var properties = new PersonalBillingProperties();
+        var policyService = mock(PersonalAccountPolicyService.class);
         var accountId = UUID.randomUUID();
         when(repository.findByPersonalAccountIdAndProvider(accountId, Provider.OPENAI))
                 .thenReturn(Optional.of(PersonalProviderConnection.builder().status("REVOKED").build()));
 
-        var resolver = new PersonalBillingModeResolver(repository, properties);
+        var resolver = new PersonalBillingModeResolver(repository, policyService);
 
         assertThrows(PersonalBillingModeException.class,
                 () -> resolver.resolve(personalContext(accountId), Provider.OPENAI, "gpt-5", "BYOK"));
@@ -60,10 +60,10 @@ class PersonalBillingModeResolverTest {
     @Test
     void freeModeNeverSilentlyTreatsARegularModelAsFree() {
         var repository = mock(PersonalProviderConnectionRepository.class);
-        var properties = new PersonalBillingProperties();
+        var policyService = mock(PersonalAccountPolicyService.class);
         var accountId = UUID.randomUUID();
 
-        var resolver = new PersonalBillingModeResolver(repository, properties);
+        var resolver = new PersonalBillingModeResolver(repository, policyService);
 
         assertThrows(PersonalBillingModeException.class,
                 () -> resolver.resolve(personalContext(accountId), Provider.OPENAI, "gpt-5", "FREE"));
@@ -73,7 +73,7 @@ class PersonalBillingModeResolverTest {
     void rejectsNonPersonalAuthentication() {
         var repository = mock(PersonalProviderConnectionRepository.class);
         var properties = new PersonalBillingProperties();
-        var resolver = new PersonalBillingModeResolver(repository, properties);
+        var resolver = new PersonalBillingModeResolver(repository, policyService);
 
         assertThrows(PersonalBillingModeException.class,
                 () -> resolver.resolve(AuthenticationContext.builder().build(),
