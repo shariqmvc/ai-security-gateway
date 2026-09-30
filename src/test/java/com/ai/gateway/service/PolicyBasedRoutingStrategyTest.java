@@ -16,6 +16,7 @@ import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import com.ai.gateway.core.routing.policy.RoutingPolicy;
 import com.ai.gateway.core.routing.policy.RoutingPolicyService;
 import com.ai.gateway.core.routing.registry.ProviderModelRegistryService;
+import com.ai.gateway.core.routing.registry.ModelDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -222,7 +223,7 @@ class PolicyBasedRoutingStrategyTest {
                         Provider.GEMINI);
 
         verify(providerModelRegistryService)
-                .requireModel(
+                .requireModels(
                         Provider.GEMINI,
                         "gemini-test");
     }
