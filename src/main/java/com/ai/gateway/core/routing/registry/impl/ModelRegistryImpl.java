@@ -186,6 +186,7 @@ public class ModelRegistryImpl implements ModelRegistry {
             case CLAUDE -> claude;
             case XAI -> xai;
             case GROQ -> groq;
+            case MISTRAL -> "VISION,TOOLS,REASONING";
         };
 
         if (raw != null) {
