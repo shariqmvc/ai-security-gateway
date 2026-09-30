@@ -1467,6 +1467,7 @@ public class GatewayServiceImpl implements GatewayService {
             case GEMINI -> "Gemini";
             case XAI -> "xAI";
             case GROQ -> "Groq";
+            case MISTRAL -> "Mistral AI";
             case OLLAMA -> "Ollama";
         };
     }
