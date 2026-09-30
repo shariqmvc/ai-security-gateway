@@ -670,6 +670,14 @@ public class PolicyBasedRoutingStrategy
                 }
 
                 try {
+                    /*
+                     * Validate the provider boundary before resolving models.
+                     * This preserves the provider/model distinction and ensures
+                     * provider-registry failures are never hidden by model
+                     * resolution.
+                     */
+                    providerModelRegistryService.requireProvider(provider);
+
                     List<com.ai.gateway.core.routing.registry.ModelDefinition> modelDefinitions =
                             providerModelRegistryService.requireModels(
                                     provider,
