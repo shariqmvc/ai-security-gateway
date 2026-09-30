@@ -223,7 +223,7 @@ class PolicyBasedRoutingStrategyTest {
                         Provider.GEMINI);
 
         verify(providerModelRegistryService)
-                .requireModels(
+                .requireModel(
                         Provider.GEMINI,
                         "gemini-test");
     }
