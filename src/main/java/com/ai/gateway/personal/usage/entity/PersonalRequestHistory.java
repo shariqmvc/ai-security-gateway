@@ -38,7 +38,6 @@ public class PersonalRequestHistory {
  @Column(name="cache_hit",nullable=false) @Builder.Default private boolean cacheHit=false;
  @Column(name="rag_enabled",nullable=false) @Builder.Default private boolean ragEnabled=false;
  @Column(name="error_category",length=128) private String errorCategory;
- @Column(name="finish_reason",length=64) private String finishReason;
  @Column(name="created_at",nullable=false) private LocalDateTime createdAt;
  @PrePersist void prePersist(){if(createdAt==null)createdAt=LocalDateTime.now();}
 }
