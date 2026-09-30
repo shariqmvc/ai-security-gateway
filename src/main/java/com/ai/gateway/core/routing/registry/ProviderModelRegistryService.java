@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,29 @@ public class ProviderModelRegistryService {
                                         provider +
                                         "."));
     }
+    public List<ModelDefinition> requireModels(
+            Provider provider,
+            String modelId,
+            Set<String> requiredCapabilities) {
+
+        List<ModelDefinition> models = modelRegistry.findAll(provider, modelId)
+                .stream()
+                .filter(ModelDefinition::isEnabled)
+                .filter(model -> requiredCapabilities == null
+                        || requiredCapabilities.isEmpty()
+                        || model.capabilities().containsAll(requiredCapabilities))
+                .toList();
+
+        if (models.isEmpty()) {
+            throw new BusinessException(
+                    "Model " + modelId + " is not available for provider "
+                            + provider + " with required capabilities: "
+                            + requiredCapabilities);
+        }
+
+        return models;
+    }
+
     public ModelDefinition requireModel(
             Provider provider,
             String modelId,
