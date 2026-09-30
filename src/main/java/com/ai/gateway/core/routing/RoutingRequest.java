@@ -33,9 +33,10 @@ public record RoutingRequest(
         if (request == null) {
             throw new IllegalArgumentException("Chat request is required.");
         }
-        ProviderPreferences preferences = request.getProvider() == null
-                ? ProviderPreferences.defaults()
-                : new ProviderPreferences(java.util.List.of(request.getProvider()), Set.of(), true);
+        ProviderPreferences preferences = new ProviderPreferences(
+                request.getPreferredProviders(),
+                request.getExcludedProviders(),
+                request.isAllowProviderFallbacks());
         return new RoutingRequest(
                 request.getModel(),
                 request.getProvider(),
