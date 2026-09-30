@@ -52,6 +52,11 @@ public class RoutingOutcomeServiceImpl implements RoutingOutcomeService {
         tenantAccessGuard.requireAccess(auth.getTenantId());
         tenantSchemaRoutingService.useTenantSchema();
 
+        String endpointId = request.getEndpointId();
+        if (endpointId == null || endpointId.isBlank()) {
+            endpointId = request.getProvider().name().toLowerCase(java.util.Locale.ROOT) + "-default";
+        }
+
         RoutingDecisionMetadata metadata = decision == null ? null : decision.metadata();
 
         String priority = null;
@@ -73,6 +78,7 @@ public class RoutingOutcomeServiceImpl implements RoutingOutcomeService {
                 .tenantId(auth == null ? null : auth.getTenantId())
                 .provider(request.getProvider())
                 .model(request.getModel())
+                .endpointId(endpointId)
                 .routingStrategy(decision == null ? null : decision.strategy())
                 .selectedScore(metadata == null ? null : metadata.selectedScore())
                 .selectedRank(metadata == null ? null : metadata.selectedRank())
