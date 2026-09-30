@@ -224,6 +224,8 @@ gateway:
           - OLLAMA
         OPENAI:
           - GEMINI
+        MISTRAL:
+          - OLLAMA
         OLLAMA:
           - GEMINI
       failure-injection:
