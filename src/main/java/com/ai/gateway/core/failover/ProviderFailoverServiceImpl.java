@@ -47,6 +47,9 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private RoutingHealthService routingHealthService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ai.gateway.core.routing.intelligence.RoutingCapacityService routingCapacityService;
+
     /**
      * Local, low-latency circuit breaker. Optional injection preserves the
      * lightweight unit-test construction path while production receives the
@@ -460,6 +463,18 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
         AIProvider provider =
                 providerFactory.getProvider(request.getProvider());
 
+        RoutingCandidate capacityCandidate =
+                new RoutingCandidate(
+                        request.getProvider(),
+                        request.getModel(),
+                        request.getEndpointId());
+
+        if (routingCapacityService != null
+                && !routingCapacityService.tryAcquire(capacityCandidate)) {
+            throw new ProviderCapacityExceededException(
+                    "Provider capacity exhausted for " + capacityCandidate.candidateKey());
+        }
+
         long startedAtNanos = System.nanoTime();
 
         String previousAttempt = MDC.get("providerAttempt");
@@ -483,11 +498,21 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                 response.setProvider(request.getProvider());
                 response.setModel(request.getModel());
                 response.setEndpointId(request.getEndpointId());
+                if (routingCapacityService != null && response.getUsage() != null) {
+                    routingCapacityService.recordCompletedRequest(
+                            capacityCandidate,
+                            response.getUsage().getTotalTokens() == null
+                                    ? 0L
+                                    : response.getUsage().getTotalTokens());
+                }
             }
 
             recordRoutingHealthSuccess(request, startedAtNanos);
             return response;
         } finally {
+            if (routingCapacityService != null) {
+                routingCapacityService.release(capacityCandidate);
+            }
             if (previousAttempt == null) {
                 MDC.remove("providerAttempt");
             } else {
@@ -564,7 +589,8 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
          * input, not from provider availability. Do not mark the provider
          * unhealthy and do not update its circuit state.
          */
-        if (ProviderFailureClassifier.classify(ex)
+        if (ex instanceof ProviderCapacityExceededException
+                || ProviderFailureClassifier.classify(ex)
                 == ProviderFailureCategory.MEDIA_INPUT) {
             return;
         }
