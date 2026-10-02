@@ -10,6 +10,7 @@ import com.ai.gateway.core.routing.scoring.ScoredCandidate;
 import com.ai.gateway.core.routing.scoring.config.RoutingScoringProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -33,7 +34,8 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
     private final List<CandidateScoreStrategy> strategies;
     private final RoutingScoringProperties properties;
     private final RoutingUtilityCalculator utilityCalculator = new RoutingUtilityCalculator();
-    private final RoutingOptimizationService optimizationService;
+    @Autowired(required = false)
+    private RoutingOptimizationService optimizationService = new RoutingOptimizationService();
 
     @Override
     public List<ScoredCandidate> score(List<RoutingCandidate> candidates, CandidateScoringContext context) {
