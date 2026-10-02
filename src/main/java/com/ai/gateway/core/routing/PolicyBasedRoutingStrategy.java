@@ -407,7 +407,7 @@ public class PolicyBasedRoutingStrategy
                     routingDecisionIntelligence.scoringContext(policy, decisionContext);
             List<CostAwareCandidate> costEvaluations =
                     costAwareRoutingEvaluator.evaluate(
-                            healthEligibleCandidates,
+                            capacityEligibleCandidates,
                             costContextForEstimate.estimatedInputTokens(),
                             costContextForEstimate.estimatedOutputTokens(),
                             costContext);
