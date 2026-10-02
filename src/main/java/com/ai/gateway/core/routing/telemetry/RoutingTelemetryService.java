@@ -86,6 +86,9 @@ public class RoutingTelemetryService {
         double avgLatency = average(samples.stream().mapToLong(RoutingTelemetryEvent::latencyMs).boxed().toList());
         double p50 = percentile(samples, 0.50);
         double p95 = percentile(samples, 0.95);
+        double avgTimeToFirstToken = averageNullableLong(samples, Metric.TTFT);
+        double p50TimeToFirstToken = percentileNullable(samples, Metric.TTFT, 0.50);
+        double p95TimeToFirstToken = percentileNullable(samples, Metric.TTFT, 0.95);
 
         double avgInput = averageNullable(samples, Metric.INPUT);
         double avgOutput = averageNullable(samples, Metric.OUTPUT);
@@ -116,6 +119,9 @@ public class RoutingTelemetryService {
                 avgLatency,
                 p50,
                 p95,
+                avgTimeToFirstToken,
+                p50TimeToFirstToken,
+                p95TimeToFirstToken,
                 avgInput,
                 avgOutput,
                 avgTotal,
@@ -151,6 +157,36 @@ public class RoutingTelemetryService {
                 .orElse(0.0);
     }
 
+    private double averageNullableLong(List<RoutingTelemetryEvent> samples, Metric metric) {
+        return samples.stream()
+                .map(metric::longValue)
+                .filter(v -> v != null)
+                .mapToLong(Long::longValue)
+                .average()
+                .orElse(0.0);
+    }
+
+    private double percentileNullable(
+            List<RoutingTelemetryEvent> samples,
+            Metric metric,
+            double percentile) {
+        long[] values = samples.stream()
+                .map(metric::longValue)
+                .filter(v -> v != null)
+                .mapToLong(Long::longValue)
+                .sorted()
+                .toArray();
+        if (values.length == 0) return 0.0;
+        if (values.length == 1) return values[0];
+
+        double rank = percentile * (values.length - 1);
+        int lower = (int) Math.floor(rank);
+        int upper = (int) Math.ceil(rank);
+        if (lower == upper) return values[lower];
+        double weight = rank - lower;
+        return values[lower] + (values[upper] - values[lower]) * weight;
+    }
+
     private Map<String, Long> snapshotCounts(Map<String, AtomicLong> source) {
         Map<String, Long> snapshot = new LinkedHashMap<>();
         source.forEach((key, value) -> snapshot.put(key, value.get()));
@@ -173,8 +209,23 @@ public class RoutingTelemetryService {
         },
         REASONING {
             @Override Integer value(RoutingTelemetryEvent e) { return e.reasoningTokens(); }
+        },
+        TTFT {
+            @Override Integer value(RoutingTelemetryEvent e) {
+                Long value = e.timeToFirstTokenMs();
+                return value == null ? null : (int) Math.min(Integer.MAX_VALUE, value);
+            }
+
+            @Override Long longValue(RoutingTelemetryEvent e) {
+                return e.timeToFirstTokenMs();
+            }
         };
 
         abstract Integer value(RoutingTelemetryEvent event);
+
+        Long longValue(RoutingTelemetryEvent event) {
+            Integer value = value(event);
+            return value == null ? null : value.longValue();
+        }
     }
 }
