@@ -20,6 +20,7 @@ public record RoutingTelemetryEvent(
         Integer outputTokens,
         Integer totalTokens,
         Integer reasoningTokens,
+        String finishReason,
         String failureCategory,
         Instant recordedAt) {
 
