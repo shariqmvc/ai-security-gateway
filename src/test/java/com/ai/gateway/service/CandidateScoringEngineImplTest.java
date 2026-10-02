@@ -220,7 +220,7 @@ class CandidateScoringEngineImplTest {
     }
 
     @Test
-    void runtimeHealthOptimizationSurvivesObjectiveProfileSelection() {
+    void candidateAwareHealthOptimizationPenalizesOnlyDegradedCandidate() {
         stubPricing();
 
         RoutingCandidate openAi =
@@ -230,43 +230,39 @@ class CandidateScoringEngineImplTest {
 
         RoutingRuntimeSignals signals = new RoutingRuntimeSignals(
                 java.util.Map.of(
-                        "OPENAI:gpt-a", 200.0,
-                        "GEMINI:gemini-b", 800.0),
+                        openAi.candidateKey(), 200.0,
+                        gemini.candidateKey(), 800.0),
                 java.util.Map.of(
-                        "OPENAI:gpt-a", 0.80,
-                        "GEMINI:gemini-b", 0.99));
-
-        java.util.Map<CandidateScoreDimension, Double> optimizedWeights =
-                new RoutingOptimizationService().optimize(
-                        java.util.Map.of(
-                                CandidateScoreDimension.COST, 0.30,
-                                CandidateScoreDimension.LATENCY, 0.25,
-                                CandidateScoreDimension.AVAILABILITY, 0.20,
-                                CandidateScoreDimension.POLICY_PREFERENCE, 0.25),
-                        signals,
-                        RoutingPriority.BALANCED);
-
-        RoutingOptimizationProfile profile =
-                new RoutingOptimizationProfileRegistry()
-                        .get(RoutingOptimizationProfileRegistry.BALANCED);
+                        openAi.candidateKey(), 0.80,
+                        gemini.candidateKey(), 0.99),
+                java.util.Map.of(
+                        openAi.candidateKey(), 10L,
+                        gemini.candidateKey(), 10L));
 
         CandidateScoringContext context =
                 new CandidateScoringContext(
                         policy(), 1_000, 1_000, false, null,
-                        null, optimizedWeights, signals)
-                        .withObjectiveWeights(profile.weights());
+                        null, java.util.Map.of(), signals);
 
         List<ScoredCandidate> result = engine.score(
                 List.of(openAi, gemini), context);
 
-        double availabilityWeight = component(
-                result.get(0), CandidateScoreDimension.AVAILABILITY).weight();
+        ScoredCandidate openAiScore = result.stream()
+                .filter(c -> c.candidate().equals(openAi))
+                .findFirst()
+                .orElseThrow();
+        ScoredCandidate geminiScore = result.stream()
+                .filter(c -> c.candidate().equals(gemini))
+                .findFirst()
+                .orElseThrow();
 
+        assertEquals(0.85, openAiScore.optimizationMultiplier(), 1e-9);
+        assertEquals("DEGRADED_AVAILABILITY", openAiScore.optimizationReason());
+        assertEquals(1.0, geminiScore.optimizationMultiplier(), 1e-9);
+        assertNull(geminiScore.optimizationReason());
         assertTrue(
-                availabilityWeight
-                        > profile.weights().weightOf(
-                                com.ai.gateway.core.routing.scoring.objective.RoutingObjective.AVAILABILITY),
-                "Runtime health optimization must still increase the profile availability weight.");
+                openAiScore.totalScore() < geminiScore.totalScore(),
+                "Confident degraded health must reduce only the degraded candidate's score.");
     }
 
     @Test
