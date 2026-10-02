@@ -22,6 +22,9 @@ public class RoutingAnalyticsService {
     private final Map<String, AtomicLong> decisionsByProviderModel =
             new ConcurrentHashMap<>();
 
+    private final Map<String, AtomicLong> decisionsByCandidate =
+            new ConcurrentHashMap<>();
+
     private final AtomicLong failoverAttempts =
             new AtomicLong();
 
@@ -91,6 +94,11 @@ public class RoutingAnalyticsService {
                             ignored -> new AtomicLong())
                     .incrementAndGet();
         }
+
+        decision.selectedCandidates().forEach(candidate ->
+                decisionsByCandidate
+                        .computeIfAbsent(candidate.candidateKey(), ignored -> new AtomicLong())
+                        .incrementAndGet());
     }
 
     public void recordFailoverAttempt() {
@@ -112,6 +120,7 @@ public class RoutingAnalyticsService {
                 snapshot(decisionsByStrategy),
                 snapshot(decisionsByProvider),
                 snapshot(decisionsByProviderModel),
+                snapshot(decisionsByCandidate),
                 failoverAttempts.get(),
                 failoverSuccesses.get(),
                 failoverFailures.get(),
