@@ -22,6 +22,7 @@ import com.ai.gateway.core.routing.scoring.objective.RoutingObjectiveWeights;
 import com.ai.gateway.core.routing.scoring.objective.RoutingUtilityCalculator;
 import com.ai.gateway.core.routing.scoring.objective.RoutingUtilityResult;
 import com.ai.gateway.core.routing.intelligence.RoutingOptimizationService;
+import com.ai.gateway.core.routing.intelligence.RoutingOptimizationService.RoutingCandidateOptimization;
 
 /**
  * Deterministic scoring with O(S*C) normalization rather than O(S*C^2).
@@ -141,7 +142,20 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
                 components = utilityComponents;
             }
 
-            result.add(new ScoredCandidate(candidate, components, total));
+            RoutingCandidateOptimization optimization =
+                    optimizationService.optimizeCandidate(
+                            candidate,
+                            context.runtimeSignals());
+
+            double adjustedTotal =
+                    total * optimization.scoreMultiplier();
+
+            result.add(new ScoredCandidate(
+                    candidate,
+                    components,
+                    adjustedTotal,
+                    optimization.scoreMultiplier(),
+                    optimization.reason()));
         }
 
         return List.copyOf(result);
