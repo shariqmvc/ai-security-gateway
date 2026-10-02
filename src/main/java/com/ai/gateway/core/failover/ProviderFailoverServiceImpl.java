@@ -460,9 +460,6 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
                     "Controlled provider failure injection: " + type);
         }
 
-        AIProvider provider =
-                providerFactory.getProvider(request.getProvider());
-
         RoutingCandidate capacityCandidate =
                 new RoutingCandidate(
                         request.getProvider(),
@@ -474,6 +471,9 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
             throw new ProviderCapacityExceededException(
                     "Provider capacity exhausted for " + capacityCandidate.candidateKey());
         }
+
+        AIProvider provider =
+                providerFactory.getProvider(request.getProvider());
 
         long startedAtNanos = System.nanoTime();
 
@@ -696,6 +696,9 @@ public class ProviderFailoverServiceImpl implements ProviderFailoverService {
      * breaker so retry and health behavior remain consistent.
      */
     private boolean isRetryableFailure(Throwable failure) {
+        if (failure instanceof ProviderCapacityExceededException) {
+            return true;
+        }
         return ProviderFailureClassifier.isRetryable(failure);
     }
 
