@@ -344,11 +344,11 @@ class GatewayServiceImplTest {
                 events::add);
 
         assertEquals(
-                java.util.List.of("start", "delta", "delta", "routing", "done"),
+                java.util.List.of("start", "status", "delta", "delta", "routing", "done"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
-        assertEquals("hello ", events.get(3).getContent());
-        assertEquals("world", events.get(4).getContent());
-        assertEquals(6, events.get(6).getTotalTokens());
+        assertEquals("hello ", events.get(2).getContent());
+        assertEquals("world", events.get(3).getContent());
+        assertEquals(6, events.get(5).getTotalTokens());
 
         verify(postProviderPersistenceService).persistSuccess(
                 any(UUID.class),
@@ -390,10 +390,10 @@ class GatewayServiceImplTest {
                 events::add);
 
         assertEquals(
-                java.util.List.of("start", "delta", "error"),
+                java.util.List.of("start", "status", "delta", "error"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
-        assertEquals("partial ", events.get(3).getContent());
-        assertEquals("Provider request timed out.", events.get(4).getError());
+        assertEquals("partial ", events.get(2).getContent());
+        assertEquals("Provider request timed out.", events.get(3).getError());
 
         verify(postProviderPersistenceService, never()).persistSuccess(
                 any(), any(), any(), any(), any(), anyLong(), anyString(), anyLong());
@@ -451,7 +451,7 @@ class GatewayServiceImplTest {
                 consumer);
 
         assertEquals(
-                java.util.List.of("start", "delta"),
+                java.util.List.of("start", "status", "delta"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
         verify(postProviderPersistenceService, never()).persistSuccess(
                 any(), any(), any(), any(), any(), anyLong(), anyString(), anyLong());
