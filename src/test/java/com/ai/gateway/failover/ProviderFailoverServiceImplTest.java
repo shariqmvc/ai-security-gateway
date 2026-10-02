@@ -100,6 +100,12 @@ class ProviderFailoverServiceImplTest {
                 "routingHealthService",
                 routingHealthService);
 
+        // Unknown/unconfigured routing health must not block ordinary
+        // failover tests. The dedicated unhealthy-candidate test overrides
+        // this with an explicit false result.
+        lenient().when(routingHealthService.isHealthyForRouting(any()))
+                .thenReturn(true);
+
         primaryRequest = AIRequest.builder()
                 .provider(Provider.GEMINI)
                 .model("gemini-test")
@@ -998,6 +1004,17 @@ class ProviderFailoverServiceImplTest {
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(primaryFailure);
 
+        when(openAiProvider.defaultModel())
+                .thenReturn("gpt-test");
+
+        when(registry.requireProvider(Provider.OPENAI))
+                .thenReturn(enabledProvider(Provider.OPENAI));
+
+        when(registry.requireModel(
+                Provider.OPENAI,
+                "gpt-test"))
+                .thenReturn(enabledModel(Provider.OPENAI, "gpt-test"));
+
         when(routingHealthService.isHealthyForRouting(any()))
                 .thenReturn(false);
 
@@ -1009,7 +1026,8 @@ class ProviderFailoverServiceImplTest {
         assertSame(primaryFailure, thrown);
 
         verify(geminiProvider).chat(primaryRequest);
-        verify(providerFactory, never()).getProvider(Provider.OPENAI);
+        verify(providerFactory).getProvider(Provider.OPENAI);
+        verify(openAiProvider, never()).chat(any(AIRequest.class));
         verify(routingHealthService).isHealthyForRouting(
                 argThat(candidate ->
                         candidate.provider() == Provider.OPENAI
