@@ -1129,6 +1129,7 @@ public class GatewayServiceImpl implements GatewayService {
                     .failoverReason(result.getFailoverReason())
                     .providerAttempt(result.getProviderAttempt())
                     .providerAttempts(result.getProviderAttempts())
+                    .timeToFirstTokenMs(result.getTimeToFirstTokenMs())
                     .phase("ROUTING_COMPLETE")
                     .build());
 
