@@ -30,7 +30,7 @@ public record RoutingTelemetryEvent(
     }
 
     public String candidateKey() {
-        String base = provider + ":" + model;
+        String base = provider + "/" + model;
         return endpointId == null || endpointId.isBlank()
                 ? base
                 : base + "@" + endpointId;
