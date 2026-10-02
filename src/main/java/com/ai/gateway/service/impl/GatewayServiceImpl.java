@@ -958,18 +958,6 @@ public class GatewayServiceImpl implements GatewayService {
 
             eventConsumer.accept(GatewayStreamEvent.builder()
                     .requestId(requestId)
-                    .type("status")
-                    .phase("PROVIDER_CONNECTING")
-                    .provider(aiRequest.getProvider().name())
-                    .model(aiRequest.getModel())
-                    .endpointId(aiRequest.getEndpointId())
-                    .requestedProvider(requestedStreamProvider.name())
-                    .requestedModel(requestedStreamModel)
-                    .content("Connecting to " + providerLabel(aiRequest.getProvider()) + "…")
-                    .build());
-
-            eventConsumer.accept(GatewayStreamEvent.builder()
-                    .requestId(requestId)
                     .type("start")
                     .provider(aiRequest.getProvider().name())
                     .model(aiRequest.getModel())
