@@ -21,7 +21,8 @@ class RoutingOptimizationServiceTest {
 
         RoutingRuntimeSignals signals = new RoutingRuntimeSignals(
                 Map.of("OPENAI:gpt-5", 500.0),
-                Map.of("OPENAI:gpt-5", 0.80));
+                Map.of("OPENAI:gpt-5", 0.80),
+                Map.of("OPENAI:gpt-5", 3L));
 
         Map<CandidateScoreDimension, Double> result =
                 new RoutingOptimizationService().optimize(
@@ -29,6 +30,25 @@ class RoutingOptimizationServiceTest {
 
         assertTrue(result.get(CandidateScoreDimension.AVAILABILITY) > 0.20);
         assertEquals(1.0, result.values().stream().mapToDouble(Double::doubleValue).sum(), 1e-9);
+    }
+
+    @Test
+    void doesNotBoostAvailabilityForInsufficientObservations() {
+        Map<CandidateScoreDimension, Double> base = new EnumMap<>(CandidateScoreDimension.class);
+        base.put(CandidateScoreDimension.COST, 0.30);
+        base.put(CandidateScoreDimension.LATENCY, 0.25);
+        base.put(CandidateScoreDimension.AVAILABILITY, 0.20);
+        base.put(CandidateScoreDimension.POLICY_PREFERENCE, 0.25);
+
+        RoutingRuntimeSignals signals = new RoutingRuntimeSignals(
+                Map.of("OPENAI:gpt-5", 500.0),
+                Map.of("OPENAI:gpt-5", 0.20),
+                Map.of("OPENAI:gpt-5", 2L));
+
+        Map<CandidateScoreDimension, Double> result =
+                new RoutingOptimizationService().optimize(base, signals, RoutingPriority.BALANCED);
+
+        assertEquals(0.20, result.get(CandidateScoreDimension.AVAILABILITY), 1e-9);
     }
 
     @Test
