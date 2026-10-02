@@ -36,6 +36,7 @@ public class RoutingScoringProperties {
         private double cost = 0.30;
         private double latency = 0.25;
         private double availability = 0.20;
+        private double capacity = 0.10;
         private double policyPreference = 0.25;
     }
 
