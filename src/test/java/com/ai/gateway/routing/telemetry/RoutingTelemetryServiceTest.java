@@ -54,7 +54,7 @@ class RoutingTelemetryServiceTest {
     private RoutingTelemetryEvent event(
             boolean success,
             long latency,
-            long timeToFirstTokenMs,
+            Long timeToFirstTokenMs,
             Integer input,
             Integer output,
             Integer total,
