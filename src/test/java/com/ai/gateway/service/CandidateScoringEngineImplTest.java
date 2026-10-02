@@ -263,8 +263,10 @@ class CandidateScoringEngineImplTest {
                 result.get(0), CandidateScoreDimension.AVAILABILITY).weight();
 
         assertTrue(
-                availabilityWeight > 0.125,
-                "Runtime health optimization must still influence the final profile-weighted score.");
+                availabilityWeight
+                        > profile.weights().weightOf(
+                                com.ai.gateway.core.routing.scoring.objective.RoutingObjective.AVAILABILITY),
+                "Runtime health optimization must still increase the profile availability weight.");
     }
 
     @Test
