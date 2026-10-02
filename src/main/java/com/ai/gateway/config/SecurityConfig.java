@@ -121,8 +121,7 @@ public class SecurityConfig {
                          * missing/invalid API keys therefore still fail with
                          * HTTP 401 before the controller is reached.
                          */
-                        .requestMatchers("/api/chat")
-                        .permitAll()
+                        .requestMatchers("/api/chat").permitAll()
                         .anyRequest()
                         .authenticated()
                 )
