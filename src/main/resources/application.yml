@@ -306,6 +306,7 @@ gateway:
         cost: 0.30
         latency: 0.25
         availability: 0.20
+        capacity: 0.10
         policy-preference: 0.25
       defaults:
         latency-ms: 1000
