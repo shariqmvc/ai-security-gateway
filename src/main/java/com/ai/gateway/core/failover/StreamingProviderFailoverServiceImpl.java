@@ -49,6 +49,8 @@ public class StreamingProviderFailoverServiceImpl
     private RoutingHealthService routingHealthService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ProviderCircuitBreaker providerCircuitBreaker;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.ai.gateway.core.routing.intelligence.RoutingCapacityService routingCapacityService;
 
     @Override
     public AIStreamResult stream(
@@ -371,6 +373,14 @@ public class StreamingProviderFailoverServiceImpl
         String previousAttempt = MDC.get("providerAttempt");
         MDC.put("providerAttempt", String.valueOf(attempt));
 
+        com.ai.gateway.core.routing.engine.RoutingCandidate capacityCandidate =
+                new com.ai.gateway.core.routing.engine.RoutingCandidate(
+                        request.getProvider(), request.getModel(), request.getEndpointId());
+        if (routingCapacityService != null && !routingCapacityService.tryAcquire(capacityCandidate)) {
+            throw new ProviderCapacityExceededException(
+                    "Provider capacity exhausted for " + capacityCandidate.candidateKey());
+        }
+
         long startedAtNanos = System.nanoTime();
         final long[] firstDeltaAtNanos = {0L};
         final boolean[] emitted = {false};
@@ -406,6 +416,11 @@ public class StreamingProviderFailoverServiceImpl
             if (result == null) {
                 return null;
             }
+            if (routingCapacityService != null) {
+                routingCapacityService.recordCompletedRequest(
+                        capacityCandidate,
+                        result.getTotalTokens() == null ? 0L : result.getTotalTokens());
+            }
 
             /*
              * AIStreamResult is immutable (@Value), so preserve the provider
@@ -438,6 +453,9 @@ public class StreamingProviderFailoverServiceImpl
              */
             throw new StreamingProviderFailureException(ex, emitted[0]);
         } finally {
+            if (routingCapacityService != null) {
+                routingCapacityService.release(capacityCandidate);
+            }
             if (previousAttempt == null) {
                 MDC.remove("providerAttempt");
             } else {
