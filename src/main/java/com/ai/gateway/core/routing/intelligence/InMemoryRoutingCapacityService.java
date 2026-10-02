@@ -23,6 +23,10 @@ public class InMemoryRoutingCapacityService implements RoutingCapacityService {
         this(properties, Clock.systemUTC());
     }
 
+    public InMemoryRoutingCapacityService() {
+        this(new RoutingCapacityProperties(), Clock.systemUTC());
+    }
+
     InMemoryRoutingCapacityService(RoutingCapacityProperties properties, Clock clock) {
         this.properties = properties;
         this.clock = clock;
