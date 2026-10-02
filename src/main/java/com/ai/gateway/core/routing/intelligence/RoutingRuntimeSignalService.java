@@ -54,7 +54,8 @@ public class RoutingRuntimeSignalService {
             availability.put(key, state.availability());
             observations.put(key, state.successes + state.failures);
         });
-        return new RoutingRuntimeSignals(latency, availability, observations);
+        return new RoutingRuntimeSignals(latency, availability, observations,
+                capacityService == null ? RoutingCapacitySignals.empty() : capacityService.snapshot());
     }
 
     public void recordSuccess(RoutingCandidate candidate, long latencyMs) {
