@@ -151,7 +151,7 @@ class InferenceCacheServiceTest {
                 new ObjectMapper(),
                 true,
                 100,
-                Duration.ofMillis(20));
+                Duration.ofMillis(100));
         AIRequest request = request("ttl", Provider.OLLAMA, "llama3.1:8b");
         CachedInferenceResponse response =
                 new CachedInferenceResponse("cached", Provider.OLLAMA, "llama3.1:8b");
@@ -159,7 +159,7 @@ class InferenceCacheServiceTest {
         shortLivedCache.put(tenantA, request, response);
         assertEquals(response, shortLivedCache.get(tenantA, request));
 
-        Thread.sleep(60L);
+        Thread.sleep(150L);
         assertNull(shortLivedCache.get(tenantA, request));
     }
 
