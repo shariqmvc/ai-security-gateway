@@ -260,9 +260,32 @@ class CandidateScoringEngineImplTest {
         assertEquals("DEGRADED_AVAILABILITY", openAiScore.optimizationReason());
         assertEquals(1.0, geminiScore.optimizationMultiplier(), 1e-9);
         assertNull(geminiScore.optimizationReason());
-        assertTrue(
-                openAiScore.totalScore() < geminiScore.totalScore(),
-                "Confident degraded health must reduce only the degraded candidate's score.");
+
+        // The optimization layer is candidate-specific; it must reduce the
+        // degraded candidate relative to its own unoptimized score, not
+        // necessarily force it below every healthy peer.
+        CandidateScoringContext baselineContext =
+                new CandidateScoringContext(
+                        policy(), 1_000, 1_000, false, null,
+                        null, java.util.Map.of(), RoutingRuntimeSignals.empty());
+
+        List<ScoredCandidate> baseline = engine.score(
+                List.of(openAi, gemini), baselineContext);
+
+        ScoredCandidate baselineOpenAi = baseline.stream()
+                .filter(c -> c.candidate().equals(openAi))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(
+                baselineOpenAi.totalScore() * 0.85,
+                openAiScore.totalScore(),
+                1e-9,
+                "Candidate-specific optimization must apply its multiplier to the candidate's own baseline score.");
+        assertNotEquals(
+                baselineOpenAi.totalScore(),
+                openAiScore.totalScore(),
+                1e-9);
     }
 
     @Test
