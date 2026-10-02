@@ -3,7 +3,7 @@ package com.ai.gateway.core.failover;
 import com.ai.gateway.core.contract.AIRequest;
 import com.ai.gateway.core.contract.AIResponse;
 import com.ai.gateway.core.model.Provider;
-import com.ai.gateway.core.routing.RoutingCandidate;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import com.ai.gateway.core.metrics.GatewayMetricsService;
 import com.ai.gateway.core.metrics.MetricsConstants;
 import com.ai.gateway.core.observability.PerformanceLogger;
