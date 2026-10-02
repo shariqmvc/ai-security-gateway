@@ -30,6 +30,7 @@ public class RoutingRuntimeSignalService {
         if (healthService != null) {
             Map<String, Double> latency = new ConcurrentHashMap<>();
             Map<String, Double> availability = new ConcurrentHashMap<>();
+            Map<String, Long> observations = new ConcurrentHashMap<>();
             healthService.snapshots().stream()
                     .filter(s -> s.fresh())
                     .forEach(s -> {
@@ -37,17 +38,20 @@ public class RoutingRuntimeSignalService {
                                 + (s.endpointId() == null || s.endpointId().isBlank() ? "" : "@" + s.endpointId());
                         latency.put(key, s.ewmaLatencyMs());
                         availability.put(key, s.availability());
+                        observations.put(key, s.successCount() + s.failureCount());
                     });
-            return new RoutingRuntimeSignals(latency, availability);
+            return new RoutingRuntimeSignals(latency, availability, observations);
         }
 
         Map<String, Double> latency = new ConcurrentHashMap<>();
         Map<String, Double> availability = new ConcurrentHashMap<>();
+        Map<String, Long> observations = new ConcurrentHashMap<>();
         fallbackStates.forEach((key, state) -> {
             latency.put(key, state.latencyMs);
             availability.put(key, state.availability());
+            observations.put(key, state.successes + state.failures);
         });
-        return new RoutingRuntimeSignals(latency, availability);
+        return new RoutingRuntimeSignals(latency, availability, observations);
     }
 
     public void recordSuccess(RoutingCandidate candidate, long latencyMs) {
