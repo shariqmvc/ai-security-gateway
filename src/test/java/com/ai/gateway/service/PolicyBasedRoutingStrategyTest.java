@@ -495,10 +495,11 @@ class PolicyBasedRoutingStrategyTest {
                 authenticationContext))
                 .thenReturn(policy);
 
-        stubCandidate(
-                policy,
-                Provider.GEMINI,
-                "gemini-test");
+        when(candidateProviderResolver.resolve(policy))
+                .thenReturn(List.of(Provider.GEMINI));
+        when(candidateModelResolver.resolve(
+                Provider.GEMINI, policy))
+                .thenReturn(List.of("gemini-test"));
 
         doThrow(
                 new BusinessException(
@@ -549,11 +550,11 @@ class PolicyBasedRoutingStrategyTest {
                 authenticationContext))
                 .thenReturn(policy);
 
-        stubCandidate(
-                policy,
-                Provider.GEMINI,
-                "gemini-test");
-
+        when(candidateProviderResolver.resolve(policy))
+                .thenReturn(List.of(Provider.GEMINI));
+        when(candidateModelResolver.resolve(
+                Provider.GEMINI, policy))
+                .thenReturn(List.of("gemini-test"));
         doThrow(
                 new BusinessException(
                         "Model gemini-test is not available."))
@@ -862,8 +863,10 @@ class PolicyBasedRoutingStrategyTest {
                 "No eligible routing candidate is available.",
                 exception.getMessage());
 
-        verifyNoInteractions(
-                providerModelRegistryService);
+        verify(providerModelRegistryService).requireProvider(Provider.GEMINI);
+        verify(providerModelRegistryService).requireModel(Provider.GEMINI, "gemini-test");
+        verify(providerModelRegistryService).requireModels(
+                Provider.GEMINI, "gemini-test", java.util.Set.of());
     }
 
     @Test
