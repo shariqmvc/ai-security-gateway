@@ -10,6 +10,7 @@ public record RoutingTelemetryEvent(
         String endpointId,
         boolean success,
         long latencyMs,
+        Long timeToFirstTokenMs,
         Integer inputTokens,
         Integer outputTokens,
         Integer totalTokens,
@@ -20,6 +21,9 @@ public record RoutingTelemetryEvent(
 
     public RoutingTelemetryEvent {
         latencyMs = Math.max(0L, latencyMs);
+        timeToFirstTokenMs = timeToFirstTokenMs == null
+                ? null
+                : Math.max(0L, timeToFirstTokenMs);
         inputTokens = nonNegative(inputTokens);
         outputTokens = nonNegative(outputTokens);
         totalTokens = totalTokens == null && inputTokens != null && outputTokens != null
