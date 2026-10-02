@@ -482,6 +482,9 @@ class ProviderFailoverServiceImplTest {
                         new RuntimeException(
                                 "Gemini unavailable"));
 
+        when(registry.defaultModel(Provider.OPENAI))
+                .thenReturn("gpt-test");
+
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(
                         enabledProvider(Provider.OPENAI));
@@ -985,7 +988,7 @@ class ProviderFailoverServiceImplTest {
         assertSame(primaryFailure, thrown);
 
         verify(geminiProvider).chat(primaryRequest);
-        verify(providerFactory).getProvider(Provider.OPENAI);
+        verify(providerFactory, never()).getProvider(Provider.OPENAI);
         verify(openAiProvider, never()).chat(any(AIRequest.class));
         verify(routingHealthService).isHealthyForRouting(
                 argThat(candidate ->
