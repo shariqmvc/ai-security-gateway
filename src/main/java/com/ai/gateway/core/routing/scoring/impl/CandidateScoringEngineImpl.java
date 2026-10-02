@@ -20,6 +20,7 @@ import com.ai.gateway.core.routing.scoring.objective.RoutingObjectiveVector;
 import com.ai.gateway.core.routing.scoring.objective.RoutingObjectiveWeights;
 import com.ai.gateway.core.routing.scoring.objective.RoutingUtilityCalculator;
 import com.ai.gateway.core.routing.scoring.objective.RoutingUtilityResult;
+import com.ai.gateway.core.routing.intelligence.RoutingOptimizationService;
 
 /**
  * Deterministic scoring with O(S*C) normalization rather than O(S*C^2).
@@ -32,6 +33,7 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
     private final List<CandidateScoreStrategy> strategies;
     private final RoutingScoringProperties properties;
     private final RoutingUtilityCalculator utilityCalculator = new RoutingUtilityCalculator();
+    private final RoutingOptimizationService optimizationService;
 
     @Override
     public List<ScoredCandidate> score(List<RoutingCandidate> candidates, CandidateScoringContext context) {
@@ -46,6 +48,15 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
         if (validCandidates.isEmpty()) return List.of();
 
         Map<CandidateScoreDimension, Double> weights = weights(context);
+        if (context.objectiveWeights() == null) {
+            RoutingPriority priority = context.decisionContext() == null
+                    ? null
+                    : context.decisionContext().routingPriority();
+            weights = optimizationService.optimize(
+                    weights,
+                    context.runtimeSignals(),
+                    priority);
+        }
         int candidateCount = validCandidates.size();
 
         EnumMap<CandidateScoreDimension, double[]> rawValues =
