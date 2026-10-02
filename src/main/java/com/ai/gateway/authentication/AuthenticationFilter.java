@@ -94,6 +94,6 @@ public class AuthenticationFilter extends OncePerRequestFilter {
                 || servletPath.startsWith("/public/")
                 // Payment webhooks authenticate with their HMAC signature,
                 // not with a customer session/API key.
-                || servletPath.startsWith("/api/personal/billing/webhooks")));
+                || servletPath.startsWith("/api/personal/billing/webhooks"));
     }
 }
