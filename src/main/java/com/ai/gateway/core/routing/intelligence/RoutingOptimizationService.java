@@ -16,6 +16,24 @@ import java.util.Map;
 @Service
 public class RoutingOptimizationService {
 
+    /**
+     * Candidate-specific adaptive routing adjustment.
+     */
+    public record RoutingCandidateOptimization(double scoreMultiplier, String reason) {
+        public RoutingCandidateOptimization {
+            if (!Double.isFinite(scoreMultiplier)
+                    || scoreMultiplier <= 0.0
+                    || scoreMultiplier > 1.0) {
+                throw new IllegalArgumentException(
+                        "Candidate score multiplier must be finite and in (0, 1].");
+            }
+        }
+
+        public static RoutingCandidateOptimization neutral() {
+            return new RoutingCandidateOptimization(1.0, null);
+        }
+    }
+
     @Autowired(required = false)
     private RoutingOptimizationProperties properties = new RoutingOptimizationProperties();
 
