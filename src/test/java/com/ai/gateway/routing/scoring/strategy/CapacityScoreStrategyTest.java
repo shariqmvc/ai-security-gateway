@@ -28,7 +28,7 @@ class CapacityScoreStrategyTest {
                 Map.of(idle.candidateKey(), 0.25, busy.candidateKey(), 0.80));
 
         CandidateScoringContext context = new CandidateScoringContext(
-                RoutingPolicy.builder().build(),
+                new RoutingPolicy(true, java.util.List.of(), java.util.List.of(), null, null),
                 100,
                 100,
                 false,
