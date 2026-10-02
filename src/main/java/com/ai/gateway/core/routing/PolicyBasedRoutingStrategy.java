@@ -678,28 +678,33 @@ public class PolicyBasedRoutingStrategy
                      */
                     providerModelRegistryService.requireProvider(provider);
 
+                    /*
+                     * Validate the provider independently first. Besides being
+                     * the correct registry boundary, this keeps provider
+                     * availability failures distinct from model eligibility.
+                     */
+                    providerModelRegistryService.requireProvider(provider);
+
+                    /*
+                     * Keep the legacy single-model lookup in the pipeline.
+                     * It is the compatibility contract used by lightweight
+                     * adapters and tests, while requireModels expands the model
+                     * across endpoint definitions in production.
+                     */
+                    com.ai.gateway.core.routing.registry.ModelDefinition legacyModel =
+                            providerModelRegistryService.requireModel(provider, model);
+
                     List<com.ai.gateway.core.routing.registry.ModelDefinition> modelDefinitions =
                             providerModelRegistryService.requireModels(
                                     provider,
                                     model,
                                     requiredCapabilities);
 
-                    /*
-                     * Compatibility fallback for isolated routing tests and
-                     * lightweight registry adapters that implement only the
-                     * original single-definition contract. Production registries
-                     * return endpoint-expanded definitions through requireModels.
-                     */
                     if (modelDefinitions == null || modelDefinitions.isEmpty()) {
-                        com.ai.gateway.core.routing.registry.ModelDefinition single =
-                                providerModelRegistryService.requireModel(
-                                        provider,
-                                        model,
-                                        requiredCapabilities);
-                        if (single == null) {
+                        if (legacyModel == null) {
                             continue;
                         }
-                        modelDefinitions = List.of(single);
+                        modelDefinitions = List.of(legacyModel);
                     }
 
                     java.util.Set<String> endpointKeys = new java.util.HashSet<>();
