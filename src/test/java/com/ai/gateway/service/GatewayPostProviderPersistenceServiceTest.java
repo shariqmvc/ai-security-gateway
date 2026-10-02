@@ -10,6 +10,7 @@ import com.ai.gateway.core.routing.RoutingDecision;
 import com.ai.gateway.core.routing.RoutingStrategy;
 import com.ai.gateway.business.routing.health.RoutingOutcomeService;
 import com.ai.gateway.core.routing.intelligence.RoutingRuntimeSignalService;
+import com.ai.gateway.core.routing.telemetry.RoutingTelemetryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,6 +27,7 @@ class GatewayPostProviderPersistenceServiceTest {
 
     @Mock private RoutingRuntimeSignalService routingRuntimeSignalService;
     @Mock private RoutingOutcomeService routingOutcomeService;
+    @Mock private RoutingTelemetryService routingTelemetryService;
     @Mock private TokenUsageService tokenUsageService;
     @Mock private CostService costService;
     @Mock private AuditService auditService;
@@ -60,6 +62,7 @@ class GatewayPostProviderPersistenceServiceTest {
         verify(routingRuntimeSignalService).recordSuccess(any(), eq(100L));
         verify(routingOutcomeService).recordSuccess(
                 eq(requestId), eq(auth), eq(request), eq(decision), eq(100L));
+        verify(routingTelemetryService).record(any());
         verify(auditService).save(
                 eq(requestId), eq("hello"), eq("hello"), eq(120L),
                 eq("gemini-test"), eq("GEMINI"), any());
@@ -85,6 +88,7 @@ class GatewayPostProviderPersistenceServiceTest {
                 requestId, auth, request, decision, 500L, "hello", 510L, true, "TIMEOUT");
 
         verify(routingRuntimeSignalService).recordFailure(any(), eq("TIMEOUT"));
+        verify(routingTelemetryService).record(any());
         verify(routingOutcomeService).recordFailure(
                 eq(requestId), eq(auth), eq(request), eq(decision), eq(500L), any());
         verify(auditService).save(
