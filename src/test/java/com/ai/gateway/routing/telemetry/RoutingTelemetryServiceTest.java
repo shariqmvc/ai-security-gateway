@@ -15,7 +15,7 @@ class RoutingTelemetryServiceTest {
     void shouldAggregateEndpointAwareExecutionTelemetry() {
         RoutingTelemetryService service = new RoutingTelemetryService();
 
-        service.record(event(true, 120, 10, 20, 30, 0, "stop", null));
+        service.record(event(true, 120, 40, 10, 20, 30, 0, "stop", null));
         service.record(event(false, 80, null, null, null, null, null, "TIMEOUT"));
 
         var snapshot = service.snapshot();
@@ -38,6 +38,9 @@ class RoutingTelemetryServiceTest {
         assertEquals(100.0, stats.averageLatencyMs());
         assertEquals(100.0, stats.p50LatencyMs());
         assertEquals(118.0, stats.p95LatencyMs());
+        assertEquals(40.0, stats.averageTimeToFirstTokenMs());
+        assertEquals(40.0, stats.p50TimeToFirstTokenMs());
+        assertEquals(40.0, stats.p95TimeToFirstTokenMs());
         assertEquals(10.0, stats.averageInputTokens());
         assertEquals(20.0, stats.averageOutputTokens());
         assertEquals(30.0, stats.averageTotalTokens());
@@ -51,6 +54,7 @@ class RoutingTelemetryServiceTest {
     private RoutingTelemetryEvent event(
             boolean success,
             long latency,
+            long timeToFirstTokenMs,
             Integer input,
             Integer output,
             Integer total,
@@ -64,6 +68,7 @@ class RoutingTelemetryServiceTest {
                 "ollama-gpu-02",
                 success,
                 latency,
+                timeToFirstTokenMs,
                 input,
                 output,
                 total,
