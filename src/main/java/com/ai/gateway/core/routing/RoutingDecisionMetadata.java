@@ -53,7 +53,9 @@ public record RoutingDecisionMetadata(
             String endpointId,
             double score,
             int rank,
-            List<RoutingScoreComponentMetadata> scoreComponents) {
+            List<RoutingScoreComponentMetadata> scoreComponents,
+            double optimizationMultiplier,
+            String optimizationReason) {
 
         public RoutingCandidateMetadata {
             Objects.requireNonNull(provider, "Provider is required.");
@@ -63,22 +65,36 @@ public record RoutingDecisionMetadata(
             }
             if (rank < 1) throw new IllegalArgumentException("Candidate rank must be positive.");
             scoreComponents = scoreComponents == null ? List.of() : List.copyOf(scoreComponents);
+            if (!Double.isFinite(optimizationMultiplier)
+                    || optimizationMultiplier <= 0.0
+                    || optimizationMultiplier > 1.0) {
+                throw new IllegalArgumentException(
+                        "Optimization multiplier must be finite and in (0, 1].");
+            }
         }
 
         public RoutingCandidateMetadata(
                 String provider, String model, double score, int rank) {
-            this(provider, model, null, score, rank, List.of());
+            this(provider, model, null, score, rank, List.of(), 1.0, null);
         }
 
         public RoutingCandidateMetadata(
                 String provider, String model, String endpointId,
                 double score, int rank) {
-            this(provider, model, endpointId, score, rank, List.of());
+            this(provider, model, endpointId, score, rank, List.of(), 1.0, null);
         }
 
         public static RoutingCandidateMetadata from(
                 String provider, String model, String endpointId, double score, int rank,
                 List<CandidateScoreComponent> components) {
+            return from(provider, model, endpointId, score, rank, components, 1.0, null);
+        }
+
+        public static RoutingCandidateMetadata from(
+                String provider, String model, String endpointId, double score, int rank,
+                List<CandidateScoreComponent> components,
+                double optimizationMultiplier,
+                String optimizationReason) {
             List<RoutingScoreComponentMetadata> metadata = components == null
                     ? List.of()
                     : components.stream()
@@ -89,7 +105,9 @@ public record RoutingDecisionMetadata(
                                     component.weight(),
                                     component.weightedScore()))
                             .toList();
-            return new RoutingCandidateMetadata(provider, model, endpointId, score, rank, metadata);
+            return new RoutingCandidateMetadata(
+                    provider, model, endpointId, score, rank, metadata,
+                    optimizationMultiplier, optimizationReason);
         }
     }
 
