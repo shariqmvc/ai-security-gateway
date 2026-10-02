@@ -8,5 +8,6 @@ public enum CandidateScoreDimension {
     COST,
     LATENCY,
     AVAILABILITY,
+    CAPACITY,
     POLICY_PREFERENCE
 }
