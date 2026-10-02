@@ -28,6 +28,9 @@ public class AIResponse {
     /** Provider-native generation termination reason, when supplied. */
     private String finishReason;
 
+    /** Time from provider request start until the first streamed token/delta. */
+    private Long timeToFirstTokenMs;
+
     /** Primary execution target before failover, when failover occurred. */
     private String failoverFromEndpointId;
 
