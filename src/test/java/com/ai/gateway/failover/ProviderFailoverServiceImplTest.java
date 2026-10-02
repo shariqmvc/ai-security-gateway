@@ -3,6 +3,7 @@ package com.ai.gateway.core.failover;
 import com.ai.gateway.core.contract.AIRequest;
 import com.ai.gateway.core.contract.AIResponse;
 import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.core.routing.RoutingCandidate;
 import com.ai.gateway.core.metrics.GatewayMetricsService;
 import com.ai.gateway.core.metrics.MetricsConstants;
 import com.ai.gateway.core.observability.PerformanceLogger;
@@ -176,10 +177,7 @@ class ProviderFailoverServiceImplTest {
                 .recordFailoverFailure();
 
         verify(providerCircuitBreaker, never())
-                .recordFailure(
-                        any(),
-                        any(),
-                        any(ProviderFailureCategory.class));
+                .recordFailure(any(RoutingCandidate.class), any(ProviderFailureCategory.class));
     }
 
     @Test
@@ -227,9 +225,6 @@ class ProviderFailoverServiceImplTest {
 
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(primaryFailure);
-
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
 
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(enabledProvider(Provider.OPENAI));
@@ -310,10 +305,7 @@ class ProviderFailoverServiceImplTest {
                 .getProvider(Provider.OPENAI);
 
         verify(providerCircuitBreaker, never())
-                .recordFailure(
-                        any(),
-                        any(),
-                        any(ProviderFailureCategory.class));
+                .recordFailure(any(RoutingCandidate.class), any(ProviderFailureCategory.class));
 
         verify(routingAnalyticsService, never())
                 .recordFailoverAttempt();
@@ -357,10 +349,7 @@ class ProviderFailoverServiceImplTest {
                         MetricsConstants.ROUTING_FAILOVER_BUDGET_EXHAUSTED);
 
         verify(providerCircuitBreaker, never())
-                .recordFailure(
-                        any(),
-                        any(),
-                        any(ProviderFailureCategory.class));
+                .recordFailure(any(RoutingCandidate.class), any(ProviderFailureCategory.class));
     }
 
     @Test
@@ -440,9 +429,6 @@ class ProviderFailoverServiceImplTest {
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(primaryFailure);
 
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
-
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(enabledProvider(Provider.OPENAI));
 
@@ -495,9 +481,6 @@ class ProviderFailoverServiceImplTest {
                 .thenThrow(
                         new RuntimeException(
                                 "Gemini unavailable"));
-
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
 
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(
@@ -563,9 +546,6 @@ class ProviderFailoverServiceImplTest {
                         new RuntimeException(
                                 "Gemini unavailable"));
 
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
-
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(
                         enabledProvider(Provider.OPENAI));
@@ -622,9 +602,6 @@ class ProviderFailoverServiceImplTest {
 
         when(providerFactory.getProvider(Provider.OPENAI))
                 .thenReturn(openAiProvider);
-
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
 
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(
@@ -690,10 +667,7 @@ class ProviderFailoverServiceImplTest {
         assertSame(failure, thrown);
 
         verify(providerCircuitBreaker, never())
-                .recordFailure(
-                        any(),
-                        any(),
-                        any(ProviderFailureCategory.class));
+                .recordFailure(any(RoutingCandidate.class), any(ProviderFailureCategory.class));
 
         verify(providerFactory, never())
                 .getProvider(Provider.OPENAI);
@@ -753,9 +727,6 @@ class ProviderFailoverServiceImplTest {
                         new RuntimeException(
                                 "Gemini unavailable"));
 
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
-
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(
                         enabledProvider(Provider.OPENAI));
@@ -806,8 +777,6 @@ class ProviderFailoverServiceImplTest {
 
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(serverFailure);
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(enabledProvider(Provider.OPENAI));
         when(registry.requireModel(Provider.OPENAI, "gpt-test"))
@@ -822,8 +791,7 @@ class ProviderFailoverServiceImplTest {
         verify(metricsService).increment(MetricsConstants.ROUTING_FAILOVER_ATTEMPTS);
         verify(metricsService).increment(MetricsConstants.ROUTING_FAILOVER_SUCCESS);
         verify(providerCircuitBreaker).recordFailure(
-                eq(Provider.GEMINI),
-                eq("gemini-test"),
+                eq(new RoutingCandidate(Provider.GEMINI, "gemini-test")),
                 eq(ProviderFailureCategory.SERVER_ERROR));
     }
 
@@ -847,8 +815,6 @@ class ProviderFailoverServiceImplTest {
 
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(rateLimited);
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(enabledProvider(Provider.OPENAI));
         when(registry.requireModel(Provider.OPENAI, "gpt-test"))
@@ -859,8 +825,7 @@ class ProviderFailoverServiceImplTest {
         assertSame(response, service.execute(primaryRequest));
 
         verify(providerCircuitBreaker).recordFailure(
-                eq(Provider.GEMINI),
-                eq("gemini-test"),
+                eq(new RoutingCandidate(Provider.GEMINI, "gemini-test")),
                 eq(ProviderFailureCategory.RATE_LIMITED),
                 eq(7000L));
         verify(openAiProvider).chat(any(AIRequest.class));
@@ -883,8 +848,6 @@ class ProviderFailoverServiceImplTest {
 
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(timeout);
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(enabledProvider(Provider.OPENAI));
         when(registry.requireModel(Provider.OPENAI, "gpt-test"))
@@ -895,8 +858,7 @@ class ProviderFailoverServiceImplTest {
         assertSame(response, service.execute(primaryRequest));
 
         verify(providerCircuitBreaker).recordFailure(
-                eq(Provider.GEMINI),
-                eq("gemini-test"),
+                eq(new RoutingCandidate(Provider.GEMINI, "gemini-test")),
                 eq(ProviderFailureCategory.TIMEOUT));
         verify(openAiProvider).chat(any(AIRequest.class));
     }
@@ -1003,9 +965,6 @@ class ProviderFailoverServiceImplTest {
 
         when(geminiProvider.chat(primaryRequest))
                 .thenThrow(primaryFailure);
-
-        when(openAiProvider.defaultModel())
-                .thenReturn("gpt-test");
 
         when(registry.requireProvider(Provider.OPENAI))
                 .thenReturn(enabledProvider(Provider.OPENAI));
