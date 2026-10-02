@@ -17,6 +17,11 @@ All notable changes to the AI Security Gateway are documented here.
 - V39 persists endpoint identity for routing outcomes.
 
 ### Test and architecture hardening
+- Preserved the established `/api/chat` security contract: the mandatory AuthenticationFilter owns API-key authentication and Spring request authorization does not add a second role decision.
+- Removed the synthetic `PROVIDER_CONNECTING` status SSE event from the Gateway stream contract; provider routing/failover metadata remains exposed through the dedicated routing event.
+- Policy routing now validates provider availability and the legacy model registry contract before endpoint-expanded model resolution, preserving distinct provider/model failure semantics.
+- Failover tests now explicitly model unknown routing health as healthy and use an explicit unhealthy health result for the dedicated unhealthy-candidate case.
+
 - Streaming failover now resolves configured fallback models lazily through the model registry, matching synchronous failover behavior.
 - Failover fallback default models are now resolved through the model registry rather than instantiating provider adapters.
 - Policy routing validates provider availability before endpoint/model resolution.
