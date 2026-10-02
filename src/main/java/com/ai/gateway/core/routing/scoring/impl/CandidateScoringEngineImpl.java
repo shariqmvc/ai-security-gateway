@@ -109,12 +109,27 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
                 RoutingObjectiveVector vector = objectiveVector(components);
                 RoutingUtilityResult utility = utilityCalculator.calculate(
                         vector, effectiveObjectiveWeights(context));
-                total = utility.utility();
+
+                double capacityWeight = Math.max(0.0,
+                        Math.min(1.0, properties.getWeights().getCapacity()));
+                total = utility.utility() * (1.0 - capacityWeight);
 
                 List<CandidateScoreComponent> utilityComponents = new ArrayList<>(components.size());
                 for (CandidateScoreComponent component : components) {
+                    if (component.dimension() == CandidateScoreDimension.CAPACITY) {
+                        double weighted = component.normalizedScore() * capacityWeight;
+                        total += weighted;
+                        utilityComponents.add(new CandidateScoreComponent(
+                                component.dimension(),
+                                component.rawValue(),
+                                component.normalizedScore(),
+                                capacityWeight,
+                                weighted));
+                        continue;
+                    }
                     RoutingObjective objective = toObjective(component.dimension());
-                    double effectiveWeight = utility.effectiveWeightOf(objective);
+                    double effectiveWeight = utility.effectiveWeightOf(objective)
+                            * (1.0 - capacityWeight);
                     double weighted = component.normalizedScore() * effectiveWeight;
                     utilityComponents.add(new CandidateScoreComponent(
                             component.dimension(),
@@ -189,6 +204,9 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
     private RoutingObjectiveVector objectiveVector(List<CandidateScoreComponent> components) {
         EnumMap<RoutingObjective, Double> values = new EnumMap<>(RoutingObjective.class);
         for (CandidateScoreComponent component : components) {
+            if (component.dimension() == CandidateScoreDimension.CAPACITY) {
+                continue;
+            }
             values.put(toObjective(component.dimension()), component.normalizedScore());
         }
         return new RoutingObjectiveVector(values);
@@ -209,6 +227,7 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
         weights.put(CandidateScoreDimension.COST, configured.getCost());
         weights.put(CandidateScoreDimension.LATENCY, configured.getLatency());
         weights.put(CandidateScoreDimension.AVAILABILITY, configured.getAvailability());
+        weights.put(CandidateScoreDimension.CAPACITY, configured.getCapacity());
         weights.put(CandidateScoreDimension.POLICY_PREFERENCE, configured.getPolicyPreference());
         if (context != null && !context.weightOverrides().isEmpty()) context.weightOverrides().forEach(weights::put);
 
