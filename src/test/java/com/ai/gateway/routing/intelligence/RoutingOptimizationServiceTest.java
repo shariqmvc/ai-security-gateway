@@ -94,10 +94,10 @@ class RoutingOptimizationServiceTest {
 
         assertTrue(result.get(CandidateScoreDimension.LATENCY)
                 > base.get(CandidateScoreDimension.LATENCY));
-        assertEquals(
-                base.get(CandidateScoreDimension.AVAILABILITY),
-                result.get(CandidateScoreDimension.AVAILABILITY),
-                1e-9);
+        assertTrue(
+                result.get(CandidateScoreDimension.AVAILABILITY)
+                        < base.get(CandidateScoreDimension.AVAILABILITY),
+                "Normalizing the boosted weights must reduce the relative share of unaffected dimensions.");
         assertEquals(
                 1.0,
                 result.values().stream().mapToDouble(Double::doubleValue).sum(),
