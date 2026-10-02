@@ -18,6 +18,10 @@ public class RoutingOptimizationProperties {
     private double reliabilityPriorityBoost = 1.15;
     /** Minimum observations required before runtime availability can influence adaptive optimization. */
     private long minObservations = 3;
+    /** Candidate score multiplier applied when confident availability is degraded. */
+    private double degradedCandidateScoreMultiplier = 0.85;
+    /** Candidate score multiplier applied when confident availability is unhealthy. */
+    private double unhealthyCandidateScoreMultiplier = 0.60;
     /** Maximum number of candidates retained for final deterministic ranking. */
     private int topK = 5;
     /** Enable Pareto-dominance pruning before bounded Top-K selection. */
