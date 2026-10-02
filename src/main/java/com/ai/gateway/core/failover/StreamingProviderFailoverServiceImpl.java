@@ -298,6 +298,7 @@ public class StreamingProviderFailoverServiceImpl
                         .totalTokens(response.getTotalTokens())
                         .latencyMs(response.getLatencyMs())
                         .finishReason(response.getFinishReason())
+                        .timeToFirstTokenMs(response.getTimeToFirstTokenMs())
                         .failoverFromProvider(primary)
                         .failoverFromEndpointId(request.getEndpointId())
                         .providerAttempt(fallbackAttempts + 1)
@@ -371,6 +372,7 @@ public class StreamingProviderFailoverServiceImpl
         MDC.put("providerAttempt", String.valueOf(attempt));
 
         long startedAtNanos = System.nanoTime();
+        final long[] firstDeltaAtNanos = {0L};
         final boolean[] emitted = {false};
 
         try {
@@ -380,6 +382,9 @@ public class StreamingProviderFailoverServiceImpl
                             delta -> {
                                 if (delta != null && !delta.isEmpty()) {
                                     emitted[0] = true;
+                                    if (firstDeltaAtNanos[0] == 0L) {
+                                        firstDeltaAtNanos[0] = System.nanoTime();
+                                    }
                                 }
                                 deltaConsumer.accept(delta);
                             });
@@ -415,6 +420,10 @@ public class StreamingProviderFailoverServiceImpl
                     .totalTokens(result.getTotalTokens())
                     .latencyMs(result.getLatencyMs())
                     .finishReason(result.getFinishReason())
+                    .timeToFirstTokenMs(firstDeltaAtNanos[0] == 0L
+                            ? result.getTimeToFirstTokenMs()
+                            : Math.max(0L, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                                    firstDeltaAtNanos[0] - startedAtNanos)))
                     .endpointId(request.getEndpointId())
                     .build();
 
@@ -455,6 +464,7 @@ public class StreamingProviderFailoverServiceImpl
                 .totalTokens(response.getTotalTokens())
                 .latencyMs(response.getLatencyMs())
                 .finishReason(response.getFinishReason())
+                .timeToFirstTokenMs(response.getTimeToFirstTokenMs())
                 .providerAttempt(successfulAttempt)
                 .providerAttempts(List.copyOf(attempts))
                 .failoverFromEndpointId(primaryEndpointId)
