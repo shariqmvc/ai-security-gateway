@@ -11,6 +11,7 @@ import com.ai.gateway.core.provider.AIProvider;
 import com.ai.gateway.core.provider.AIProviderFactory;
 import com.ai.gateway.core.routing.analytics.RoutingAnalyticsService;
 import com.ai.gateway.core.routing.health.RoutingHealthService;
+import com.ai.gateway.core.routing.intelligence.RoutingCapacityService;
 import com.ai.gateway.core.routing.registry.ModelDefinition;
 import com.ai.gateway.core.routing.registry.ModelStatus;
 import com.ai.gateway.core.routing.registry.ProviderDefinition;
@@ -66,6 +67,9 @@ class ProviderFailoverServiceImplTest {
     @Mock
     private RoutingHealthService routingHealthService;
 
+    @Mock
+    private RoutingCapacityService routingCapacityService;
+
     private FailoverProperties properties;
     private ProviderFailoverServiceImpl service;
 
@@ -100,6 +104,12 @@ class ProviderFailoverServiceImplTest {
                 service,
                 "routingHealthService",
                 routingHealthService);
+        ReflectionTestUtils.setField(
+                service,
+                "routingCapacityService",
+                routingCapacityService);
+        lenient().when(routingCapacityService.tryAcquire(any(RoutingCandidate.class)))
+                .thenReturn(true);
 
         // Unknown/unconfigured routing health must not block ordinary
         // failover tests. The dedicated unhealthy-candidate test overrides
@@ -178,6 +188,51 @@ class ProviderFailoverServiceImplTest {
 
         verify(providerCircuitBreaker, never())
                 .recordFailure(any(RoutingCandidate.class), any(ProviderFailureCategory.class));
+    }
+
+    @Test
+    void shouldRejectAtCapacityBeforeProviderInvocation() {
+        allowPrimaryCircuit();
+        when(routingCapacityService.tryAcquire(any(RoutingCandidate.class))).thenReturn(false);
+        when(providerFactory.getProvider(Provider.GEMINI)).thenReturn(geminiProvider);
+
+        assertThrows(ProviderCapacityExceededException.class, () -> service.execute(primaryRequest));
+
+        verify(geminiProvider, never()).chat(any(AIRequest.class));
+        verify(routingCapacityService).tryAcquire(eq(new RoutingCandidate(Provider.GEMINI, "gemini-test")));
+        verify(routingCapacityService, never()).release(any(RoutingCandidate.class));
+    }
+
+    @Test
+    void shouldReleaseCapacityAfterProviderFailure() {
+        allowPrimaryCircuit();
+        when(providerFactory.getProvider(Provider.GEMINI)).thenReturn(geminiProvider);
+        when(geminiProvider.chat(primaryRequest)).thenThrow(new RuntimeException("provider unavailable"));
+
+        assertThrows(RuntimeException.class, () -> service.execute(primaryRequest));
+
+        RoutingCandidate candidate = new RoutingCandidate(Provider.GEMINI, "gemini-test");
+        verify(routingCapacityService).tryAcquire(eq(candidate));
+        verify(routingCapacityService).release(eq(candidate));
+    }
+
+    @Test
+    void shouldFailoverWhenPrimaryCapacityIsExhausted() {
+        allowPrimaryCircuit();
+        when(routingCapacityService.tryAcquire(eq(new RoutingCandidate(Provider.GEMINI, "gemini-test")))).thenReturn(false);
+        when(routingCapacityService.tryAcquire(eq(new RoutingCandidate(Provider.OPENAI, "gpt-test")))).thenReturn(true);
+        when(providerFactory.getProvider(Provider.OPENAI)).thenReturn(openAiProvider);
+        when(registry.requireProvider(Provider.OPENAI)).thenReturn(enabledProvider(Provider.OPENAI));
+        when(registry.requireModel(Provider.OPENAI, "gpt-test")).thenReturn(enabledModel(Provider.OPENAI, "gpt-test"));
+        when(openAiProvider.chat(any(AIRequest.class))).thenReturn(response);
+
+        assertSame(response, service.execute(primaryRequest));
+
+        verify(geminiProvider, never()).chat(any(AIRequest.class));
+        verify(openAiProvider).chat(any(AIRequest.class));
+        verify(routingCapacityService).tryAcquire(eq(new RoutingCandidate(Provider.GEMINI, "gemini-test")));
+        verify(routingCapacityService).tryAcquire(eq(new RoutingCandidate(Provider.OPENAI, "gpt-test")));
+        verify(routingCapacityService).release(eq(new RoutingCandidate(Provider.OPENAI, "gpt-test")));
     }
 
     @Test
