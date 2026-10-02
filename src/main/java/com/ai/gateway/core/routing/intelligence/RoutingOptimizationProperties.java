@@ -16,6 +16,8 @@ public class RoutingOptimizationProperties {
     private double latencyPriorityBoost = 1.15;
     private double costPriorityBoost = 1.15;
     private double reliabilityPriorityBoost = 1.15;
+    /** Minimum observations required before runtime availability can influence adaptive optimization. */
+    private long minObservations = 3;
     /** Maximum number of candidates retained for final deterministic ranking. */
     private int topK = 5;
     /** Enable Pareto-dominance pruning before bounded Top-K selection. */
