@@ -17,6 +17,9 @@ public class AIStreamResult {
     Long latencyMs;
     String finishReason;
 
+    /** Time from provider request start until the first streamed token/delta. */
+    Long timeToFirstTokenMs;
+
     /** Actual executable endpoint used for this stream. */
     String endpointId;
 
