@@ -73,6 +73,9 @@ public class PolicyBasedRoutingStrategy
 
     private final CostAwareRoutingEvaluator costAwareRoutingEvaluator;
 
+    @Autowired(required = false)
+    private com.ai.gateway.core.routing.intelligence.RoutingCapacityService routingCapacityService;
+
     private final RoutingOptimizationProfileResolver optimizationProfileResolver;
 
     /**
@@ -370,6 +373,23 @@ public class PolicyBasedRoutingStrategy
         }
 
         /*
+         * Capacity admission is a hard constraint only when explicitly
+         * configured. Governance, eligibility and health filtering have
+         * already narrowed the authoritative candidate set.
+         */
+        List<RoutingCandidate> capacityEligibleCandidates =
+                routingCapacityService == null
+                        ? healthEligibleCandidates
+                        : healthEligibleCandidates.stream()
+                                .filter(candidate -> !routingCapacityService.isAtHardLimit(candidate))
+                                .toList();
+
+        if (capacityEligibleCandidates.isEmpty()) {
+            throw new BusinessException(
+                    "No routing candidate has available capacity.");
+        }
+
+        /*
          * B.4/B.5 Cost Guardrail Integration.
          * Workflow accounting remains outside routing; the routing context
          * supplies only the current effective budget boundary.
@@ -380,7 +400,7 @@ public class PolicyBasedRoutingStrategy
                 costContext.effectiveMaximumCost();
 
         List<RoutingCandidate> costEligibleCandidates =
-                healthEligibleCandidates;
+                capacityEligibleCandidates;
 
         if (effectiveMaximumCost != null) {
             CandidateScoringContext costContextForEstimate =
