@@ -17,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RoutingRuntimeSignalService {
 
     private final RoutingScoringProperties properties;
+    @Autowired(required = false)
+    private RoutingCapacityService capacityService;
     private final Map<String, SignalState> fallbackStates = new ConcurrentHashMap<>();
 
     @Autowired(required = false)
@@ -40,7 +42,8 @@ public class RoutingRuntimeSignalService {
                         availability.put(key, s.availability());
                         observations.put(key, s.successCount() + s.failureCount());
                     });
-            return new RoutingRuntimeSignals(latency, availability, observations);
+            return new RoutingRuntimeSignals(latency, availability, observations,
+                    capacityService == null ? RoutingCapacitySignals.empty() : capacityService.snapshot());
         }
 
         Map<String, Double> latency = new ConcurrentHashMap<>();
