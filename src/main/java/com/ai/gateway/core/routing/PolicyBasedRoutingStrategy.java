@@ -500,7 +500,9 @@ public class PolicyBasedRoutingStrategy
                             candidate.candidate().endpointId(),
                             candidate.totalScore(),
                             index + 1,
-                            candidate.components()));
+                            candidate.components(),
+                            candidate.optimizationMultiplier(),
+                            candidate.optimizationReason()));
         }
 
         RoutingDecisionExplanation explanation =
