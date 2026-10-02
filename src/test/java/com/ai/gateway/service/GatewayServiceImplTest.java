@@ -344,7 +344,7 @@ class GatewayServiceImplTest {
                 events::add);
 
         assertEquals(
-                java.util.List.of("status", "start", "status", "delta", "delta", "routing", "done"),
+                java.util.List.of("start", "delta", "delta", "routing", "done"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
         assertEquals("hello ", events.get(3).getContent());
         assertEquals("world", events.get(4).getContent());
@@ -390,7 +390,7 @@ class GatewayServiceImplTest {
                 events::add);
 
         assertEquals(
-                java.util.List.of("status", "start", "status", "delta", "error"),
+                java.util.List.of("start", "delta", "error"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
         assertEquals("partial ", events.get(3).getContent());
         assertEquals("Provider request timed out.", events.get(4).getError());
@@ -451,7 +451,7 @@ class GatewayServiceImplTest {
                 consumer);
 
         assertEquals(
-                java.util.List.of("status", "start", "status", "delta"),
+                java.util.List.of("start", "delta"),
                 events.stream().map(GatewayStreamEvent::getType).toList());
         verify(postProviderPersistenceService, never()).persistSuccess(
                 any(), any(), any(), any(), any(), anyLong(), anyString(), anyLong());
