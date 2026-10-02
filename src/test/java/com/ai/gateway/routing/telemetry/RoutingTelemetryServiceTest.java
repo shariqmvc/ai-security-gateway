@@ -15,7 +15,7 @@ class RoutingTelemetryServiceTest {
     void shouldAggregateEndpointAwareExecutionTelemetry() {
         RoutingTelemetryService service = new RoutingTelemetryService();
 
-        service.record(event(true, 120, 40, 10, 20, 30, 0, "stop", null));
+        service.record(event(true, 120, 40L, 10, 20, 30, 0, "stop", null));
         service.record(event(false, 80, null, null, null, null, null, "TIMEOUT"));
 
         var snapshot = service.snapshot();
