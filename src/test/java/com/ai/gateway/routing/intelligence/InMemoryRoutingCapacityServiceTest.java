@@ -4,6 +4,11 @@ import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class InMemoryRoutingCapacityServiceTest {
@@ -48,6 +53,66 @@ class InMemoryRoutingCapacityServiceTest {
         assertTrue(service.tryAcquire(candidate));
         assertFalse(service.isAtHardLimit(candidate));
         assertEquals(0, service.inFlight(candidate));
+    }
+
+    @Test
+    void endpointSpecificLimitOverridesProviderModelLimit() {
+        RoutingCapacityProperties properties = new RoutingCapacityProperties();
+        properties.setMaxParallelRequests(3);
+        properties.getMaxParallel().put("OPENAI/gpt-test", 2);
+        properties.getMaxParallel().put("OPENAI/gpt-test@east", 1);
+
+        InMemoryRoutingCapacityService service =
+                new InMemoryRoutingCapacityService(properties);
+
+        RoutingCandidate east =
+                new RoutingCandidate(Provider.OPENAI, "gpt-test", "east");
+        RoutingCandidate west =
+                new RoutingCandidate(Provider.OPENAI, "gpt-test", "west");
+
+        assertTrue(service.tryAcquire(east));
+        assertFalse(service.tryAcquire(east));
+        assertTrue(service.tryAcquire(west));
+        assertTrue(service.tryAcquire(west));
+        assertFalse(service.tryAcquire(west));
+    }
+
+    @Test
+    void concurrentAdmissionNeverExceedsConfiguredLimit() throws Exception {
+        RoutingCapacityProperties properties = new RoutingCapacityProperties();
+        properties.setMaxParallelRequests(4);
+        InMemoryRoutingCapacityService service =
+                new InMemoryRoutingCapacityService(properties);
+        RoutingCandidate candidate =
+                new RoutingCandidate(Provider.OPENAI, "gpt-test", "east");
+
+        int workers = 32;
+        var executor = Executors.newFixedThreadPool(workers);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(workers);
+        List<Boolean> acquired = new ArrayList<>();
+
+        for (int i = 0; i < workers; i++) {
+            executor.submit(() -> {
+                try {
+                    start.await();
+                    synchronized (acquired) {
+                        acquired.add(service.tryAcquire(candidate));
+                    }
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        start.countDown();
+        done.await();
+        executor.shutdownNow();
+
+        assertEquals(4, acquired.stream().filter(Boolean::booleanValue).count());
+        assertEquals(4, service.inFlight(candidate));
     }
 
     @Test
