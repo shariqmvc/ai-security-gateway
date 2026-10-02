@@ -1,5 +1,15 @@
 # Project exclude paths
 /target/
+
 # Local environment and IDE files
 .evn
+.env
 .idea/
+*.iml
+
+# Runtime logs
+/logs/*.log
+/logs/archive/*.log.gz
+
+# Local/personal runtime data
+/data/personal-files/
