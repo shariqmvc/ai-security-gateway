@@ -15,35 +15,8 @@ class RoutingTelemetryServiceTest {
     void shouldAggregateEndpointAwareExecutionTelemetry() {
         RoutingTelemetryService service = new RoutingTelemetryService();
 
-        service.record(new RoutingTelemetryEvent(
-                UUID.randomUUID(),
-                "OLLAMA",
-                "llama3.2:3b",
-                "ollama-gpu-02",
-                true,
-                120,
-                10,
-                20,
-                30,
-                0,
-                "stop",
-                null,
-                Instant.now()));
-
-        service.record(new RoutingTelemetryEvent(
-                UUID.randomUUID(),
-                "OLLAMA",
-                "llama3.2:3b",
-                "ollama-gpu-02",
-                false,
-                80,
-                null,
-                null,
-                null,
-                null,
-                null,
-                "TIMEOUT",
-                Instant.now()));
+        service.record(event(true, 120, 10, 20, 30, 0, "stop", null));
+        service.record(event(false, 80, null, null, null, null, null, "TIMEOUT"));
 
         var snapshot = service.snapshot();
 
@@ -52,11 +25,51 @@ class RoutingTelemetryServiceTest {
         assertEquals(1L, snapshot.failedExecutions());
         assertEquals(200L, snapshot.totalLatencyMs());
         assertEquals(100.0, snapshot.averageLatencyMs());
-        assertEquals(
-                2L,
-                snapshot.executionsByCandidate()
-                        .get("OLLAMA/llama3.2:3b@ollama-gpu-02"));
+
+        String key = "OLLAMA/llama3.2:3b@ollama-gpu-02";
+        assertEquals(2L, snapshot.executionsByCandidate().get(key));
         assertEquals(1L, snapshot.failuresByCategory().get("TIMEOUT"));
+
+        var stats = snapshot.candidateStats().get(key);
+        assertEquals(2L, stats.executions());
+        assertEquals(1L, stats.successes());
+        assertEquals(1L, stats.failures());
+        assertEquals(0.5, stats.successRate());
+        assertEquals(100.0, stats.averageLatencyMs());
+        assertEquals(100.0, stats.p50LatencyMs());
+        assertEquals(118.0, stats.p95LatencyMs());
+        assertEquals(10.0, stats.averageInputTokens());
+        assertEquals(20.0, stats.averageOutputTokens());
+        assertEquals(30.0, stats.averageTotalTokens());
+        assertEquals(0.0, stats.averageReasoningTokens());
+        assertEquals(166.66666666666666, stats.outputTokensPerSecond());
+        assertEquals(1L, stats.finishReasons().get("stop"));
+        assertEquals(1L, stats.failureCategories().get("TIMEOUT"));
         assertEquals(2, snapshot.recentEvents().size());
+    }
+
+    private RoutingTelemetryEvent event(
+            boolean success,
+            long latency,
+            Integer input,
+            Integer output,
+            Integer total,
+            Integer reasoning,
+            String finishReason,
+            String failureCategory) {
+        return new RoutingTelemetryEvent(
+                UUID.randomUUID(),
+                "OLLAMA",
+                "llama3.2:3b",
+                "ollama-gpu-02",
+                success,
+                latency,
+                input,
+                output,
+                total,
+                reasoning,
+                finishReason,
+                failureCategory,
+                Instant.now());
     }
 }
