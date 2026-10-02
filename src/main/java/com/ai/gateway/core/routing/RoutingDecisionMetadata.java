@@ -80,6 +80,13 @@ public record RoutingDecisionMetadata(
 
         public RoutingCandidateMetadata(
                 String provider, String model, String endpointId,
+                double score, int rank,
+                List<RoutingScoreComponentMetadata> scoreComponents) {
+            this(provider, model, endpointId, score, rank, scoreComponents, 1.0, null);
+        }
+
+        public RoutingCandidateMetadata(
+                String provider, String model, String endpointId,
                 double score, int rank) {
             this(provider, model, endpointId, score, rank, List.of(), 1.0, null);
         }
