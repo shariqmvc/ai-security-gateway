@@ -321,6 +321,9 @@ gateway:
       latency-priority-boost: ${ROUTING_OPTIMIZATION_LATENCY_BOOST:1.15}
       cost-priority-boost: ${ROUTING_OPTIMIZATION_COST_BOOST:1.15}
       reliability-priority-boost: ${ROUTING_OPTIMIZATION_RELIABILITY_BOOST:1.15}
+      min-observations: ${ROUTING_OPTIMIZATION_MIN_OBSERVATIONS:3}
+      degraded-candidate-score-multiplier: ${ROUTING_OPTIMIZATION_DEGRADED_CANDIDATE_MULTIPLIER:0.85}
+      unhealthy-candidate-score-multiplier: ${ROUTING_OPTIMIZATION_UNHEALTHY_CANDIDATE_MULTIPLIER:0.60}
     health:
       enabled: ${ROUTING_HEALTH_ENABLED:true}
       reject-unhealthy: ${ROUTING_HEALTH_REJECT_UNHEALTHY:true}
