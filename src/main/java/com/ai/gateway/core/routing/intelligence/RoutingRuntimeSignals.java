@@ -7,6 +7,10 @@ public record RoutingRuntimeSignals(
         Map<String, Double> availability,
         Map<String, Long> observations) {
 
+    public RoutingRuntimeSignals(Map<String, Double> latencyMs, Map<String, Double> availability) {
+        this(latencyMs, availability, Map.of());
+    }
+
     public RoutingRuntimeSignals {
         latencyMs = latencyMs == null ? Map.of() : Map.copyOf(latencyMs);
         availability = availability == null ? Map.of() : Map.copyOf(availability);
