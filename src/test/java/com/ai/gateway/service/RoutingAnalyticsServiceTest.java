@@ -3,6 +3,8 @@ package com.ai.gateway.service;
 import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.core.routing.RoutingDecision;
 import com.ai.gateway.core.routing.RoutingStrategy;
+import com.ai.gateway.core.routing.RoutingDecisionMetadata;
+import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import com.ai.gateway.core.routing.analytics.RoutingAnalytics;
 import com.ai.gateway.core.routing.analytics.RoutingAnalyticsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +67,32 @@ class RoutingAnalyticsServiceTest {
                 1L,
                 analytics.decisionsByProviderModel()
                         .get("GEMINI:gemini-test"));
+    }
+
+    @Test
+    void shouldTrackEndpointAwareSelectedCandidates() {
+
+        RoutingCandidate selected =
+                new RoutingCandidate(
+                        Provider.OLLAMA,
+                        "llama3.2:3b",
+                        "ollama-gpu-02");
+
+        service.recordDecision(
+                new RoutingDecision(
+                        Provider.OLLAMA,
+                        "llama3.2:3b",
+                        RoutingStrategy.EXPLICIT_MODEL,
+                        RoutingDecisionMetadata.empty(),
+                        java.util.List.of(selected)));
+
+        RoutingAnalytics analytics =
+                service.getAnalytics();
+
+        assertEquals(
+                1L,
+                analytics.decisionsByCandidate()
+                        .get("OLLAMA/llama3.2:3b@ollama-gpu-02"));
     }
 
     @Test
@@ -198,6 +226,7 @@ class RoutingAnalyticsServiceTest {
         assertTrue(analytics.decisionsByStrategy().isEmpty());
         assertTrue(analytics.decisionsByProvider().isEmpty());
         assertTrue(analytics.decisionsByProviderModel().isEmpty());
+        assertTrue(analytics.decisionsByCandidate().isEmpty());
     }
 
     @Test
@@ -226,6 +255,9 @@ class RoutingAnalyticsServiceTest {
 
         assertTrue(
                 analytics.decisionsByProviderModel().isEmpty());
+
+        assertTrue(
+                analytics.decisionsByCandidate().isEmpty());
     }
 
     @Test
