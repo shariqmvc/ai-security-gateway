@@ -679,13 +679,6 @@ public class PolicyBasedRoutingStrategy
                     providerModelRegistryService.requireProvider(provider);
 
                     /*
-                     * Validate the provider independently first. Besides being
-                     * the correct registry boundary, this keeps provider
-                     * availability failures distinct from model eligibility.
-                     */
-                    providerModelRegistryService.requireProvider(provider);
-
-                    /*
                      * Keep the legacy single-model lookup in the pipeline.
                      * It is the compatibility contract used by lightweight
                      * adapters and tests, while requireModels expands the model
