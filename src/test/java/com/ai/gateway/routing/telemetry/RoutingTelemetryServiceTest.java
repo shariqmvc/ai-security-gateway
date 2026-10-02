@@ -55,7 +55,7 @@ class RoutingTelemetryServiceTest {
         assertEquals(
                 2L,
                 snapshot.executionsByCandidate()
-                        .get("OLLAMA:llama3.2:3b@ollama-gpu-02"));
+                        .get("OLLAMA/llama3.2:3b@ollama-gpu-02"));
         assertEquals(1L, snapshot.failuresByCategory().get("TIMEOUT"));
         assertEquals(2, snapshot.recentEvents().size());
     }
