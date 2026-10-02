@@ -19,6 +19,37 @@ public record RoutingTelemetryEvent(
         String failureCategory,
         Instant recordedAt) {
 
+    public RoutingTelemetryEvent(
+            UUID requestId,
+            String provider,
+            String model,
+            String endpointId,
+            boolean success,
+            long latencyMs,
+            Integer inputTokens,
+            Integer outputTokens,
+            Integer totalTokens,
+            Integer reasoningTokens,
+            String finishReason,
+            String failureCategory,
+            Instant recordedAt) {
+        this(
+                requestId,
+                provider,
+                model,
+                endpointId,
+                success,
+                latencyMs,
+                null,
+                inputTokens,
+                outputTokens,
+                totalTokens,
+                reasoningTokens,
+                finishReason,
+                failureCategory,
+                recordedAt);
+    }
+
     public RoutingTelemetryEvent {
         latencyMs = Math.max(0L, latencyMs);
         timeToFirstTokenMs = timeToFirstTokenMs == null
