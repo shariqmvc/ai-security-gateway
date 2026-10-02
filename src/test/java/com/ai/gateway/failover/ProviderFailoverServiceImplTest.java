@@ -603,6 +603,10 @@ class ProviderFailoverServiceImplTest {
                 "gpt-test"))
                 .thenReturn(true);
 
+        // Configured fallback models are resolved lazily from the registry.
+        when(registry.defaultModel(Provider.OPENAI))
+                .thenReturn("gpt-test");
+
         when(providerFactory.getProvider(Provider.OPENAI))
                 .thenReturn(openAiProvider);
 
