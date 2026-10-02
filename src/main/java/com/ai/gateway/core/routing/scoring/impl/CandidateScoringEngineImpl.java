@@ -218,6 +218,8 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
             case LATENCY -> RoutingObjective.LATENCY;
             case AVAILABILITY -> RoutingObjective.AVAILABILITY;
             case POLICY_PREFERENCE -> RoutingObjective.POLICY_PREFERENCE;
+            case CAPACITY -> throw new IllegalStateException(
+                    "Capacity is handled outside the objective profile.");
         };
     }
 
