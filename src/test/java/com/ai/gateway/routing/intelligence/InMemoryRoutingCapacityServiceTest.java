@@ -4,8 +4,7 @@ import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.core.routing.engine.RoutingCandidate;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
@@ -90,14 +89,14 @@ class InMemoryRoutingCapacityServiceTest {
         var executor = Executors.newFixedThreadPool(workers);
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(workers);
-        List<Boolean> acquired = new ArrayList<>();
+        AtomicInteger acquired = new AtomicInteger();
 
         for (int i = 0; i < workers; i++) {
             executor.submit(() -> {
                 try {
                     start.await();
-                    synchronized (acquired) {
-                        acquired.add(service.tryAcquire(candidate));
+                    if (service.tryAcquire(candidate)) {
+                        acquired.incrementAndGet();
                     }
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
@@ -111,7 +110,7 @@ class InMemoryRoutingCapacityServiceTest {
         done.await();
         executor.shutdownNow();
 
-        assertEquals(4, acquired.stream().filter(Boolean::booleanValue).count());
+        assertEquals(4, acquired.get());
         assertEquals(4, service.inFlight(candidate));
     }
 
