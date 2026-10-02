@@ -32,9 +32,18 @@ public class RoutingOptimizationService {
         }
 
         if (signals != null && !signals.availability().isEmpty()) {
-            double minAvailability = signals.availability().values().stream()
-                    .mapToDouble(Double::doubleValue)
-                    .min().orElse(1.0);
+            double minAvailability = Double.POSITIVE_INFINITY;
+            boolean confidentSignal = false;
+            for (Map.Entry<String, Double> entry : signals.availability().entrySet()) {
+                long observations = signals.observations().getOrDefault(entry.getKey(), 0L);
+                if (observations >= properties.getMinObservations()) {
+                    confidentSignal = true;
+                    minAvailability = Math.min(minAvailability, entry.getValue());
+                }
+            }
+            if (!confidentSignal) {
+                minAvailability = 1.0;
+            }
 
             if (minAvailability < 0.90) {
                 boost(result, CandidateScoreDimension.AVAILABILITY,
