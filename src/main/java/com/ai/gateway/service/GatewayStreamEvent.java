@@ -28,4 +28,5 @@ public class GatewayStreamEvent {
     String error;
     String phase;
     String finishReason;
+    Long timeToFirstTokenMs;
 }
