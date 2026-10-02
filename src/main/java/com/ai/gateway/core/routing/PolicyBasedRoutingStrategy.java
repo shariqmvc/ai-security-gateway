@@ -502,15 +502,11 @@ public class PolicyBasedRoutingStrategy
                         explanation);
 
         /*
-         * Final registry validation.
+         * Candidate registry validation is performed while building the
+         * candidate set. The selected candidate is derived directly from
+         * that validated set, so re-validating the provider/model here would
+         * duplicate registry calls and create avoidable routing overhead.
          */
-        providerModelRegistryService.requireProvider(
-                selected.provider());
-
-        providerModelRegistryService.requireModel(
-                selected.provider(),
-                selected.model());
-
         List<RoutingCandidate> selectedCandidates =
                 selectionResult.selectedCandidates().stream()
                         .map(ScoredCandidate::candidate)
