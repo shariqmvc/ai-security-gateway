@@ -7,6 +7,7 @@ public record RoutingAnalytics(
         Map<String, Long> decisionsByStrategy,
         Map<String, Long> decisionsByProvider,
         Map<String, Long> decisionsByProviderModel,
+        Map<String, Long> decisionsByCandidate,
         long failoverAttempts,
         long failoverSuccesses,
         long failoverFailures,
@@ -23,6 +24,6 @@ public record RoutingAnalytics(
             long failoverSuccesses,
             long failoverFailures) {
         this(totalDecisions, decisionsByStrategy, decisionsByProvider, decisionsByProviderModel,
-                failoverAttempts, failoverSuccesses, failoverFailures, 0, 0, Map.of());
+                Map.of(), failoverAttempts, failoverSuccesses, failoverFailures, 0, 0, Map.of());
     }
 }
