@@ -4,17 +4,20 @@ import com.ai.gateway.authentication.AuthenticationContext;
 import com.ai.gateway.business.cost.service.CostService;
 import com.ai.gateway.core.contract.AIRequest;
 import com.ai.gateway.core.contract.AIResponse;
-import com.ai.gateway.enums.AuditStatus;
-import com.ai.gateway.core.metrics.GatewayMetricsService;
 import com.ai.gateway.core.routing.RoutingDecision;
 import com.ai.gateway.core.routing.engine.RoutingCandidate;
-import com.ai.gateway.business.routing.health.RoutingOutcomeService;
 import com.ai.gateway.core.routing.intelligence.RoutingRuntimeSignalService;
+import com.ai.gateway.core.routing.telemetry.RoutingTelemetryEvent;
+import com.ai.gateway.core.routing.telemetry.RoutingTelemetryService;
+import com.ai.gateway.business.routing.health.RoutingOutcomeService;
+import com.ai.gateway.core.metrics.GatewayMetricsService;
+import com.ai.gateway.enums.AuditStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -29,6 +32,7 @@ public class GatewayPostProviderPersistenceService {
 
     private final RoutingRuntimeSignalService routingRuntimeSignalService;
     private final RoutingOutcomeService routingOutcomeService;
+    private final RoutingTelemetryService routingTelemetryService;
     private final TokenUsageService tokenUsageService;
     private final CostService costService;
     private final AuditService auditService;
@@ -46,8 +50,15 @@ public class GatewayPostProviderPersistenceService {
             long totalLatency) {
 
         try {
+            String endpointId = response != null && response.getEndpointId() != null
+                    ? response.getEndpointId()
+                    : request.getEndpointId();
+
             RoutingCandidate candidate =
-                    new RoutingCandidate(request.getProvider(), request.getModel());
+                    new RoutingCandidate(
+                            request.getProvider(),
+                            request.getModel(),
+                            endpointId);
 
             routingRuntimeSignalService.recordSuccess(candidate, providerLatency);
 
@@ -58,6 +69,25 @@ public class GatewayPostProviderPersistenceService {
                         request,
                         routingDecision,
                         providerLatency);
+            }
+
+            if (response != null) {
+                var usage = response.getUsage();
+                routingTelemetryService.record(
+                        new RoutingTelemetryEvent(
+                                requestId,
+                                request.getProvider().name(),
+                                request.getModel(),
+                                endpointId,
+                                true,
+                                providerLatency,
+                                usage == null ? null : usage.getInputTokens(),
+                                usage == null ? null : usage.getOutputTokens(),
+                                usage == null ? null : usage.getTotalTokens(),
+                                usage == null ? null : usage.getReasoningTokens(),
+                                response.getFinishReason(),
+                                null,
+                                Instant.now()));
             }
 
             if (response != null && response.getUsage() != null
@@ -103,11 +133,34 @@ public class GatewayPostProviderPersistenceService {
                     && request != null
                     && request.getProvider() != null
                     && request.getModel() != null) {
+
                 RoutingCandidate candidate =
-                        new RoutingCandidate(request.getProvider(), request.getModel());
-                routingRuntimeSignalService.recordFailure(
-                        candidate,
-                        failureCategory == null ? "PROVIDER_FAILURE" : failureCategory);
+                        new RoutingCandidate(
+                                request.getProvider(),
+                                request.getModel(),
+                                request.getEndpointId());
+
+                String category = failureCategory == null
+                        ? "PROVIDER_FAILURE"
+                        : failureCategory;
+
+                routingRuntimeSignalService.recordFailure(candidate, category);
+
+                routingTelemetryService.record(
+                        new RoutingTelemetryEvent(
+                                requestId,
+                                request.getProvider().name(),
+                                request.getModel(),
+                                request.getEndpointId(),
+                                false,
+                                providerLatency,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                category,
+                                Instant.now()));
 
                 if (routingOutcomeService != null) {
                     routingOutcomeService.recordFailure(
@@ -116,10 +169,7 @@ public class GatewayPostProviderPersistenceService {
                             request,
                             routingDecision,
                             providerLatency,
-                            new IllegalStateException(
-                                    failureCategory == null
-                                            ? "Provider execution failed"
-                                            : failureCategory));
+                            new IllegalStateException(category));
                 }
             }
 
