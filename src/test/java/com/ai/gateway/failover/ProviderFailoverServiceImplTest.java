@@ -194,8 +194,6 @@ class ProviderFailoverServiceImplTest {
     void shouldRejectAtCapacityBeforeProviderInvocation() {
         allowPrimaryCircuit();
         when(routingCapacityService.tryAcquire(any(RoutingCandidate.class))).thenReturn(false);
-        when(providerFactory.getProvider(Provider.GEMINI)).thenReturn(geminiProvider);
-
         assertThrows(ProviderCapacityExceededException.class, () -> service.execute(primaryRequest));
 
         verify(geminiProvider, never()).chat(any(AIRequest.class));
