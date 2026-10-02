@@ -292,6 +292,15 @@ gateway:
         MISTRAL: ${GATEWAY_MISTRAL_CONTEXT_WINDOW:131072}
       models: {}
 
+    capacity:
+      enabled: ${GATEWAY_ROUTING_CAPACITY_ENABLED:true}
+      hard-limit: ${GATEWAY_ROUTING_CAPACITY_HARD_LIMIT:true}
+      max-parallel-requests: ${GATEWAY_ROUTING_CAPACITY_MAX_PARALLEL:0}
+      utilization-threshold: ${GATEWAY_ROUTING_CAPACITY_UTILIZATION_THRESHOLD:0.80}
+      rpm-window-seconds: ${GATEWAY_ROUTING_CAPACITY_RPM_WINDOW_SECONDS:60}
+      tpm-window-seconds: ${GATEWAY_ROUTING_CAPACITY_TPM_WINDOW_SECONDS:60}
+      max-parallel: {}
+
     scoring:
       weights:
         cost: 0.30
