@@ -88,6 +88,26 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
             maxima.put(strategy.dimension(), max);
         }
 
+        // Candidate-specific health optimization must be applied to the
+        // candidate's own unoptimized baseline. Runtime availability is a
+        // scoring signal too, but using the runtime-normalized total here
+        // would double-penalize a degraded candidate.
+        List<ScoredCandidate> baselineScores = List.of();
+        if (context.runtimeSignals() != null
+                && !context.runtimeSignals().availability().isEmpty()) {
+            CandidateScoringContext baselineContext = new CandidateScoringContext(
+                    context.policy(),
+                    context.estimatedInputTokens(),
+                    context.estimatedOutputTokens(),
+                    context.extensiveResearchEnabled(),
+                    context.executionRole(),
+                    context.decisionContext(),
+                    context.weightOverrides(),
+                    com.ai.gateway.core.routing.intelligence.RoutingRuntimeSignals.empty(),
+                    context.objectiveWeights());
+            baselineScores = score(validCandidates, baselineContext);
+        }
+
         List<ScoredCandidate> result = new ArrayList<>(candidateCount);
         for (int i = 0; i < candidateCount; i++) {
             RoutingCandidate candidate = validCandidates.get(i);
@@ -147,8 +167,13 @@ public class CandidateScoringEngineImpl implements CandidateScoringEngine {
                             candidate,
                             context.runtimeSignals());
 
+            double optimizationBase = total;
+            if (optimization.scoreMultiplier() < 1.0 && !baselineScores.isEmpty()) {
+                optimizationBase = baselineScores.get(i).totalScore();
+            }
+
             double adjustedTotal =
-                    total * optimization.scoreMultiplier();
+                    optimizationBase * optimization.scoreMultiplier();
 
             result.add(new ScoredCandidate(
                     candidate,
