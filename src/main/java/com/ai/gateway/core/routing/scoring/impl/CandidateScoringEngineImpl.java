@@ -1,6 +1,7 @@
 package com.ai.gateway.core.routing.scoring.impl;
 
 import com.ai.gateway.core.routing.engine.RoutingCandidate;
+import com.ai.gateway.core.routing.intelligence.RoutingPriority;
 import com.ai.gateway.core.routing.scoring.CandidateScoreComponent;
 import com.ai.gateway.core.routing.scoring.CandidateScoreDimension;
 import com.ai.gateway.core.routing.scoring.CandidateScoreStrategy;
