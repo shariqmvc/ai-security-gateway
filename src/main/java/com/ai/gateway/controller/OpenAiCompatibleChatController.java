@@ -51,7 +51,10 @@ public class OpenAiCompatibleChatController {
                 .id("chatcmpl-" + (requestId == null ? UUID.randomUUID() : requestId))
                 .object("chat.completion")
                 .created(Instant.now().getEpochSecond())
-                .model(request.getModel())
+                .model(
+                        response != null && response.getModel() != null
+                                ? response.getModel()
+                                : request.getModel())
                 .choices(List.of(OpenAiChoice.builder()
                         .index(0)
                         .message(OpenAiMessage.builder().role("assistant").content(content).build())
