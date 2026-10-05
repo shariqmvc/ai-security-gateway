@@ -119,6 +119,7 @@ class PersonalPreferencesServiceTest {
                         new PersonalPreferencesUpdateRequest(
                                 null, null, "INVALID", null)));
     }
+
     @Test
     void appliesSavedDefaultsOnlyToOmittedRequestFields() {
         UUID accountId = UUID.randomUUID();
@@ -195,6 +196,35 @@ class PersonalPreferencesServiceTest {
         assertEquals("COST", request.getRoutingPriority());
     }
 
+    @Test
+    void preservesAutoRoutingIntentOverSavedDefaults() {
+        UUID accountId = UUID.randomUUID();
+        PersonalAccount account = activeAccount(accountId);
+        PersonalAccountPreferences preferences = PersonalAccountPreferences.builder()
+                .personalAccount(account)
+                .defaultProvider("OLLAMA")
+                .defaultModel("llama3.2:3b")
+                .billingMode("BYOK")
+                .routingPriority("BALANCED")
+                .build();
+
+        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(preferencesRepository.findByPersonalAccountId(accountId)).thenReturn(Optional.of(preferences));
+
+        AuthenticationContext context = personalContext(accountId);
+
+        ChatRequest request = ChatRequest.builder()
+                .prompt("hello")
+                .model("auto")
+                .build();
+
+        preferencesService.applyRequestDefaults(context, request);
+
+        assertNull(request.getProvider());
+        assertEquals("auto", request.getModel());
+        assertEquals("BYOK", request.getBillingMode());
+        assertEquals("BALANCED", request.getRoutingPriority());
+    }
 
     @Test
     void rejectsUnknownDefaultModel() {
@@ -255,5 +285,4 @@ class PersonalPreferencesServiceTest {
                 .personalAccountId(accountId)
                 .build();
     }
-
 }
