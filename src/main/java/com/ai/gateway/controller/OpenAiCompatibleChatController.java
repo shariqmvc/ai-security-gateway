@@ -191,11 +191,15 @@ public class OpenAiCompatibleChatController {
                         .build())
                 .toList();
 
+        String routedModel = "auto".equalsIgnoreCase(request.getModel().trim())
+                ? null
+                : request.getModel();
+
         return ChatRequest.builder()
                 .prompt(prompt)
                 .contextMessages(contextMessages)
                 .provider(request.getProvider())
-                .model(request.getModel())
+                .model(routedModel)
                 .billingMode(request.getBillingMode())
                 .requiredCapabilities(request.getRequiredCapabilities() == null ? java.util.Set.of() : request.getRequiredCapabilities())
                 .extensiveResearch(request.isExtensiveResearch())
