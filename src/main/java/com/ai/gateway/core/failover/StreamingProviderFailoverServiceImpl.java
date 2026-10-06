@@ -390,13 +390,14 @@ public class StreamingProviderFailoverServiceImpl
                     streamingProvider.stream(
                             request,
                             delta -> {
-                                if (delta != null && !delta.isEmpty()) {
-                                    emitted[0] = true;
-                                    if (firstDeltaAtNanos[0] == 0L) {
-                                        firstDeltaAtNanos[0] = System.nanoTime();
-                                    }
+                                if (delta != null && !delta.isEmpty()
+                                        && firstDeltaAtNanos[0] == 0L) {
+                                    firstDeltaAtNanos[0] = System.nanoTime();
                                 }
                                 deltaConsumer.accept(delta);
+                                if (delta != null && !delta.isEmpty()) {
+                                    emitted[0] = true;
+                                }
                             });
 
             ensureRequestBudgetAvailable(
