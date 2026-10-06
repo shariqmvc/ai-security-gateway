@@ -43,6 +43,22 @@ public class GatewayAsyncConfig implements WebMvcConfigurer {
     }
 
     /**
+     * Routing health persistence must never run on the streaming worker.
+     * Keep it on a dedicated executor so a provider stream failure cannot
+     * inherit request-scoped state or block failover on JPA telemetry.
+     */
+    @Bean(name = "routingHealthExecutor")
+    public ThreadPoolTaskExecutor routingHealthExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(1000);
+        executor.setThreadNamePrefix("routing-health-");
+        executor.initialize();
+        return executor;
+    }
+
+    /**
      * Spring MVC executes StreamingResponseBody on an async worker thread.
      * Use the same context-propagating executor so request/tenant/security
      * context is available to provider streaming telemetry.
