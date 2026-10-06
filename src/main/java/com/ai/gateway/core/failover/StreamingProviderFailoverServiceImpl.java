@@ -532,12 +532,24 @@ public class StreamingProviderFailoverServiceImpl
 
     private void recordSuccess(AIRequest request, long latencyMs) {
         if (routingHealthService != null) {
-            routingHealthService.recordSuccess(
-                    new RoutingCandidate(
-                            request.getProvider(),
-                            request.getModel(),
-                            request.getEndpointId()),
-                    latencyMs);
+            try {
+                routingHealthService.recordSuccess(
+                        new RoutingCandidate(
+                                request.getProvider(),
+                                request.getModel(),
+                                request.getEndpointId()),
+                        latencyMs);
+            } catch (Exception healthException) {
+                // Health telemetry must never turn a successful provider
+                // response into a failed inference.
+                log.warn(
+                        "ROUTING_HEALTH_SUCCESS_RECORD_FAILED requestId={} provider={} model={} error={}",
+                        requestId(),
+                        request.getProvider(),
+                        request.getModel(),
+                        healthException.getMessage(),
+                        healthException);
+            }
         }
         if (providerCircuitBreaker != null) {
             providerCircuitBreaker.recordSuccess(
