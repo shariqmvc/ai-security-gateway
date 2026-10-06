@@ -7,6 +7,7 @@ import com.ai.gateway.core.routing.health.entity.RoutingHealthProfile;
 import com.ai.gateway.core.routing.health.repository.RoutingHealthProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -57,7 +58,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSuccess(RoutingCandidate candidate, long latencyMs) {
         if (!properties.isEnabled() || candidate == null) return;
 
@@ -82,7 +83,7 @@ public class RoutingHealthServiceImpl implements RoutingHealthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailure(RoutingCandidate candidate, String failureCategory) {
         if (!properties.isEnabled() || candidate == null) return;
 
