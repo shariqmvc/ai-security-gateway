@@ -29,6 +29,7 @@ spring:
     import: classpath:firewall-patterns.yml
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
 
