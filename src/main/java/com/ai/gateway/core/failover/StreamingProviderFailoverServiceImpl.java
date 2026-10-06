@@ -558,12 +558,24 @@ public class StreamingProviderFailoverServiceImpl
         }
 
         if (routingHealthService != null) {
-            routingHealthService.recordFailure(
-                    new RoutingCandidate(
-                            request.getProvider(),
-                            request.getModel(),
-                            request.getEndpointId()),
-                    ProviderFailureClassifier.classify(failure).name());
+            try {
+                routingHealthService.recordFailure(
+                        new RoutingCandidate(
+                                request.getProvider(),
+                                request.getModel(),
+                                request.getEndpointId()),
+                        ProviderFailureClassifier.classify(failure).name());
+            } catch (Exception healthException) {
+                // Health telemetry must never replace the provider failure that
+                // drives retry/failover classification.
+                log.warn(
+                        "ROUTING_HEALTH_RECORD_FAILED requestId={} provider={} model={} error={}",
+                        requestId(),
+                        request.getProvider(),
+                        request.getModel(),
+                        healthException.getMessage(),
+                        healthException);
+            }
         }
 
         if (providerCircuitBreaker != null
