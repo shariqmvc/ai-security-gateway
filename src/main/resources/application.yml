@@ -19,7 +19,7 @@ spring:
       max-request-size: ${RAG_INGESTION_MAX_FILE_SIZE:20MB}
   mvc:
     async:
-      request-timeout: ${SPRING_MVC_ASYNC_REQUEST_TIMEOUT:90s}
+      request-timeout: ${SPRING_MVC_ASYNC_REQUEST_TIMEOUT:120s}
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
