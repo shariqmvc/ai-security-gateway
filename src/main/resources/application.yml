@@ -17,6 +17,9 @@ spring:
     multipart:
       max-file-size: ${RAG_INGESTION_MAX_FILE_SIZE:20MB}
       max-request-size: ${RAG_INGESTION_MAX_FILE_SIZE:20MB}
+  mvc:
+    async:
+      request-timeout: ${SPRING_MVC_ASYNC_REQUEST_TIMEOUT:90s}
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
@@ -278,7 +281,7 @@ gateway:
           enabled: true
         mistral-default:
           provider: MISTRAL
-          url: ${MISTRAL_BASE_URL:https://api.mistral.ai/v1}
+          url: ${MISTRAL_BASE_URL:https://api.mistral.ai}
           enabled: true
 
     context-windows:
