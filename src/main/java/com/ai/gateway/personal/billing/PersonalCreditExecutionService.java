@@ -10,9 +10,11 @@ import com.ai.gateway.personal.credit.entity.PersonalCreditReservation;
 import com.ai.gateway.personal.credit.service.PersonalCreditService;
 import com.ai.gateway.personal.billing.PersonalBillingSettingsRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditLedgerRepository;
+import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -32,7 +34,9 @@ public class PersonalCreditExecutionService {
     private final PersonalBillingProperties properties;
     private final PersonalBillingSettingsRepository billingSettingsRepository;
     private final PersonalCreditLedgerRepository ledgerRepository;
+    private final PersonalCreditReservationRepository reservationRepository;
 
+    @Transactional
     public ReservationContext reserve(
             AuthenticationContext context,
             AIRequest request,
@@ -75,13 +79,31 @@ public class PersonalCreditExecutionService {
             reserveAmount = minimumCreditCharge;
         }
 
-        var billingSettings=billingSettingsRepository.findByPersonalAccountId(context.getPersonalAccountId()).orElse(null);
-        if(billingSettings!=null && billingSettings.getMonthlySpendCap()!=null){
-            BigDecimal monthSpend=ledgerRepository.sumCapturedSince(
-                    context.getPersonalAccountId(),
-                    LocalDateTime.now().withDayOfMonth(1).toLocalDate().atStartOfDay());
-            if(monthSpend.add(reserveAmount).compareTo(billingSettings.getMonthlySpendCap())>0){
-                throw new PersonalBillingModeException("Monthly Personal credit spend cap would be exceeded.");
+        /*
+         * Serialize the spend-cap check on the account wallet row. The lock is
+         * held by this transaction through reservation creation, so another
+         * request for the same account cannot pass the cap check concurrently.
+         */
+        creditService.lockWalletForUpdate(context.getPersonalAccountId());
+
+        var billingSettings = billingSettingsRepository
+                .findByPersonalAccountId(context.getPersonalAccountId())
+                .orElse(null);
+        if (billingSettings != null && billingSettings.getMonthlySpendCap() != null) {
+            LocalDateTime monthStart = LocalDateTime.now()
+                    .withDayOfMonth(1)
+                    .toLocalDate()
+                    .atStartOfDay();
+            BigDecimal capturedSpend = ledgerRepository.sumCapturedSince(
+                    context.getPersonalAccountId(), monthStart);
+            BigDecimal outstandingReservations = reservationRepository
+                    .sumOutstandingReservations(context.getPersonalAccountId());
+            BigDecimal committedSpend = capturedSpend.add(outstandingReservations);
+
+            if (committedSpend.add(reserveAmount)
+                    .compareTo(billingSettings.getMonthlySpendCap()) > 0) {
+                throw new PersonalBillingModeException(
+                        "Monthly Personal credit spend cap would be exceeded.");
             }
         }
 
