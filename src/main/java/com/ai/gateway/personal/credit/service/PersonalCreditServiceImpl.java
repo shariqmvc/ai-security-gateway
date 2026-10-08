@@ -159,6 +159,74 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
     @Override
     @Transactional
+    public PersonalCreditReservation prepareCapture(UUID reservationId, BigDecimal actualAmount) {
+        requireReservationId(reservationId);
+        if (actualAmount == null || actualAmount.compareTo(ZERO) < 0) {
+            throw new PersonalCreditException("Actual credit amount cannot be negative.");
+        }
+
+        PersonalCreditReservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new PersonalCreditException("Credit reservation not found."));
+        if (reservation.getStatus() == PersonalCreditReservationStatus.CAPTURED) {
+            if (reservation.getCapturedAmount() != null
+                    && reservation.getCapturedAmount().compareTo(actualAmount) == 0) {
+                return reservation;
+            }
+            throw new PersonalCreditException("Credit reservation was already captured with a different amount.");
+        }
+        if (reservation.getStatus() == PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
+            if (reservation.getSettlementAmount() != null
+                    && reservation.getSettlementAmount().compareTo(actualAmount) == 0) {
+                return reservation;
+            }
+            throw new PersonalCreditException("A different credit settlement is already pending.");
+        }
+        if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED) {
+            throw new PersonalCreditException("Credit reservation is no longer active.");
+        }
+        if (actualAmount.compareTo(reservation.getReservedAmount()) > 0) {
+            throw new PersonalCreditException("Actual credit amount exceeds reserved amount.");
+        }
+
+        reservation.setSettlementAmount(actualAmount);
+        reservation.setStatus(PersonalCreditReservationStatus.SETTLEMENT_PENDING);
+        return reservationRepository.save(reservation);
+    }
+
+    @Override
+    @Transactional
+    public PersonalCreditReservation markProviderInvocationStarted(UUID reservationId) {
+        requireReservationId(reservationId);
+        PersonalCreditReservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new PersonalCreditException("Credit reservation not found."));
+        if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED) {
+            throw new PersonalCreditException("Credit reservation is not ready for provider invocation.");
+        }
+        if (!reservation.isProviderInvocationStarted()) {
+            reservation.setProviderInvocationStarted(true);
+            reservationRepository.save(reservation);
+        }
+        return reservation;
+    }
+
+    @Override
+    @Transactional
+    public boolean releaseStaleIfSafe(UUID reservationId, LocalDateTime createdBefore) {
+        requireReservationId(reservationId);
+        PersonalCreditReservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new PersonalCreditException("Credit reservation not found."));
+        if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED
+                || reservation.isProviderInvocationStarted()
+                || reservation.getCreatedAt() == null
+                || !reservation.getCreatedAt().isBefore(createdBefore)) {
+            return false;
+        }
+        releaseReservedReservation(reservation);
+        return true;
+    }
+
+    @Override
+    @Transactional
     public PersonalCreditReservation capture(UUID reservationId, BigDecimal actualAmount) {
         requireReservationId(reservationId);
         if (actualAmount == null || actualAmount.compareTo(ZERO) < 0) {
@@ -171,18 +239,23 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
             if (reservation.getCapturedAmount() != null
                     && reservation.getCapturedAmount().compareTo(actualAmount) == 0) {
                 // Repeated reconciliation of the same result is safe: the
-                // original capture already committed its wallet and ledger
-                // mutations, so return without applying them a second time.
+                // original capture already committed its wallet and ledger mutations.
                 return reservation;
             }
             throw new PersonalCreditException(
                     "Credit reservation was already captured with a different amount.");
         }
-        if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED) {
+        if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED
+                && reservation.getStatus() != PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
             throw new PersonalCreditException("Credit reservation is no longer active.");
         }
         if (actualAmount.compareTo(reservation.getReservedAmount()) > 0) {
             throw new PersonalCreditException("Actual credit amount exceeds reserved amount.");
+        }
+        if (reservation.getStatus() == PersonalCreditReservationStatus.SETTLEMENT_PENDING
+                && (reservation.getSettlementAmount() == null
+                    || reservation.getSettlementAmount().compareTo(actualAmount) != 0)) {
+            throw new PersonalCreditException("Capture amount does not match the pending settlement.");
         }
 
         PersonalCreditWallet wallet = getWalletForUpdate(reservation.getPersonalAccountId());
@@ -241,10 +314,19 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
             // Failure cleanup is idempotent after capture/release.
             return reservation;
         }
+        if (reservation.getStatus() == PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
+            throw new PersonalCreditException(
+                    "A pending credit settlement cannot be released before reconciliation.");
+        }
         if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED) {
             throw new PersonalCreditException("Credit reservation is no longer active.");
         }
 
+        releaseReservedReservation(reservation);
+        return reservation;
+    }
+
+    private void releaseReservedReservation(PersonalCreditReservation reservation) {
         PersonalCreditWallet wallet = getWalletForUpdate(reservation.getPersonalAccountId());
         wallet.setReservedBalance(wallet.getReservedBalance().subtract(reservation.getReservedAmount()));
         wallet.setUpdatedAt(LocalDateTime.now());
@@ -259,12 +341,10 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
                 .entryType(PersonalCreditLedgerEntryType.RELEASE)
                 .amount(reservation.getReservedAmount())
                 .referenceId(reservation.getReferenceId() + ":release")
-                .reservationId(reservationId)
+                .reservationId(reservation.getId())
                 .description("Inference reservation released")
                 .createdAt(LocalDateTime.now())
                 .build());
-
-        return reservation;
     }
 
     private PersonalCreditWallet getWalletForUpdate(UUID personalAccountId) {
