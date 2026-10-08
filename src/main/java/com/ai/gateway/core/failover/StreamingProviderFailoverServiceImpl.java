@@ -400,9 +400,12 @@ public class StreamingProviderFailoverServiceImpl
                                 }
                             });
 
-            ensureRequestBudgetAvailable(
-                    request.getProvider(), request.getModel(), attempt);
-
+            /*
+             * The provider has completed the stream successfully at this point.
+             * The request-time budget bounds admission and failover decisions;
+             * it must not convert an already completed provider response into
+             * a failure after the caller has received the stream.
+             */
             long latencyMs = Math.max(
                     0L,
                     java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
