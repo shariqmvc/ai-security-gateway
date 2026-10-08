@@ -178,6 +178,95 @@ class PersonalCreditServiceImplTest {
     }
 
     @Test
+    void prepareCapturePersistsSettlementIntentWithoutMutatingWallet() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-settlement-intent");
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(reservations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PersonalCreditReservation result = service.prepareCapture(
+                reservationId, new BigDecimal("3.20"));
+
+        assertEquals(PersonalCreditReservationStatus.SETTLEMENT_PENDING, result.getStatus());
+        assertEquals(new BigDecimal("3.20"), result.getSettlementAmount());
+        verify(reservations).save(reservation);
+        verifyNoInteractions(wallets);
+        org.mockito.Mockito.verify(ledger, never()).save(any());
+    }
+
+    @Test
+    void pendingSettlementCaptureDeductsOnlyPersistedSettlementAmount() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditWallet wallet = wallet("20.00", "5.00");
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-pending-settlement");
+        reservation.setStatus(PersonalCreditReservationStatus.SETTLEMENT_PENDING);
+        reservation.setSettlementAmount(new BigDecimal("3.20"));
+
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(wallets.findByPersonalAccountIdForUpdate(accountId)).thenReturn(Optional.of(wallet));
+        when(wallets.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reservations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ledger.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PersonalCreditReservation result = service.capture(reservationId, new BigDecimal("3.20"));
+
+        assertEquals(new BigDecimal("16.80"), wallet.getBalance());
+        assertEquals(new BigDecimal("0.00"), wallet.getReservedBalance());
+        assertEquals(PersonalCreditReservationStatus.CAPTURED, result.getStatus());
+        assertEquals(new BigDecimal("3.20"), result.getCapturedAmount());
+    }
+
+    @Test
+    void pendingSettlementCannotBeReleasedAsFailureCleanup() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-do-not-release");
+        reservation.setStatus(PersonalCreditReservationStatus.SETTLEMENT_PENDING);
+        reservation.setSettlementAmount(new BigDecimal("3.20"));
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+
+        assertThrows(PersonalCreditException.class, () -> service.release(reservationId));
+
+        verifyNoInteractions(wallets);
+        org.mockito.Mockito.verify(ledger, never()).save(any());
+    }
+
+    @Test
+    void staleRecoveryDoesNotReleaseReservationAfterProviderInvocationStarted() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-provider-started");
+        reservation.setCreatedAt(LocalDateTime.now().minusHours(2));
+        reservation.setProviderInvocationStarted(true);
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+
+        boolean released = service.releaseStaleIfSafe(reservationId, LocalDateTime.now().minusMinutes(30));
+
+        assertFalse(released);
+        assertEquals(PersonalCreditReservationStatus.RESERVED, reservation.getStatus());
+        verifyNoInteractions(wallets);
+        org.mockito.Mockito.verify(ledger, never()).save(any());
+    }
+
+    @Test
+    void staleRecoveryReleasesOnlyOldReservationsThatNeverStartedProviderInvocation() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditWallet wallet = wallet("20.00", "5.00");
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-abandoned-before-provider");
+        reservation.setCreatedAt(LocalDateTime.now().minusHours(2));
+
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(wallets.findByPersonalAccountIdForUpdate(accountId)).thenReturn(Optional.of(wallet));
+        when(wallets.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reservations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ledger.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        boolean released = service.releaseStaleIfSafe(reservationId, LocalDateTime.now().minusMinutes(30));
+
+        assertTrue(released);
+        assertEquals(PersonalCreditReservationStatus.RELEASED, reservation.getStatus());
+        assertEquals(new BigDecimal("0.00"), wallet.getReservedBalance());
+    }
+
+    @Test
     void completedReservationCannotBeCapturedAgain() {
         UUID reservationId = UUID.randomUUID();
         PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-6");
