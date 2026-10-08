@@ -136,19 +136,27 @@ public class PersonalCreditExecutionService {
                 && response.getUsage().getOutputTokens() != null
                 ? response.getUsage().getOutputTokens() : 0;
 
+        // Routing/failover may execute a different provider/model than the original
+        // request. Persist and price the successful response target when available.
+        Provider settledProvider = response != null && response.getProvider() != null
+                ? response.getProvider() : request.getProvider();
+        String settledModel = response != null && response.getModel() != null
+                && !response.getModel().isBlank()
+                ? response.getModel() : request.getModel();
+
         // Commit the successful provider result first. If cost estimation or
         // capture fails, the recovery worker still has the provider/model/usage.
         creditService.markProviderInvocationSucceeded(
                 reservationContext.reservationId(),
-                request.getProvider() == null ? null : request.getProvider().name(),
-                request.getModel(),
+                settledProvider == null ? null : settledProvider.name(),
+                settledModel,
                 inputTokens,
                 outputTokens);
 
         PreRequestCostEstimate actual = costEstimator.estimate(
                 PreRequestCostRequest.builder()
-                        .provider(request.getProvider())
-                        .model(request.getModel())
+                        .provider(settledProvider)
+                        .model(settledModel)
                         .inputTokens(inputTokens)
                         .outputTokens(outputTokens)
                         .cachedInputTokens(0)
