@@ -18,7 +18,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PersonalCreditServiceImplTest {
@@ -210,7 +210,7 @@ class PersonalCreditServiceImplTest {
         assertEquals(new BigDecimal("3.20"), result.getSettlementAmount());
         verify(reservations).save(reservation);
         verifyNoInteractions(wallets);
-        org.mockito.Mockito.verify(ledger, never()).save(any());
+        verify(ledger, never()).save(any());
     }
 
     @Test
@@ -246,7 +246,7 @@ class PersonalCreditServiceImplTest {
         assertThrows(PersonalCreditException.class, () -> service.release(reservationId));
 
         verifyNoInteractions(wallets);
-        org.mockito.Mockito.verify(ledger, never()).save(any());
+        verify(ledger, never()).save(any());
     }
 
     @Test
@@ -262,7 +262,7 @@ class PersonalCreditServiceImplTest {
         assertFalse(released);
         assertEquals(PersonalCreditReservationStatus.RESERVED, reservation.getStatus());
         verifyNoInteractions(wallets);
-        org.mockito.Mockito.verify(ledger, never()).save(any());
+        verify(ledger, never()).save(any());
     }
 
     @Test
