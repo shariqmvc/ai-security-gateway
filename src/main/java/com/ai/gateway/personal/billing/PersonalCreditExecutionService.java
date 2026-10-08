@@ -6,6 +6,7 @@ import com.ai.gateway.core.contract.AIResponse;
 import com.ai.gateway.core.cost.dto.PreRequestCostEstimate;
 import com.ai.gateway.core.cost.dto.PreRequestCostRequest;
 import com.ai.gateway.core.cost.service.PreRequestCostEstimator;
+import com.ai.gateway.core.model.Provider;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservation;
 import com.ai.gateway.personal.credit.service.PersonalCreditService;
 import com.ai.gateway.personal.billing.PersonalBillingSettingsRepository;
@@ -13,6 +14,7 @@ import com.ai.gateway.personal.credit.repository.PersonalCreditLedgerRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ import java.util.UUID;
  * provider returns. BYOK and FREE never enter this service.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PersonalCreditExecutionService {
 
@@ -133,6 +136,15 @@ public class PersonalCreditExecutionService {
                 && response.getUsage().getOutputTokens() != null
                 ? response.getUsage().getOutputTokens() : 0;
 
+        // Commit the successful provider result first. If cost estimation or
+        // capture fails, the recovery worker still has the provider/model/usage.
+        creditService.markProviderInvocationSucceeded(
+                reservationContext.reservationId(),
+                request.getProvider() == null ? null : request.getProvider().name(),
+                request.getModel(),
+                inputTokens,
+                outputTokens);
+
         PreRequestCostEstimate actual = costEstimator.estimate(
                 PreRequestCostRequest.builder()
                         .provider(request.getProvider())
@@ -171,6 +183,44 @@ public class PersonalCreditExecutionService {
         if (reservationContext != null) {
             creditService.markProviderInvocationStarted(reservationContext.reservationId());
         }
+    }
+
+    public void recoverPendingSettlement(PersonalCreditReservation reservation) {
+        if (reservation == null
+                || reservation.getStatus() != com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
+            return;
+        }
+        if (reservation.getSettlementAmount() != null) {
+            creditService.capture(reservation.getId(), reservation.getSettlementAmount());
+            return;
+        }
+        if (reservation.getSettlementProvider() == null || reservation.getSettlementModel() == null) {
+            throw new PersonalBillingModeException(
+                    "Pending credit settlement is missing provider usage metadata.");
+        }
+
+        Provider provider = Provider.valueOf(reservation.getSettlementProvider());
+        PreRequestCostEstimate estimate = costEstimator.estimate(
+                PreRequestCostRequest.builder()
+                        .provider(provider)
+                        .model(reservation.getSettlementModel())
+                        .inputTokens(reservation.getSettlementInputTokens() == null
+                                ? 0 : reservation.getSettlementInputTokens())
+                        .outputTokens(reservation.getSettlementOutputTokens() == null
+                                ? 0 : reservation.getSettlementOutputTokens())
+                        .cachedInputTokens(0)
+                        .build());
+        BigDecimal actualAmount = estimate.getTotalEstimatedCost();
+        if (actualAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            actualAmount = minimumCreditCharge().min(reservation.getReservedAmount());
+        }
+        if (actualAmount.compareTo(reservation.getReservedAmount()) > 0) {
+            log.error("Recovered inference cost exceeds reservation; capturing reserved ceiling reservationId={} estimatedAmount={} reservedAmount={}",
+                    reservation.getId(), actualAmount, reservation.getReservedAmount());
+            actualAmount = reservation.getReservedAmount();
+        }
+        creditService.prepareCapture(reservation.getId(), actualAmount);
+        creditService.capture(reservation.getId(), actualAmount);
     }
 
     public void releaseOnFailure(ReservationContext reservationContext) {
