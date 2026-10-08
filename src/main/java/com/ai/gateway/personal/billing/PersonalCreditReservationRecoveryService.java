@@ -3,6 +3,7 @@ package com.ai.gateway.personal.billing;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservation;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus;
 import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
+import com.ai.gateway.personal.credit.service.PersonalCreditService;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 public class PersonalCreditReservationRecoveryService {
 
     private final PersonalCreditExecutionService creditExecutionService;
+    private final PersonalCreditService creditService;
     private final PersonalCreditReservationRepository reservationRepository;
     private final PersonalBillingProperties properties;
 
