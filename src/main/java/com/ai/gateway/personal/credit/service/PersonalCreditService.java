@@ -27,6 +27,10 @@ public interface PersonalCreditService {
                                       String referenceId, String description);
 
     /** Persist the intended charge before attempting the wallet/ledger capture. */
+    PersonalCreditReservation markProviderInvocationSucceeded(
+            UUID reservationId, String provider, String model,
+            Integer inputTokens, Integer outputTokens);
+
     PersonalCreditReservation prepareCapture(UUID reservationId, BigDecimal actualAmount);
 
     /** Mark the reservation before invoking the provider so recovery cannot release an active request. */
