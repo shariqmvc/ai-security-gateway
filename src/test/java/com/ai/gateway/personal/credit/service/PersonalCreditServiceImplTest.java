@@ -191,8 +191,8 @@ class PersonalCreditServiceImplTest {
         assertEquals(PersonalCreditReservationStatus.SETTLEMENT_PENDING, result.getStatus());
         assertEquals("OPENAI", result.getSettlementProvider());
         assertEquals("gpt-test", result.getSettlementModel());
-        assertEquals(120, result.getSettlementInputTokens());
-        assertEquals(45, result.getSettlementOutputTokens());
+        assertEquals(Integer.valueOf(120), result.getSettlementInputTokens());
+        assertEquals(Integer.valueOf(45), result.getSettlementOutputTokens());
         assertNull(result.getSettlementAmount());
     }
 
