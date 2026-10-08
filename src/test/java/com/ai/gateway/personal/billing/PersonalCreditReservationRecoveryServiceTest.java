@@ -65,7 +65,7 @@ class PersonalCreditReservationRecoveryServiceTest {
 
         PersonalBillingProperties properties = new PersonalBillingProperties();
         PersonalCreditReservationRecoveryService recovery = new PersonalCreditReservationRecoveryService(
-                creditService, reservationRepository, properties);
+                creditExecutionService, creditService, reservationRepository, properties);
 
         recovery.recoverReservations();
 
