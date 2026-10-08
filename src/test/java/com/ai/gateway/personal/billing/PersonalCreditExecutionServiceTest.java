@@ -125,6 +125,34 @@ class PersonalCreditExecutionServiceTest {
     }
 
     @Test
+    void reconciliationPricesActualProviderAndModelAfterFailover() {
+        UUID reservationId = UUID.randomUUID();
+        when(costEstimator.estimate(any())).thenReturn(PreRequestCostEstimate.builder()
+                .totalEstimatedCost(new BigDecimal("0.25"))
+                .build());
+        var reservationContext = new PersonalCreditExecutionService.ReservationContext(
+                reservationId, new BigDecimal("0.50"));
+        AIRequest request = AIRequest.builder()
+                .provider(Provider.OPENAI)
+                .model("gpt-test")
+                .prompt("hello")
+                .build();
+        com.ai.gateway.core.contract.AIResponse response =
+                com.ai.gateway.core.contract.AIResponse.builder()
+                        .provider(Provider.ANTHROPIC)
+                        .model("claude-test")
+                        .build();
+
+        service.reconcile(reservationContext, request, response);
+
+        verify(creditService).markProviderInvocationSucceeded(
+                reservationId, "ANTHROPIC", "claude-test", 0, 0);
+        verify(costEstimator).estimate(argThat(costRequest ->
+                costRequest.getProvider() == Provider.ANTHROPIC
+                        && "claude-test".equals(costRequest.getModel())));
+    }
+
+    @Test
     void recoveryRecomputesCostFromPersistedProviderUsageWhenAmountWasNotStored() {
         UUID reservationId = UUID.randomUUID();
         PersonalCreditReservation reservation = PersonalCreditReservation.builder()
