@@ -80,7 +80,7 @@ xai:
 
 groq:
   api-key: ${GROQ_API_KEY:}
-  base-url: ${GROQ_BASE_URL:https://api.groq.com/v1}
+  base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
   model: ${GROQ_MODEL:openai/gpt-oss-120b}
 
 mistral:
@@ -277,7 +277,7 @@ gateway:
           enabled: true
         groq-default:
           provider: GROQ
-          url: ${GROQ_BASE_URL:https://api.groq.ai/v1}
+          url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
           enabled: true
         mistral-default:
           provider: MISTRAL
@@ -477,6 +477,6 @@ alroute:
       xai:
         base-url: ${ALROUTE_PERSONAL_XAI_BASE_URL:https://api.x.ai}
       groq:
-        base-url: ${ALROUTE_PERSONAL_GROQ_BASE_URL:https://api.groq.ai}
+        base-url: ${ALROUTE_PERSONAL_GROQ_BASE_URL:https://api.groq.com}
       mistral:
         base-url: ${ALROUTE_PERSONAL_MISTRAL_BASE_URL:https://api.mistral.ai}
