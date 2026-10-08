@@ -144,6 +144,40 @@ class PersonalCreditServiceImplTest {
     }
 
     @Test
+    void repeatedCaptureWithSameAmountDoesNotMutateWalletOrLedgerAgain() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-duplicate-capture");
+        reservation.setStatus(PersonalCreditReservationStatus.CAPTURED);
+        reservation.setCapturedAmount(new BigDecimal("3.20"));
+        reservation.setCompletedAt(LocalDateTime.now());
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+
+        PersonalCreditReservation result = service.capture(
+                reservationId, new BigDecimal("3.20"));
+
+        assertSame(reservation, result);
+        verifyNoInteractions(wallets);
+        verify(ledger, never()).save(any());
+        verify(reservations, never()).save(any());
+    }
+
+    @Test
+    void repeatedCaptureWithDifferentAmountIsRejectedWithoutMutation() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-conflicting-capture");
+        reservation.setStatus(PersonalCreditReservationStatus.CAPTURED);
+        reservation.setCapturedAmount(new BigDecimal("3.20"));
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+
+        assertThrows(PersonalCreditException.class, () -> service.capture(
+                reservationId, new BigDecimal("3.50")));
+
+        verifyNoInteractions(wallets);
+        verify(ledger, never()).save(any());
+        verify(reservations, never()).save(any());
+    }
+
+    @Test
     void completedReservationCannotBeCapturedAgain() {
         UUID reservationId = UUID.randomUUID();
         PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-6");
