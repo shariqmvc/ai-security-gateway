@@ -178,6 +178,25 @@ class PersonalCreditServiceImplTest {
     }
 
     @Test
+    void providerSuccessPersistsUsageAndMovesReservationToSettlementPending() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-provider-success");
+        reservation.setProviderInvocationStarted(true);
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(reservations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PersonalCreditReservation result = service.markProviderInvocationSucceeded(
+                reservationId, "OPENAI", "gpt-test", 120, 45);
+
+        assertEquals(PersonalCreditReservationStatus.SETTLEMENT_PENDING, result.getStatus());
+        assertEquals("OPENAI", result.getSettlementProvider());
+        assertEquals("gpt-test", result.getSettlementModel());
+        assertEquals(120, result.getSettlementInputTokens());
+        assertEquals(45, result.getSettlementOutputTokens());
+        assertNull(result.getSettlementAmount());
+    }
+
+    @Test
     void prepareCapturePersistsSettlementIntentWithoutMutatingWallet() {
         UUID reservationId = UUID.randomUUID();
         PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-settlement-intent");
