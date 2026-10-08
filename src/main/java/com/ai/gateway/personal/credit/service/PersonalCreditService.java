@@ -11,6 +11,12 @@ public interface PersonalCreditService {
 
     PersonalCreditWallet getOrCreateWallet(UUID personalAccountId);
 
+    /**
+     * Acquires the account wallet row lock for the duration of the caller's
+     * transaction so account-scoped billing checks can be serialized.
+     */
+    PersonalCreditWallet lockWalletForUpdate(UUID personalAccountId);
+
     PersonalCreditLedger credit(UUID personalAccountId, BigDecimal amount,
                                 String referenceId, String description);
 
