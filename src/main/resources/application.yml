@@ -1,7 +1,3 @@
-security:
-  encryption:
-    aes-key: ${AES_KEY:mysecretkey12345}
-
 personal:
   security:
     chat:
@@ -41,3 +37,446 @@ spring:
       ddl-auto: validate
 
     show-sql: ${SPRING_JPA_SHOW_SQL:false}
+
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+logging:
+  pattern:
+    console: "%d %-5level [%X{requestId}] %logger - %msg%n"
+
+  level:
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:INFO}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  model: gpt-5
+  url: https://api.openai.com/v1/responses
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY}
+
+  base:
+    url: https://generativelanguage.googleapis.com
+
+  model: gemini-3.6-flash
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+  model: ${ANTHROPIC_MODEL:claude-sonnet-4-6}
+  max-tokens: ${ANTHROPIC_MAX_TOKENS:4096}
+
+xai:
+  api-key: ${XAI_API_KEY:}
+  base-url: ${XAI_BASE_URL:https://api.x.ai/v1}
+  model: ${XAI_MODEL:grok-4.6}
+
+groq:
+  api-key: ${GROQ_API_KEY:}
+  base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+  model: ${GROQ_MODEL:openai/gpt-oss-120b}
+
+mistral:
+  api-key: ${MISTRAL_API_KEY:}
+  base-url: ${MISTRAL_BASE_URL:https://api.mistral.ai/v1}
+  model: ${MISTRAL_MODEL:mistral-small-latest}
+
+ollama:
+  base:
+    url: http://localhost:11434
+  # Backward-compatible default model used when a request does not select one.
+  model: ${OLLAMA_MODEL:llama3.1:8b}
+  # Models exposed to Alroute's provider/model registry. The first entry
+  # remains the default; additional models can be selected per request.
+  models:
+    - ${OLLAMA_MODEL:llama3.1:8b}
+    - ${OLLAMA_MODEL_2:llama3.2:3b}
+    - ${OLLAMA_VISION_MODEL:qwen2.5vl:3b}
+  # Vision-capable Ollama model used for image requests when the selected
+  # model does not advertise VISION.
+  vision-model: ${OLLAMA_VISION_MODEL:qwen2.5vl:3b}
+  # Keep the local model resident between requests and cap generation so
+  # provider latency cannot grow without bound. Override per environment.
+  keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
+  num-ctx: ${OLLAMA_NUM_CTX:16384}
+  num-predict: ${OLLAMA_NUM_PREDICT:4096}
+
+aegis:
+  security:
+    platform:
+      # Bootstrap credential for the first platform owner. Leave blank and use
+      # a managed secret in production. It uses the same X-API-Key header.
+      bootstrap-api-key: ${AEGIS_PLATFORM_API_KEY:}
+
+security:
+  encryption:
+    aes-key: ${AES_KEY:mysecretkey12345}
+gateway:
+  context:
+    optimization:
+      # Provider-neutral, pre-provider context optimization.
+      # The optimizer is a no-op below the configured threshold and
+      # deterministically prunes duplicate/middle context above the budget.
+      enabled: ${CONTEXT_OPTIMIZATION_ENABLED:true}
+      max-input-tokens: ${CONTEXT_OPTIMIZATION_MAX_INPUT_TOKENS:16000}
+      min-input-tokens: ${CONTEXT_OPTIMIZATION_MIN_INPUT_TOKENS:2000}
+      minimum-savings-tokens: ${CONTEXT_OPTIMIZATION_MINIMUM_SAVINGS_TOKENS:128}
+      prefix-tokens: ${CONTEXT_OPTIMIZATION_PREFIX_TOKENS:2000}
+      suffix-tokens: ${CONTEXT_OPTIMIZATION_SUFFIX_TOKENS:5000}
+      max-segments: ${CONTEXT_OPTIMIZATION_MAX_SEGMENTS:400}
+
+  personal:
+    quota:
+      # Personal quota enforcement. A limit of 0 means unlimited.
+      # Values are environment-overridable so commercial limits can be frozen without code changes.
+      enabled: ${GATEWAY_PERSONAL_QUOTA_ENABLED:true}
+      requests-per-minute: ${GATEWAY_PERSONAL_REQUESTS_PER_MINUTE:0}
+      requests-per-day: ${GATEWAY_PERSONAL_REQUESTS_PER_DAY:0}
+      monthly-token-quota: ${GATEWAY_PERSONAL_MONTHLY_TOKEN_QUOTA:0}
+      max-input-tokens: ${GATEWAY_PERSONAL_MAX_INPUT_TOKENS:0}
+      max-output-tokens: ${GATEWAY_PERSONAL_MAX_OUTPUT_TOKENS:0}
+      max-concurrent-requests: ${GATEWAY_PERSONAL_MAX_CONCURRENT_REQUESTS:0}
+  cache:
+    exact:
+      enabled: ${GATEWAY_CACHE_EXACT_ENABLED:true}
+      maximum-size: ${GATEWAY_CACHE_EXACT_MAXIMUM_SIZE:10000}
+      ttl: ${GATEWAY_CACHE_EXACT_TTL:10m}
+  tenant-schema:
+    migration:
+      reconcile-on-startup: ${GATEWAY_TENANT_SCHEMA_RECONCILE_ON_STARTUP:true}
+  multimodal:
+    remote-media:
+      # Public HTTPS media URLs are resolved by the gateway and translated to
+      # provider-native inline media. HTTP is disabled by default.
+      allow-http: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_ALLOW_HTTP:false}
+      max-bytes: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_MAX_BYTES:15000000}
+      connect-timeout: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_CONNECT_TIMEOUT:5s}
+      read-timeout: ${GATEWAY_MULTIMODAL_REMOTE_MEDIA_READ_TIMEOUT:15s}
+
+  provider:
+
+    http:
+      connect-timeout: ${GATEWAY_PROVIDER_CONNECT_TIMEOUT:5s}
+      read-timeout: ${GATEWAY_PROVIDER_READ_TIMEOUT:30s}
+
+      providers:
+        GEMINI:
+          connect-timeout: ${GATEWAY_GEMINI_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_GEMINI_READ_TIMEOUT:15s}
+
+        CLAUDE:
+          connect-timeout: ${GATEWAY_CLAUDE_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_CLAUDE_READ_TIMEOUT:60s}
+
+        XAI:
+          connect-timeout: ${GATEWAY_XAI_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_XAI_READ_TIMEOUT:60s}
+
+        GROQ:
+          connect-timeout: ${GATEWAY_GROQ_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_GROQ_READ_TIMEOUT:60s}
+
+        MISTRAL:
+          connect-timeout: ${GATEWAY_MISTRAL_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_MISTRAL_READ_TIMEOUT:60s}
+
+        OPENAI:
+          connect-timeout: ${GATEWAY_OPENAI_CONNECT_TIMEOUT:5s}
+          read-timeout: ${GATEWAY_OPENAI_READ_TIMEOUT:30s}
+
+        OLLAMA:
+          connect-timeout: ${GATEWAY_OLLAMA_CONNECT_TIMEOUT:2s}
+          read-timeout: ${GATEWAY_OLLAMA_READ_TIMEOUT:60s}
+
+    concurrency:
+      providers:
+        OLLAMA:
+          max-concurrent: ${GATEWAY_OLLAMA_MAX_CONCURRENT:0}
+          acquire-timeout: ${GATEWAY_OLLAMA_CONCURRENCY_ACQUIRE_TIMEOUT:0s}
+
+  rate-limit:
+    requests-per-minute: 60
+  routing:
+    failover:
+      enabled: ${GATEWAY_ROUTING_FAILOVER_ENABLED:true}
+      max-attempts: ${GATEWAY_ROUTING_FAILOVER_MAX_ATTEMPTS:2}
+      request-time-budget: ${GATEWAY_ROUTING_FAILOVER_REQUEST_TIME_BUDGET:75s}
+      minimum-fallback-budget: ${GATEWAY_ROUTING_FAILOVER_MINIMUM_FALLBACK_BUDGET:1s}
+      circuit-breaker:
+        enabled: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_ENABLED:true}
+        failure-threshold: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_FAILURE_THRESHOLD:1}
+        default-open-duration: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_DEFAULT_OPEN_DURATION:60s}
+        timeout-open-duration: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_TIMEOUT_OPEN_DURATION:60s}
+        network-open-duration: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_NETWORK_OPEN_DURATION:30s}
+        rate-limit-open-duration: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_RATE_LIMIT_OPEN_DURATION:15s}
+        server-error-open-duration: ${GATEWAY_ROUTING_FAILOVER_CIRCUIT_BREAKER_SERVER_ERROR_OPEN_DURATION:30s}
+      providers:
+        GEMINI:
+          - OLLAMA
+        CLAUDE:
+          - GEMINI
+        XAI:
+          - GEMINI
+        GROQ:
+          - OLLAMA
+        OPENAI:
+          - GEMINI
+        MISTRAL:
+          - OLLAMA
+        OLLAMA:
+          - GEMINI
+      failure-injection:
+        # Controlled runtime failure injection for 6.7 validation.
+        # MUST remain disabled outside local/integration testing.
+        enabled: ${ROUTING_FAILURE_INJECTION_ENABLED:false}
+        provider: ${ROUTING_FAILURE_INJECTION_PROVIDER:}
+        model: ${ROUTING_FAILURE_INJECTION_MODEL:}
+        failure-type: ${ROUTING_FAILURE_INJECTION_TYPE:PROVIDER_ERROR}
+
+    # Phase 9 model capability registry. Override per deployment/model.
+    # The registry starts with the configured provider default model.
+    model-capabilities:
+      openai: ${GATEWAY_OPENAI_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING}
+      gemini: ${GATEWAY_GEMINI_MODEL_CAPABILITIES:VISION,AUDIO,TOOLS,REASONING,DOCUMENT_INPUT}
+      ollama: ${GATEWAY_OLLAMA_MODEL_CAPABILITIES:}
+      claude: ${GATEWAY_CLAUDE_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
+      xai: ${GATEWAY_XAI_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
+      groq: ${GATEWAY_GROQ_MODEL_CAPABILITIES:TOOLS,REASONING}
+      mistral: ${GATEWAY_MISTRAL_MODEL_CAPABILITIES:VISION,TOOLS,REASONING}
+
+    # Model-aware context budgets. Exact model entries override provider defaults.
+    # Executable provider endpoints. Endpoint IDs are referenced by routing candidates.
+    endpoints:
+      definitions:
+        ollama-default:
+          provider: OLLAMA
+          url: ${OLLAMA_BASE_URL:http://localhost:11434}
+          enabled: true
+        openai-default:
+          provider: OPENAI
+          url: ${OPENAI_BASE_URL:https://api.openai.com}
+          enabled: true
+        gemini-default:
+          provider: GEMINI
+          url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+          enabled: true
+        claude-default:
+          provider: CLAUDE
+          url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+          enabled: true
+        xai-default:
+          provider: XAI
+          url: ${XAI_BASE_URL:https://api.x.ai/v1}
+          enabled: true
+        groq-default:
+          provider: GROQ
+          url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+          enabled: true
+        mistral-default:
+          provider: MISTRAL
+          url: ${MISTRAL_BASE_URL:https://api.mistral.ai}
+          enabled: true
+
+    context-windows:
+      default-tokens: ${GATEWAY_CONTEXT_DEFAULT_TOKENS:16000}
+      providers:
+        OPENAI: ${GATEWAY_OPENAI_CONTEXT_WINDOW:128000}
+        GEMINI: ${GATEWAY_GEMINI_CONTEXT_WINDOW:128000}
+        OLLAMA: ${OLLAMA_NUM_CTX:16384}
+        CLAUDE: ${GATEWAY_CLAUDE_CONTEXT_WINDOW:200000}
+        XAI: ${GATEWAY_XAI_CONTEXT_WINDOW:500000}
+        GROQ: ${GATEWAY_GROQ_CONTEXT_WINDOW:131072}
+        MISTRAL: ${GATEWAY_MISTRAL_CONTEXT_WINDOW:131072}
+      models: {}
+
+    capacity:
+      enabled: ${GATEWAY_ROUTING_CAPACITY_ENABLED:true}
+      hard-limit: ${GATEWAY_ROUTING_CAPACITY_HARD_LIMIT:true}
+      max-parallel-requests: ${GATEWAY_ROUTING_CAPACITY_MAX_PARALLEL:0}
+      utilization-threshold: ${GATEWAY_ROUTING_CAPACITY_UTILIZATION_THRESHOLD:0.80}
+      rpm-window-seconds: ${GATEWAY_ROUTING_CAPACITY_RPM_WINDOW_SECONDS:60}
+      tpm-window-seconds: ${GATEWAY_ROUTING_CAPACITY_TPM_WINDOW_SECONDS:60}
+      max-parallel: {}
+
+    scoring:
+      weights:
+        cost: 0.30
+        latency: 0.25
+        availability: 0.20
+        capacity: 0.10
+        policy-preference: 0.25
+      defaults:
+        latency-ms: 1000
+        availability: 1.0
+      latency-ms: {}
+      availability: {}
+    optimization:
+      enabled: ${ROUTING_OPTIMIZATION_ENABLED:true}
+      degraded-availability-boost: ${ROUTING_OPTIMIZATION_DEGRADED_BOOST:1.25}
+      unhealthy-availability-boost: ${ROUTING_OPTIMIZATION_UNHEALTHY_BOOST:1.35}
+      latency-priority-boost: ${ROUTING_OPTIMIZATION_LATENCY_BOOST:1.15}
+      cost-priority-boost: ${ROUTING_OPTIMIZATION_COST_BOOST:1.15}
+      reliability-priority-boost: ${ROUTING_OPTIMIZATION_RELIABILITY_BOOST:1.15}
+      min-observations: ${ROUTING_OPTIMIZATION_MIN_OBSERVATIONS:3}
+      degraded-candidate-score-multiplier: ${ROUTING_OPTIMIZATION_DEGRADED_CANDIDATE_MULTIPLIER:0.85}
+      unhealthy-candidate-score-multiplier: ${ROUTING_OPTIMIZATION_UNHEALTHY_CANDIDATE_MULTIPLIER:0.60}
+    health:
+      enabled: ${ROUTING_HEALTH_ENABLED:true}
+      reject-unhealthy: ${ROUTING_HEALTH_REJECT_UNHEALTHY:true}
+      min-observations: ${ROUTING_HEALTH_MIN_OBSERVATIONS:3}
+      consecutive-failure-threshold: ${ROUTING_HEALTH_CONSECUTIVE_FAILURE_THRESHOLD:3}
+      degraded-availability: ${ROUTING_HEALTH_DEGRADED_AVAILABILITY:0.90}
+      unhealthy-availability: ${ROUTING_HEALTH_UNHEALTHY_AVAILABILITY:0.70}
+      ewma-alpha: ${ROUTING_HEALTH_EWMA_ALPHA:0.20}
+      signal-ttl-seconds: ${ROUTING_HEALTH_SIGNAL_TTL_SECONDS:300}
+
+    unity:
+      enabled: false
+
+rag:
+  enabled: ${RAG_ENABLED:true}
+  defaults:
+    vector-store: ${RAG_VECTOR_STORE:PGVECTOR}
+    chunking-strategy: ${RAG_CHUNKING_STRATEGY:TOKEN_AWARE}
+    retrieval-strategy: ${RAG_RETRIEVAL_STRATEGY:HYBRID}
+    top-k: ${RAG_TOP_K:5}
+  embedding:
+    enabled: ${RAG_EMBEDDING_ENABLED:true}
+    batch-size: ${RAG_EMBEDDING_BATCH_SIZE:8}
+    default-provider: ${RAG_EMBEDDING_DEFAULT_PROVIDER:OLLAMA}
+    ollama-model: ${RAG_OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    ollama-keep-alive: ${RAG_OLLAMA_EMBEDDING_KEEP_ALIVE:2m}
+    openai-model: ${RAG_OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    gemini-model: ${RAG_GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
+  ingestion:
+    max-file-size-bytes: ${RAG_INGESTION_MAX_FILE_SIZE_BYTES:20971520}
+    max-extracted-characters: ${RAG_INGESTION_MAX_EXTRACTED_CHARACTERS:2000000}
+    chunk-size-tokens: ${RAG_INGESTION_CHUNK_SIZE_TOKENS:512}
+    chunk-overlap-tokens: ${RAG_INGESTION_CHUNK_OVERLAP_TOKENS:64}
+    max-chunks: ${RAG_INGESTION_MAX_CHUNKS:10000}
+    temp-directory: ${RAG_INGESTION_TEMP_DIRECTORY:${java.io.tmpdir}/aegisai-rag}
+    allowed-extensions:
+      - pdf
+      - docx
+      - md
+      - markdown
+      - txt
+      - html
+      - htm
+      - json
+      - csv
+
+# AIRoute Personal v1 identity foundation.
+alroute:
+  personal:
+    auth:
+      session-ttl: ${ALROUTE_PERSONAL_SESSION_TTL:30d}
+      verification-ttl: ${ALROUTE_PERSONAL_VERIFICATION_TTL:24h}
+      # Keep false in production. Enable only for local/integration testing
+      # when an email delivery adapter is not configured.
+      auto-verify-on-signup: ${ALROUTE_PERSONAL_AUTO_VERIFY_ON_SIGNUP:false}
+      # Keep false in production. When enabled, signup returns a one-time
+      # verification token to support local dogfooding without email delivery.
+      expose-verification-token: ${ALROUTE_PERSONAL_EXPOSE_VERIFICATION_TOKEN:false}
+      # Local dogfooding only. Production SMS delivery must use a real SMS adapter.
+      expose-verification-code: ${ALROUTE_PERSONAL_EXPOSE_VERIFICATION_CODE:false}
+      phone-verification-ttl: ${ALROUTE_PERSONAL_PHONE_VERIFICATION_TTL:10m}
+      verification-base-url: ${ALROUTE_PERSONAL_VERIFICATION_BASE_URL:http://localhost:5173/verify-email}
+      mail-from: ${ALROUTE_PERSONAL_MAIL_FROM:noreply@airouter.local}
+      sms:
+        provider: ${ALROUTE_PERSONAL_SMS_PROVIDER:none}
+        twilio:
+          account-sid: ${TWILIO_ACCOUNT_SID:}
+          auth-token: ${TWILIO_AUTH_TOKEN:}
+          from: ${TWILIO_FROM:}
+
+    # Personal feature entitlements are intentionally separate from Business
+    # tenant entitlements. Business tenant authorization continues to use
+    # tenantId/schema. This list does not create a Business tenant.
+    features:
+      enabled:
+        - OPENAI
+        - GEMINI
+        - CLAUDE
+        - XAI
+        - GROQ
+        - MISTRAL
+        - OLLAMA
+        - CHAT
+        - STREAMING
+        - EMBEDDING
+        - PROMPT_FIREWALL
+        - POLICY_ENGINE
+        - PII_DETECTION
+        - AUDIT
+        - METRICS
+        - TOKEN_ANALYTICS
+        - COST_ANALYTICS
+        - RATE_LIMITING
+        - QUOTA
+        - RAG
+        - MCP
+        - EXTENSIVE_RESEARCH
+        - DASHBOARD
+
+    billing:
+      # Personal FREE includes local Ollama models plus provider free-tier
+      # models. Override ALROUTE_PERSONAL_FREE_MODELS per environment.
+      free-models: ${ALROUTE_PERSONAL_FREE_MODELS:OLLAMA:llama3.1:8b,OLLAMA:llama3.2:3b,OLLAMA:qwen2.5vl:3b,GROQ:openai/gpt-oss-20b,GROQ:openai/gpt-oss-120b}
+      reserve-output-tokens: ${ALROUTE_PERSONAL_RESERVE_OUTPUT_TOKENS:1024}
+      reservation-multiplier: ${ALROUTE_PERSONAL_RESERVATION_MULTIPLIER:1.25}
+      minimum-credit-charge: ${ALROUTE_PERSONAL_MINIMUM_CREDIT_CHARGE:0.01}
+      monthly-free-compute-credit-cap: ${ALROUTE_PERSONAL_MONTHLY_FREE_COMPUTE_CREDIT_CAP:0}
+
+    payment:
+      provider: ${ALROUTE_PERSONAL_PAYMENT_PROVIDER:STRIPE}
+      currency: ${ALROUTE_PERSONAL_PAYMENT_CURRENCY:USD}
+      webhook-secret: ${ALROUTE_PERSONAL_PAYMENT_WEBHOOK_SECRET:change-me-local-only}
+      secret-key: ${ALROUTE_PERSONAL_STRIPE_SECRET_KEY:}
+      api-base-url: ${ALROUTE_PERSONAL_STRIPE_API_BASE_URL:https://api.stripe.com}
+      success-url: ${ALROUTE_PERSONAL_PAYMENT_SUCCESS_URL:http://localhost:5173/billing}
+      cancel-url: ${ALROUTE_PERSONAL_PAYMENT_CANCEL_URL:http://localhost:5173/billing}
+      platform-fee-rate: ${ALROUTE_PERSONAL_PLATFORM_FEE_RATE:0.055}
+      minimum-platform-fee: ${ALROUTE_PERSONAL_MINIMUM_PLATFORM_FEE:0.80}
+      invoice-creation-enabled: ${ALROUTE_PERSONAL_STRIPE_INVOICE_CREATION_ENABLED:true}
+      custom-minimum-credits: ${ALROUTE_PERSONAL_CUSTOM_MINIMUM_CREDITS:10}
+      custom-maximum-credits: ${ALROUTE_PERSONAL_CUSTOM_MAXIMUM_CREDITS:1000}
+      credits-policy: ${ALROUTE_PERSONAL_CREDITS_POLICY:Credits do not expire.}
+      refund-policy: ${ALROUTE_PERSONAL_REFUND_POLICY:Refunds are handled under the published AIRouter refund policy.}
+      tax-policy: ${ALROUTE_PERSONAL_TAX_POLICY:USD billing; taxes are determined by the configured Stripe tax setup.}
+      packages:
+        starter10:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_10_AMOUNT:10}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_10_CREDITS:10}
+        starter25:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_25_AMOUNT:25}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_25_CREDITS:25}
+        starter50:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_50_AMOUNT:50}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_50_CREDITS:50}
+        starter100:
+          amount: ${ALROUTE_PERSONAL_PACKAGE_100_AMOUNT:100}
+          credits: ${ALROUTE_PERSONAL_PACKAGE_100_CREDITS:100}
+
+    providers:
+      # Provider endpoints are system-level infrastructure configuration.
+      # Personal credentials and Personal model choices are stored in the DB.
+      openai:
+        base-url: ${ALROUTE_PERSONAL_OPENAI_BASE_URL:https://api.openai.com}
+      gemini:
+        base-url: ${ALROUTE_PERSONAL_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+      anthropic:
+        base-url: ${ALROUTE_PERSONAL_ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      xai:
+        base-url: ${ALROUTE_PERSONAL_XAI_BASE_URL:https://api.x.ai}
+      groq:
+        base-url: ${ALROUTE_PERSONAL_GROQ_BASE_URL:https://api.groq.com}
+      mistral:
+        base-url: ${ALROUTE_PERSONAL_MISTRAL_BASE_URL:https://api.mistral.ai}
