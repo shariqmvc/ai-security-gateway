@@ -447,6 +447,9 @@ public class GatewayServiceImpl implements GatewayService {
             // Provider Invocation
             // -------------------------------
 
+            if (creditReservation != null) {
+                personalCreditExecutionService.markProviderInvocationStarted(creditReservation);
+            }
             providerInvocationStarted = true;
             providerInvocationStart = System.nanoTime();
             if (personalInferencePersistenceService != null) {
@@ -607,9 +610,11 @@ public class GatewayServiceImpl implements GatewayService {
 
         } catch (Exception ex) {
 
-            releaseCreditReservationSafely(
-                    personalCreditExecutionService, creditReservation, requestId, "CHAT_FAILURE");
-            creditReservation = null;
+            if (!providerInvocationSucceeded) {
+                releaseCreditReservationSafely(
+                        personalCreditExecutionService, creditReservation, requestId, "CHAT_FAILURE");
+                creditReservation = null;
+            }
 
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
@@ -1035,6 +1040,9 @@ public class GatewayServiceImpl implements GatewayService {
                 }
             }
 
+            if (creditReservation != null) {
+                personalCreditExecutionService.markProviderInvocationStarted(creditReservation);
+            }
             providerStart = System.nanoTime();
             providerInvocationStarted = true;
             if (personalInferencePersistenceService != null) {
@@ -1285,9 +1293,11 @@ public class GatewayServiceImpl implements GatewayService {
                     .build());
 
         } catch (StreamClientDisconnectedException ex) {
-            releaseCreditReservationSafely(
-                    personalCreditExecutionService, creditReservation, requestId, "STREAM_CLIENT_DISCONNECT");
-            creditReservation = null;
+            if (!providerInvocationSucceeded) {
+                releaseCreditReservationSafely(
+                        personalCreditExecutionService, creditReservation, requestId, "STREAM_CLIENT_DISCONNECT");
+                creditReservation = null;
+            }
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
                     ? elapsedMs(providerStart) : 0L;
@@ -1348,9 +1358,11 @@ public class GatewayServiceImpl implements GatewayService {
                     rootCause.getClass().getSimpleName(),
                     rootCause.getMessage(),
                     ex);
-            releaseCreditReservationSafely(
-                    personalCreditExecutionService, creditReservation, requestId, "STREAM_FAILURE");
-            creditReservation = null;
+            if (!providerInvocationSucceeded) {
+                releaseCreditReservationSafely(
+                        personalCreditExecutionService, creditReservation, requestId, "STREAM_FAILURE");
+                creditReservation = null;
+            }
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
                     ? elapsedMs(providerStart) : 0L;
