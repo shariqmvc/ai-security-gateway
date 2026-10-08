@@ -159,6 +159,41 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
     @Override
     @Transactional
+    public PersonalCreditReservation markProviderInvocationSucceeded(
+            UUID reservationId, String provider, String model,
+            Integer inputTokens, Integer outputTokens) {
+        requireReservationId(reservationId);
+        if (inputTokens != null && inputTokens < 0 || outputTokens != null && outputTokens < 0) {
+            throw new PersonalCreditException("Provider token usage cannot be negative.");
+        }
+        PersonalCreditReservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new PersonalCreditException("Credit reservation not found."));
+        if (reservation.getStatus() == PersonalCreditReservationStatus.CAPTURED) {
+            return reservation;
+        }
+        if (reservation.getStatus() == PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
+            boolean sameUsage = java.util.Objects.equals(reservation.getSettlementProvider(), provider)
+                    && java.util.Objects.equals(reservation.getSettlementModel(), model)
+                    && java.util.Objects.equals(reservation.getSettlementInputTokens(), inputTokens)
+                    && java.util.Objects.equals(reservation.getSettlementOutputTokens(), outputTokens);
+            if (sameUsage) return reservation;
+            throw new PersonalCreditException("A different provider settlement is already pending.");
+        }
+        if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED
+                || !reservation.isProviderInvocationStarted()) {
+            throw new PersonalCreditException("Provider success cannot be recorded for this reservation.");
+        }
+
+        reservation.setSettlementProvider(provider);
+        reservation.setSettlementModel(model);
+        reservation.setSettlementInputTokens(inputTokens == null ? 0 : inputTokens);
+        reservation.setSettlementOutputTokens(outputTokens == null ? 0 : outputTokens);
+        reservation.setStatus(PersonalCreditReservationStatus.SETTLEMENT_PENDING);
+        return reservationRepository.save(reservation);
+    }
+
+    @Override
+    @Transactional
     public PersonalCreditReservation prepareCapture(UUID reservationId, BigDecimal actualAmount) {
         requireReservationId(reservationId);
         if (actualAmount == null || actualAmount.compareTo(ZERO) < 0) {
