@@ -167,6 +167,17 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
         PersonalCreditReservation reservation = reservationRepository.findByIdForUpdate(reservationId)
                 .orElseThrow(() -> new PersonalCreditException("Credit reservation not found."));
+        if (reservation.getStatus() == PersonalCreditReservationStatus.CAPTURED) {
+            if (reservation.getCapturedAmount() != null
+                    && reservation.getCapturedAmount().compareTo(actualAmount) == 0) {
+                // Repeated reconciliation of the same result is safe: the
+                // original capture already committed its wallet and ledger
+                // mutations, so return without applying them a second time.
+                return reservation;
+            }
+            throw new PersonalCreditException(
+                    "Credit reservation was already captured with a different amount.");
+        }
         if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED) {
             throw new PersonalCreditException("Credit reservation is no longer active.");
         }
