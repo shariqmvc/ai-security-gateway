@@ -3,7 +3,6 @@ package com.ai.gateway.personal.billing;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservation;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus;
 import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
-import com.ai.gateway.personal.credit.service.PersonalCreditService;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +19,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PersonalCreditReservationRecoveryService {
 
-    private final PersonalCreditService creditService;
+    private final PersonalCreditExecutionService creditExecutionService;
     private final PersonalCreditReservationRepository reservationRepository;
     private final PersonalBillingProperties properties;
 
@@ -39,7 +38,7 @@ public class PersonalCreditReservationRecoveryService {
                             reservation.getId());
                     continue;
                 }
-                creditService.capture(reservation.getId(), reservation.getSettlementAmount());
+                creditExecutionService.recoverPendingSettlement(reservation);
             } catch (RuntimeException ex) {
                 log.warn("Credit settlement retry failed reservationId={}", reservation.getId(), ex);
             }
