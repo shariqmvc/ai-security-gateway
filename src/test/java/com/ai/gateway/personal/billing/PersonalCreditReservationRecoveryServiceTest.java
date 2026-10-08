@@ -21,6 +21,8 @@ class PersonalCreditReservationRecoveryServiceTest {
     @Mock
     private PersonalCreditService creditService;
     @Mock
+    private PersonalCreditExecutionService creditExecutionService;
+    @Mock
     private PersonalCreditReservationRepository reservationRepository;
 
     @Test
@@ -40,11 +42,11 @@ class PersonalCreditReservationRecoveryServiceTest {
 
         PersonalBillingProperties properties = new PersonalBillingProperties();
         PersonalCreditReservationRecoveryService recovery = new PersonalCreditReservationRecoveryService(
-                creditService, reservationRepository, properties);
+                creditExecutionService, creditService, reservationRepository, properties);
 
         recovery.recoverReservations();
 
-        verify(creditService).capture(id, new BigDecimal("0.42"));
+        verify(creditExecutionService).recoverPendingSettlement(reservation);
     }
 
     @Test
