@@ -23,6 +23,13 @@ public interface PersonalCreditReservationRepository extends JpaRepository<Perso
 
     Optional<PersonalCreditReservation> findByReferenceId(String referenceId);
 
+    java.util.List<PersonalCreditReservation> findTop100ByStatusOrderByCreatedAtAsc(
+            com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus status);
+
+    java.util.List<PersonalCreditReservation> findTop100ByStatusAndProviderInvocationStartedFalseAndCreatedAtBeforeOrderByCreatedAtAsc(
+            com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus status,
+            java.time.LocalDateTime createdBefore);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select r
