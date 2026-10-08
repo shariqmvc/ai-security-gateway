@@ -7,10 +7,19 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface PersonalCreditReservationRepository extends JpaRepository<PersonalCreditReservation, UUID> {
+
+    @Query("""
+            select coalesce(sum(r.reservedAmount), 0)
+            from PersonalCreditReservation r
+            where r.personalAccountId = :accountId
+              and r.status = com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.RESERVED
+            """)
+    BigDecimal sumOutstandingReservations(@Param("accountId") UUID accountId);
 
     Optional<PersonalCreditReservation> findByReferenceId(String referenceId);
 
