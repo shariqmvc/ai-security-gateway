@@ -126,54 +126,50 @@ public class PersonalCreditExecutionService {
             return;
         }
 
-        try {
-            int inputTokens = response != null && response.getUsage() != null
-                    && response.getUsage().getInputTokens() != null
-                    ? response.getUsage().getInputTokens() : 0;
-            int outputTokens = response != null && response.getUsage() != null
-                    && response.getUsage().getOutputTokens() != null
-                    ? response.getUsage().getOutputTokens() : 0;
+        int inputTokens = response != null && response.getUsage() != null
+                && response.getUsage().getInputTokens() != null
+                ? response.getUsage().getInputTokens() : 0;
+        int outputTokens = response != null && response.getUsage() != null
+                && response.getUsage().getOutputTokens() != null
+                ? response.getUsage().getOutputTokens() : 0;
 
-            PreRequestCostEstimate actual = costEstimator.estimate(
-                    PreRequestCostRequest.builder()
-                            .provider(request.getProvider())
-                            .model(request.getModel())
-                            .inputTokens(inputTokens)
-                            .outputTokens(outputTokens)
-                            .cachedInputTokens(0)
-                            .build());
+        PreRequestCostEstimate actual = costEstimator.estimate(
+                PreRequestCostRequest.builder()
+                        .provider(request.getProvider())
+                        .model(request.getModel())
+                        .inputTokens(inputTokens)
+                        .outputTokens(outputTokens)
+                        .cachedInputTokens(0)
+                        .build());
 
-            BigDecimal actualAmount = actual.getTotalEstimatedCost();
+        BigDecimal actualAmount = actual.getTotalEstimatedCost();
 
-            // Keep explicit CREDIT billable even when Core pricing for the
-            // selected provider/model is zero (for example, local Ollama).
-            if (actualAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                actualAmount = minimumCreditCharge().min(reservationContext.reservedAmount());
-            }
+        // Keep explicit CREDIT billable even when Core pricing for the
+        // selected provider/model is zero (for example, local Ollama).
+        if (actualAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            actualAmount = minimumCreditCharge().min(reservationContext.reservedAmount());
+        }
 
-            /*
-             * A reservation is deliberately a hard ceiling. If the provider
-             * reports usage above it, do not silently overdraw the wallet.
-             * The reservation is captured at its ceiling and the caller gets
-             * a deterministic billing exception so the discrepancy can be
-             * reconciled explicitly.
-             */
-            if (actualAmount.compareTo(reservationContext.reservedAmount()) > 0) {
-                creditService.capture(
-                        reservationContext.reservationId(),
-                        reservationContext.reservedAmount());
-                throw new PersonalBillingModeException(
-                        "Actual inference cost exceeded the reserved Personal credit amount.");
-            }
+        /*
+         * Persist settlement intent in its own transaction before wallet
+         * mutation. If capture fails or the process exits, recovery can retry
+         * this exact amount without recomputing usage or releasing the hold.
+         */
+        if (actualAmount.compareTo(reservationContext.reservedAmount()) > 0) {
+            BigDecimal cappedAmount = reservationContext.reservedAmount();
+            creditService.prepareCapture(reservationContext.reservationId(), cappedAmount);
+            creditService.capture(reservationContext.reservationId(), cappedAmount);
+            throw new PersonalBillingModeException(
+                    "Actual inference cost exceeded the reserved Personal credit amount.");
+        }
 
-            creditService.capture(
-                    reservationContext.reservationId(),
-                    actualAmount);
-        } catch (PersonalBillingModeException ex) {
-            throw ex;
-        } catch (RuntimeException ex) {
-            creditService.release(reservationContext.reservationId());
-            throw ex;
+        creditService.prepareCapture(reservationContext.reservationId(), actualAmount);
+        creditService.capture(reservationContext.reservationId(), actualAmount);
+    }
+
+    public void markProviderInvocationStarted(ReservationContext reservationContext) {
+        if (reservationContext != null) {
+            creditService.markProviderInvocationStarted(reservationContext.reservationId());
         }
     }
 
