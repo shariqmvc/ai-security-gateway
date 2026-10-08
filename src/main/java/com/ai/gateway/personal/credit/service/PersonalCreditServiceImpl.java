@@ -60,6 +60,12 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
     @Override
     @Transactional
+    public PersonalCreditWallet lockWalletForUpdate(UUID personalAccountId) {
+        return getWalletForUpdate(personalAccountId);
+    }
+
+    @Override
+    @Transactional
     public PersonalCreditLedger credit(UUID personalAccountId, BigDecimal amount,
                                        String referenceId, String description) {
         requirePositive(amount);
