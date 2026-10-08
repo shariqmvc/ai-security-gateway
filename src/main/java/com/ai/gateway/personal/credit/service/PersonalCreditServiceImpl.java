@@ -210,8 +210,14 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
             throw new PersonalCreditException("Credit reservation was already captured with a different amount.");
         }
         if (reservation.getStatus() == PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
-            if (reservation.getSettlementAmount() != null
-                    && reservation.getSettlementAmount().compareTo(actualAmount) == 0) {
+            if (actualAmount.compareTo(reservation.getReservedAmount()) > 0) {
+                throw new PersonalCreditException("Actual credit amount exceeds reserved amount.");
+            }
+            if (reservation.getSettlementAmount() == null) {
+                reservation.setSettlementAmount(actualAmount);
+                return reservationRepository.save(reservation);
+            }
+            if (reservation.getSettlementAmount().compareTo(actualAmount) == 0) {
                 return reservation;
             }
             throw new PersonalCreditException("A different credit settlement is already pending.");
