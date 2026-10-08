@@ -37,6 +37,18 @@ public class PersonalCreditReservation {
     @Builder.Default
     private boolean providerInvocationStarted = false;
 
+    @Column(name = "settlement_provider", length = 32)
+    private String settlementProvider;
+
+    @Column(name = "settlement_model", length = 255)
+    private String settlementModel;
+
+    @Column(name = "settlement_input_tokens")
+    private Integer settlementInputTokens;
+
+    @Column(name = "settlement_output_tokens")
+    private Integer settlementOutputTokens;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     @Builder.Default
