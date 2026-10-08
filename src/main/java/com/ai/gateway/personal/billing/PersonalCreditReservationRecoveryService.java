@@ -35,11 +35,6 @@ public class PersonalCreditReservationRecoveryService {
         for (PersonalCreditReservation reservation : reservationRepository
                 .findTop100ByStatusOrderByCreatedAtAsc(PersonalCreditReservationStatus.SETTLEMENT_PENDING)) {
             try {
-                if (reservation.getSettlementAmount() == null) {
-                    log.error("Credit reservation has pending status without settlement amount reservationId={}",
-                            reservation.getId());
-                    continue;
-                }
                 creditExecutionService.recoverPendingSettlement(reservation);
             } catch (RuntimeException ex) {
                 log.warn("Credit settlement retry failed reservationId={}", reservation.getId(), ex);
