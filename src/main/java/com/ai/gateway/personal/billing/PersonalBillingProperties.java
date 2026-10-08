@@ -17,4 +17,8 @@ public class PersonalBillingProperties {
     private BigDecimal minimumCreditCharge = new BigDecimal("0.01");
     /** Monthly provider compute-cost allowance for FREE model execution; 0 means unlimited. */
     private BigDecimal monthlyFreeComputeCreditCap = BigDecimal.ZERO;
+    /** Delay between durable credit reservation recovery runs. */
+    private long reservationRecoveryIntervalMs = 60000;
+    /** Minimum age before a reservation with no provider invocation can be released. */
+    private long staleReservationAgeMinutes = 30;
 }
