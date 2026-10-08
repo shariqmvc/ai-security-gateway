@@ -607,14 +607,9 @@ public class GatewayServiceImpl implements GatewayService {
 
         } catch (Exception ex) {
 
-            if (creditReservation != null) {
-                try {
-                    personalCreditExecutionService.releaseOnFailure(creditReservation);
-                } catch (RuntimeException releaseEx) {
-                    log.error("Failed to release Personal credit reservation requestId={}",
-                            requestId, releaseEx);
-                }
-            }
+            releaseCreditReservationSafely(
+                    personalCreditExecutionService, creditReservation, requestId, "CHAT_FAILURE");
+            creditReservation = null;
 
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
@@ -1290,10 +1285,9 @@ public class GatewayServiceImpl implements GatewayService {
                     .build());
 
         } catch (StreamClientDisconnectedException ex) {
-            if (creditReservation != null) {
-                personalCreditExecutionService.releaseOnFailure(creditReservation);
-                creditReservation = null;
-            }
+            releaseCreditReservationSafely(
+                    personalCreditExecutionService, creditReservation, requestId, "STREAM_CLIENT_DISCONNECT");
+            creditReservation = null;
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
                     ? elapsedMs(providerStart) : 0L;
@@ -1354,10 +1348,9 @@ public class GatewayServiceImpl implements GatewayService {
                     rootCause.getClass().getSimpleName(),
                     rootCause.getMessage(),
                     ex);
-            if (creditReservation != null) {
-                personalCreditExecutionService.releaseOnFailure(creditReservation);
-                creditReservation = null;
-            }
+            releaseCreditReservationSafely(
+                    personalCreditExecutionService, creditReservation, requestId, "STREAM_FAILURE");
+            creditReservation = null;
             long latency = elapsedMs(start);
             long providerLatency = providerInvocationStarted
                     ? elapsedMs(providerStart) : 0L;
@@ -1441,6 +1434,25 @@ public class GatewayServiceImpl implements GatewayService {
             if (quotaAcquired) {
                 personalQuotaService.release(auth);
             }
+        }
+    }
+
+    static void releaseCreditReservationSafely(
+            PersonalCreditExecutionService creditExecutionService,
+            PersonalCreditExecutionService.ReservationContext reservationContext,
+            UUID requestId,
+            String reason) {
+        if (reservationContext == null) {
+            return;
+        }
+        try {
+            creditExecutionService.releaseOnFailure(reservationContext);
+        } catch (RuntimeException releaseEx) {
+            log.error(
+                    "Failed to release Personal credit reservation requestId={} reason={}",
+                    requestId,
+                    reason,
+                    releaseEx);
         }
     }
 
