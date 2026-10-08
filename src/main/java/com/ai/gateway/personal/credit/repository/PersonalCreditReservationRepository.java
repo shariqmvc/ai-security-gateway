@@ -17,7 +17,10 @@ public interface PersonalCreditReservationRepository extends JpaRepository<Perso
             select coalesce(sum(r.reservedAmount), 0)
             from PersonalCreditReservation r
             where r.personalAccountId = :accountId
-              and r.status = com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.RESERVED
+              and r.status in (
+                  com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.RESERVED,
+                  com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.SETTLEMENT_PENDING
+              )
             """)
     BigDecimal sumOutstandingReservations(@Param("accountId") UUID accountId);
 
