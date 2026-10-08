@@ -42,6 +42,20 @@ public class PersonalCreditReservationRecoveryService {
         }
     }
 
+    @Scheduled(fixedDelayString = "${alroute.personal.billing.stale-inflight-audit-interval-ms:900000}")
+    public void auditStaleInFlightReservations() {
+        LocalDateTime cutoff = LocalDateTime.now()
+                .minusHours(Math.max(1, properties.getStaleInFlightReservationAuditAgeHours()));
+        for (PersonalCreditReservation reservation : reservationRepository
+                .findTop100ByStatusAndProviderInvocationStartedTrueAndCreatedAtBeforeOrderByCreatedAtAsc(
+                        PersonalCreditReservationStatus.RESERVED, cutoff)) {
+            // Do not release: the provider may have completed while durable
+            // settlement metadata failed to persist. Surface for reconciliation.
+            log.error("Stale in-flight Personal credit reservation requires reconciliation; hold retained reservationId={} referenceId={} createdAt={}",
+                    reservation.getId(), reservation.getReferenceId(), reservation.getCreatedAt());
+        }
+    }
+
     void releaseAbandonedPreInvocationReservations() {
         LocalDateTime cutoff = LocalDateTime.now()
                 .minusMinutes(Math.max(1, properties.getStaleReservationAgeMinutes()));
