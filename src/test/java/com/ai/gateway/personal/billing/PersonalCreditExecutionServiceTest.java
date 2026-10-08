@@ -5,6 +5,7 @@ import com.ai.gateway.core.contract.AIRequest;
 import com.ai.gateway.core.cost.dto.PreRequestCostEstimate;
 import com.ai.gateway.core.cost.service.PreRequestCostEstimator;
 import com.ai.gateway.core.model.Provider;
+import com.ai.gateway.personal.credit.entity.PersonalCreditReservation;
 import com.ai.gateway.personal.credit.repository.PersonalCreditLedgerRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
 import com.ai.gateway.personal.credit.service.PersonalCreditService;
