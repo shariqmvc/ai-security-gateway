@@ -71,6 +71,8 @@ class PersonalCreditExecutionServiceTest {
         service.reconcile(reservationContext, request, com.ai.gateway.core.contract.AIResponse.builder().build());
 
         InOrder order = inOrder(creditService);
+        order.verify(creditService).markProviderInvocationSucceeded(
+                reservationId, "OPENAI", "gpt-test", 0, 0);
         order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
         order.verify(creditService).capture(reservationId, new BigDecimal("0.25"));
         verify(creditService, never()).release(reservationId);
@@ -92,7 +94,10 @@ class PersonalCreditExecutionServiceTest {
                 () -> service.reconcile(reservationContext, request,
                         com.ai.gateway.core.contract.AIResponse.builder().build()));
 
-        verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
+        InOrder order = inOrder(creditService);
+        order.verify(creditService).markProviderInvocationSucceeded(
+                reservationId, "OPENAI", "gpt-test", 0, 0);
+        order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
         verify(creditService, never()).release(reservationId);
     }
 
@@ -111,9 +116,33 @@ class PersonalCreditExecutionServiceTest {
                         com.ai.gateway.core.contract.AIResponse.builder().build()));
 
         InOrder order = inOrder(creditService);
+        order.verify(creditService).markProviderInvocationSucceeded(
+                reservationId, "OPENAI", "gpt-test", 0, 0);
         order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.50"));
         order.verify(creditService).capture(reservationId, new BigDecimal("0.50"));
         verify(creditService, never()).release(reservationId);
+    }
+
+    @Test
+    void recoveryRecomputesCostFromPersistedProviderUsageWhenAmountWasNotStored() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = PersonalCreditReservation.builder()
+                .id(reservationId)
+                .reservedAmount(new BigDecimal("0.50"))
+                .status(com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.SETTLEMENT_PENDING)
+                .settlementProvider("OPENAI")
+                .settlementModel("gpt-test")
+                .settlementInputTokens(100)
+                .settlementOutputTokens(200)
+                .build();
+        when(costEstimator.estimate(any())).thenReturn(PreRequestCostEstimate.builder()
+                .totalEstimatedCost(new BigDecimal("0.25"))
+                .build());
+
+        service.recoverPendingSettlement(reservation);
+
+        verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
+        verify(creditService).capture(reservationId, new BigDecimal("0.25"));
     }
 
     @Test
