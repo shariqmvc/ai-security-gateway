@@ -26,6 +26,15 @@ public interface PersonalCreditService {
     PersonalCreditReservation reserve(UUID personalAccountId, BigDecimal amount,
                                       String referenceId, String description);
 
+    /** Persist the intended charge before attempting the wallet/ledger capture. */
+    PersonalCreditReservation prepareCapture(UUID reservationId, BigDecimal actualAmount);
+
+    /** Mark the reservation before invoking the provider so recovery cannot release an active request. */
+    PersonalCreditReservation markProviderInvocationStarted(UUID reservationId);
+
+    /** Release only if the reservation is still old and provider invocation never started. */
+    boolean releaseStaleIfSafe(UUID reservationId, java.time.LocalDateTime createdBefore);
+
     PersonalCreditReservation capture(UUID reservationId, BigDecimal actualAmount);
 
     PersonalCreditReservation release(UUID reservationId);
