@@ -59,6 +59,64 @@ class PersonalCreditExecutionServiceTest {
     }
 
     @Test
+    void reconciliationPersistsSettlementIntentBeforeCapture() {
+        UUID reservationId = UUID.randomUUID();
+        when(costEstimator.estimate(any())).thenReturn(PreRequestCostEstimate.builder()
+                .totalEstimatedCost(new BigDecimal("0.25"))
+                .build());
+        var reservationContext = new PersonalCreditExecutionService.ReservationContext(
+                reservationId, new BigDecimal("0.50"));
+        AIRequest request = AIRequest.builder().provider(Provider.OPENAI).model("gpt-test").prompt("hello").build();
+
+        service.reconcile(reservationContext, request, com.ai.gateway.core.contract.AIResponse.builder().build());
+
+        InOrder order = inOrder(creditService);
+        order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
+        order.verify(creditService).capture(reservationId, new BigDecimal("0.25"));
+        verify(creditService, never()).release(reservationId);
+    }
+
+    @Test
+    void reconciliationLeavesReservationForRecoveryWhenCaptureFails() {
+        UUID reservationId = UUID.randomUUID();
+        when(costEstimator.estimate(any())).thenReturn(PreRequestCostEstimate.builder()
+                .totalEstimatedCost(new BigDecimal("0.25"))
+                .build());
+        doThrow(new IllegalStateException("database temporarily unavailable"))
+                .when(creditService).capture(reservationId, new BigDecimal("0.25"));
+        var reservationContext = new PersonalCreditExecutionService.ReservationContext(
+                reservationId, new BigDecimal("0.50"));
+        AIRequest request = AIRequest.builder().provider(Provider.OPENAI).model("gpt-test").prompt("hello").build();
+
+        assertThrows(IllegalStateException.class,
+                () -> service.reconcile(reservationContext, request,
+                        com.ai.gateway.core.contract.AIResponse.builder().build()));
+
+        verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
+        verify(creditService, never()).release(reservationId);
+    }
+
+    @Test
+    void reconciliationCapsActualCostAtReservationAndPersistsThatAmount() {
+        UUID reservationId = UUID.randomUUID();
+        when(costEstimator.estimate(any())).thenReturn(PreRequestCostEstimate.builder()
+                .totalEstimatedCost(new BigDecimal("0.75"))
+                .build());
+        var reservationContext = new PersonalCreditExecutionService.ReservationContext(
+                reservationId, new BigDecimal("0.50"));
+        AIRequest request = AIRequest.builder().provider(Provider.OPENAI).model("gpt-test").prompt("hello").build();
+
+        assertThrows(PersonalBillingModeException.class,
+                () -> service.reconcile(reservationContext, request,
+                        com.ai.gateway.core.contract.AIResponse.builder().build()));
+
+        InOrder order = inOrder(creditService);
+        order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.50"));
+        order.verify(creditService).capture(reservationId, new BigDecimal("0.50"));
+        verify(creditService, never()).release(reservationId);
+    }
+
+    @Test
     void outstandingReservationsAreIncludedInMonthlySpendCapBeforeNewReservation() {
         when(costEstimator.estimate(any())).thenReturn(PreRequestCostEstimate.builder()
                 .totalEstimatedCost(new BigDecimal("0.50"))
