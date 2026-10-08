@@ -21,4 +21,6 @@ public class PersonalBillingProperties {
     private long reservationRecoveryIntervalMs = 60000;
     /** Minimum age before a reservation with no provider invocation can be released. */
     private long staleReservationAgeMinutes = 30;
+    /** Age after which in-flight reservations are surfaced for manual reconciliation, never auto-released. */
+    private long staleInFlightReservationAuditAgeHours = 2;
 }
