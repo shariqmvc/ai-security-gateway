@@ -30,6 +30,13 @@ public class PersonalCreditReservation {
     @Builder.Default
     private BigDecimal capturedAmount = BigDecimal.ZERO;
 
+    @Column(name = "settlement_amount", precision = 19, scale = 8)
+    private BigDecimal settlementAmount;
+
+    @Column(name = "provider_invocation_started", nullable = false)
+    @Builder.Default
+    private boolean providerInvocationStarted = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     @Builder.Default
