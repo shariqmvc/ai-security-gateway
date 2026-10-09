@@ -95,6 +95,22 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
         requirePositive(amount);
         requireReference(referenceId);
 
+        // A retry with the same reference and payload is a successful no-op.
+        // Reusing a reference for a different refund must remain an error.
+        Optional<PersonalCreditLedger> existing = ledgerRepository.findByReferenceId(referenceId);
+        if (existing.isPresent()) {
+            PersonalCreditLedger prior = existing.get();
+            if (prior.getEntryType() == PersonalCreditLedgerEntryType.REFUND
+                    && personalAccountId.equals(prior.getPersonalAccountId())
+                    && prior.getAmount() != null
+                    && prior.getAmount().compareTo(amount.negate()) == 0) {
+                return prior;
+            }
+            throw new PersonalCreditException(
+                    "Credit reference has already been processed with a different operation or amount: "
+                            + referenceId);
+        }
+
         PersonalCreditWallet wallet = getWalletForUpdate(personalAccountId);
         ensureReferenceUnused(referenceId);
 
