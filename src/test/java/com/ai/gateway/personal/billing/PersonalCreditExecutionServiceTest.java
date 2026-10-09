@@ -104,6 +104,35 @@ class PersonalCreditExecutionServiceTest {
     }
 
     @Test
+    void costEstimationFailureAfterProviderSuccessLeavesDurableSettlementForRecovery() {
+        UUID reservationId = UUID.randomUUID();
+        var reservationContext = new PersonalCreditExecutionService.ReservationContext(
+                reservationId, new BigDecimal("0.50"));
+        AIRequest request = AIRequest.builder()
+                .provider(Provider.OPENAI)
+                .model("gpt-test")
+                .prompt("hello")
+                .build();
+
+        when(costEstimator.estimate(any()))
+                .thenThrow(new IllegalStateException("pricing temporarily unavailable"));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.reconcile(reservationContext, request,
+                        com.ai.gateway.core.contract.AIResponse.builder()
+                                .usage(com.ai.gateway.core.contract.Usage.builder()
+                                        .inputTokens(100)
+                                        .outputTokens(50)
+                                        .build())
+                                .build()));
+
+        verify(creditService).markProviderInvocationSucceeded(
+                reservationId, "OPENAI", "gpt-test", 100, 50);
+        verify(creditService, never()).release(reservationId);
+        verify(creditService, never()).capture(any(), any());
+    }
+
+    @Test
     void reconciliationCapsActualCostAtReservationAndPersistsThatAmount() {
         UUID reservationId = UUID.randomUUID();
         when(costEstimator.estimate(any())).thenReturn(PreRequestCostEstimate.builder()
