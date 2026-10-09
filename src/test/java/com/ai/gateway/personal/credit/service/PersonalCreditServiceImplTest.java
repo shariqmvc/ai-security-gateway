@@ -60,6 +60,45 @@ class PersonalCreditServiceImplTest {
     }
 
     @Test
+    void repeatedDebitWithSameReferenceAndAmountIsIdempotent() {
+        PersonalCreditLedger prior = PersonalCreditLedger.builder()
+                .id(UUID.randomUUID())
+                .personalAccountId(accountId)
+                .entryType(PersonalCreditLedgerEntryType.REFUND)
+                .amount(new BigDecimal("-3.00"))
+                .referenceId("refund-retry-1")
+                .createdAt(LocalDateTime.now())
+                .build();
+        when(ledger.findByReferenceId("refund-retry-1")).thenReturn(Optional.of(prior));
+
+        PersonalCreditLedger result = service.debit(
+                accountId, new BigDecimal("3.00"), "refund-retry-1", "Retry refund");
+
+        assertSame(prior, result);
+        verifyNoInteractions(wallets, reservations);
+        verify(ledger, never()).save(any());
+    }
+
+    @Test
+    void repeatedDebitWithConflictingAmountIsRejectedWithoutMutation() {
+        PersonalCreditLedger prior = PersonalCreditLedger.builder()
+                .id(UUID.randomUUID())
+                .personalAccountId(accountId)
+                .entryType(PersonalCreditLedgerEntryType.REFUND)
+                .amount(new BigDecimal("-3.00"))
+                .referenceId("refund-conflict-1")
+                .createdAt(LocalDateTime.now())
+                .build();
+        when(ledger.findByReferenceId("refund-conflict-1")).thenReturn(Optional.of(prior));
+
+        assertThrows(PersonalCreditException.class, () -> service.debit(
+                accountId, new BigDecimal("4.00"), "refund-conflict-1", "Conflicting retry"));
+
+        verifyNoInteractions(wallets, reservations);
+        verify(ledger, never()).save(any());
+    }
+
+    @Test
     void reservationUsesAvailableBalanceAndIncreasesReservedBalance() {
         PersonalCreditWallet wallet = wallet("10.00", "2.00");
         when(wallets.findByPersonalAccountIdForUpdate(accountId)).thenReturn(Optional.of(wallet));
