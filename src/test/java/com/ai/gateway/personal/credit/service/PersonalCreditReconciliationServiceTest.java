@@ -48,6 +48,10 @@ class PersonalCreditReconciliationServiceTest {
         assertTrue(report.isFullyReconciled());
         assertEquals(new BigDecimal("0.00"), report.balanceVariance());
         assertEquals(new BigDecimal("0.00"), report.reservedBalanceVariance());
+        verify(wallets).findByPersonalAccountId(accountId);
+        verify(ledger).sumBalanceAffectingEntries(accountId);
+        verify(ledger).countByPersonalAccountId(accountId);
+        verify(reservations).sumOutstandingReservations(accountId);
         verifyNoMoreInteractions(wallets, ledger, reservations);
     }
 
