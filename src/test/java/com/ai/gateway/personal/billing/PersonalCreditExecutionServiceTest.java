@@ -212,6 +212,46 @@ class PersonalCreditExecutionServiceTest {
     }
 
     @Test
+    void recoveryWithMissingInputTokensCapturesReservedCeilingWithoutEstimating() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = PersonalCreditReservation.builder()
+                .id(reservationId)
+                .reservedAmount(new BigDecimal("0.50"))
+                .status(com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.SETTLEMENT_PENDING)
+                .settlementProvider("OPENAI")
+                .settlementModel("gpt-test")
+                .settlementInputTokens(null)
+                .settlementOutputTokens(200)
+                .build();
+
+        service.recoverPendingSettlement(reservation);
+
+        verify(creditService).prepareCapture(reservationId, new BigDecimal("0.50"));
+        verify(creditService).capture(reservationId, new BigDecimal("0.50"));
+        verify(costEstimator, never()).estimate(any());
+    }
+
+    @Test
+    void recoveryWithMissingOutputTokensCapturesReservedCeilingWithoutEstimating() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = PersonalCreditReservation.builder()
+                .id(reservationId)
+                .reservedAmount(new BigDecimal("0.50"))
+                .status(com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.SETTLEMENT_PENDING)
+                .settlementProvider("OPENAI")
+                .settlementModel("gpt-test")
+                .settlementInputTokens(100)
+                .settlementOutputTokens(null)
+                .build();
+
+        service.recoverPendingSettlement(reservation);
+
+        verify(creditService).prepareCapture(reservationId, new BigDecimal("0.50"));
+        verify(creditService).capture(reservationId, new BigDecimal("0.50"));
+        verify(costEstimator, never()).estimate(any());
+    }
+
+    @Test
     void recoveryRecomputesCostFromPersistedProviderUsageWhenAmountWasNotStored() {
         UUID reservationId = UUID.randomUUID();
         PersonalCreditReservation reservation = PersonalCreditReservation.builder()
