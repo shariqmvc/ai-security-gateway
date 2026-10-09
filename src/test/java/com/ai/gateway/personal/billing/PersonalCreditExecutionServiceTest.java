@@ -77,7 +77,7 @@ class PersonalCreditExecutionServiceTest {
 
         InOrder order = inOrder(creditService);
         order.verify(creditService).markProviderInvocationSucceeded(
-                reservationId, "OPENAI", "gpt-test", 0, 0);
+                reservationId, "OPENAI", "gpt-test", 100, 50);
         order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
         order.verify(creditService).capture(reservationId, new BigDecimal("0.25"));
         verify(creditService, never()).release(reservationId);
@@ -122,7 +122,7 @@ class PersonalCreditExecutionServiceTest {
 
         InOrder order = inOrder(creditService);
         order.verify(creditService).markProviderInvocationSucceeded(
-                reservationId, "OPENAI", "gpt-test", 0, 0);
+                reservationId, "OPENAI", "gpt-test", 100, 50);
         order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
         verify(creditService, never()).release(reservationId);
     }
@@ -175,7 +175,7 @@ class PersonalCreditExecutionServiceTest {
 
         InOrder order = inOrder(creditService);
         order.verify(creditService).markProviderInvocationSucceeded(
-                reservationId, "OPENAI", "gpt-test", 0, 0);
+                reservationId, "OPENAI", "gpt-test", 100, 50);
         order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.50"));
         order.verify(creditService).capture(reservationId, new BigDecimal("0.50"));
         verify(creditService, never()).release(reservationId);
@@ -198,12 +198,14 @@ class PersonalCreditExecutionServiceTest {
                 com.ai.gateway.core.contract.AIResponse.builder()
                         .provider(Provider.CLAUDE)
                         .model("claude-test")
+                        .usage(com.ai.gateway.core.contract.Usage.builder()
+                                .inputTokens(100).outputTokens(50).build())
                         .build();
 
         service.reconcile(reservationContext, request, response);
 
         verify(creditService).markProviderInvocationSucceeded(
-                reservationId, "CLAUDE", "claude-test", 0, 0);
+                reservationId, "CLAUDE", "claude-test", 100, 50);
         verify(costEstimator).estimate(argThat(costRequest ->
                 costRequest.getProvider() == Provider.CLAUDE
                         && "claude-test".equals(costRequest.getModel())));
