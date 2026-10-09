@@ -226,8 +226,9 @@ class PersonalCreditExecutionServiceTest {
 
         service.recoverPendingSettlement(reservation);
 
-        verify(creditService).prepareCapture(reservationId, new BigDecimal("0.50"));
+        verify(creditService).enforceReservedCeilingForIncompleteUsage(reservationId);
         verify(creditService).capture(reservationId, new BigDecimal("0.50"));
+        verify(creditService, never()).prepareCapture(any(), any());
         verify(costEstimator, never()).estimate(any());
     }
 
@@ -246,8 +247,9 @@ class PersonalCreditExecutionServiceTest {
 
         service.recoverPendingSettlement(reservation);
 
-        verify(creditService).prepareCapture(reservationId, new BigDecimal("0.50"));
+        verify(creditService).enforceReservedCeilingForIncompleteUsage(reservationId);
         verify(creditService).capture(reservationId, new BigDecimal("0.50"));
+        verify(creditService, never()).prepareCapture(any(), any());
         verify(costEstimator, never()).estimate(any());
     }
 
