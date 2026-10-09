@@ -268,6 +268,22 @@ class PersonalCreditServiceImplTest {
     }
 
     @Test
+    void releaseRejectsReservationAfterProviderInvocationStarted() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = reservation(
+                reservationId, "5.00", "request-release-after-provider-start");
+        reservation.setProviderInvocationStarted(true);
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+
+        assertThrows(PersonalCreditException.class, () -> service.release(reservationId));
+
+        assertEquals(PersonalCreditReservationStatus.RESERVED, reservation.getStatus());
+        verifyNoInteractions(wallets);
+        verify(ledger, never()).save(any());
+        verify(reservations, never()).save(any());
+    }
+
+    @Test
     void staleRecoveryDoesNotReleaseReservationAfterProviderInvocationStarted() {
         UUID reservationId = UUID.randomUUID();
         PersonalCreditReservation reservation = reservation(reservationId, "5.00", "request-provider-started");
