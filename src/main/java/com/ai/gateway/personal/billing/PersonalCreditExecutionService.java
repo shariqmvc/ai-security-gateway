@@ -133,8 +133,11 @@ public class PersonalCreditExecutionService {
                 ? response.getUsage().getInputTokens() : null;
         Integer outputTokens = response != null && response.getUsage() != null
                 ? response.getUsage().getOutputTokens() : null;
-        boolean usageComplete = inputTokens != null && outputTokens != null
-                && inputTokens >= 0 && outputTokens >= 0;
+        // Treat invalid negative counts as unavailable usage instead of leaving a
+        // successful provider call stuck in RESERVED during settlement.
+        if (inputTokens != null && inputTokens < 0) inputTokens = null;
+        if (outputTokens != null && outputTokens < 0) outputTokens = null;
+        boolean usageComplete = inputTokens != null && outputTokens != null;
 
         // Routing/failover may execute a different provider/model than the original
         // request. Persist and price the successful response target when available.
