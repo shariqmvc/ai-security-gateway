@@ -214,6 +214,20 @@ public class PersonalCreditExecutionService {
                 || reservation.getStatus() != com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
             return;
         }
+        // Incomplete usage invalidates any legacy calculated settlement amount:
+        // replace it with the reserved ceiling before attempting capture.
+        Integer inputTokens = reservation.getSettlementInputTokens();
+        Integer outputTokens = reservation.getSettlementOutputTokens();
+        if (inputTokens == null || outputTokens == null
+                || inputTokens < 0 || outputTokens < 0) {
+            log.warn("Pending settlement has incomplete token usage; enforcing reserved ceiling reservationId={} provider={} model={} inputTokens={} outputTokens={} previousSettlementAmount={}",
+                    reservation.getId(), reservation.getSettlementProvider(),
+                    reservation.getSettlementModel(), inputTokens, outputTokens,
+                    reservation.getSettlementAmount());
+            creditService.enforceReservedCeilingForIncompleteUsage(reservation.getId());
+            creditService.capture(reservation.getId(), reservation.getReservedAmount());
+            return;
+        }
         if (reservation.getSettlementAmount() != null) {
             creditService.capture(reservation.getId(), reservation.getSettlementAmount());
             return;
@@ -221,21 +235,6 @@ public class PersonalCreditExecutionService {
         if (reservation.getSettlementProvider() == null || reservation.getSettlementModel() == null) {
             throw new PersonalBillingModeException(
                     "Pending credit settlement is missing provider usage metadata.");
-        }
-
-        // Older or partially persisted settlements may have no settlement amount
-        // and incomplete token counts. Never convert a missing count to zero:
-        // settle conservatively at the reservation ceiling, matching reconcile().
-        Integer inputTokens = reservation.getSettlementInputTokens();
-        Integer outputTokens = reservation.getSettlementOutputTokens();
-        if (inputTokens == null || outputTokens == null
-                || inputTokens < 0 || outputTokens < 0) {
-            log.warn("Pending settlement has incomplete token usage; capturing reserved ceiling reservationId={} provider={} model={} inputTokens={} outputTokens={}",
-                    reservation.getId(), reservation.getSettlementProvider(),
-                    reservation.getSettlementModel(), inputTokens, outputTokens);
-            creditService.prepareCapture(reservation.getId(), reservation.getReservedAmount());
-            creditService.capture(reservation.getId(), reservation.getReservedAmount());
-            return;
         }
 
         Provider provider = Provider.valueOf(reservation.getSettlementProvider());
