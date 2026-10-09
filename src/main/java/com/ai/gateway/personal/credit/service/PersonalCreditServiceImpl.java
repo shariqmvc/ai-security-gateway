@@ -199,6 +199,32 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
     @Override
     @Transactional
+    public PersonalCreditReservation enforceReservedCeilingForIncompleteUsage(UUID reservationId) {
+        requireReservationId(reservationId);
+        PersonalCreditReservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new PersonalCreditException("Credit reservation not found."));
+        if (reservation.getStatus() == PersonalCreditReservationStatus.CAPTURED) {
+            return reservation;
+        }
+        if (reservation.getStatus() != PersonalCreditReservationStatus.SETTLEMENT_PENDING) {
+            throw new PersonalCreditException(
+                    "Conservative settlement requires a pending credit reservation.");
+        }
+        if (reservation.getSettlementInputTokens() != null
+                && reservation.getSettlementInputTokens() >= 0
+                && reservation.getSettlementOutputTokens() != null
+                && reservation.getSettlementOutputTokens() >= 0) {
+            throw new PersonalCreditException(
+                    "Cannot override settlement amount when provider token usage is complete.");
+        }
+        // Incomplete usage cannot justify a lower charge. Override any legacy
+        // amount while the row lock serializes this update against capture.
+        reservation.setSettlementAmount(reservation.getReservedAmount());
+        return reservationRepository.save(reservation);
+    }
+
+    @Override
+    @Transactional
     public PersonalCreditReservation prepareCapture(UUID reservationId, BigDecimal actualAmount) {
         requireReservationId(reservationId);
         if (actualAmount == null || actualAmount.compareTo(ZERO) < 0) {
