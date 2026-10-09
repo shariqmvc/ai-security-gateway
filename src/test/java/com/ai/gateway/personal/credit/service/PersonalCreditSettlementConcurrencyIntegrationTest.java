@@ -45,6 +45,7 @@ class PersonalCreditSettlementConcurrencyIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     private UUID accountId;
+    private UUID userId;
     private UUID reservationId;
 
     @AfterEach
@@ -52,9 +53,10 @@ class PersonalCreditSettlementConcurrencyIntegrationTest {
         if (accountId == null) {
             return;
         }
-        jdbcTemplate.update("DELETE FROM PERSONAL_CREDIT_LEDGER WHERE personal_account_id = ?", accountId);
-        jdbcTemplate.update("DELETE FROM PERSONAL_CREDIT_RESERVATIONS WHERE personal_account_id = ?", accountId);
-        jdbcTemplate.update("DELETE FROM PERSONAL_CREDIT_WALLETS WHERE personal_account_id = ?", accountId);
+        jdbcTemplate.update("DELETE FROM PERSONAL_ACCOUNTS WHERE id = ?", accountId);
+        if (userId != null) {
+            jdbcTemplate.update("DELETE FROM PERSONAL_USERS WHERE id = ?", userId);
+        }
     }
 
     @Test
@@ -142,7 +144,18 @@ class PersonalCreditSettlementConcurrencyIntegrationTest {
     }
 
     private PersonalCreditReservation createPendingSettlement() {
+        userId = UUID.randomUUID();
         accountId = UUID.randomUUID();
+        String uniqueEmail = "credit-concurrency-" + userId + "@example.test";
+        jdbcTemplate.update(
+                "INSERT INTO PERSONAL_USERS (id, email, password_hash, display_name, status, email_verified, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                userId, uniqueEmail, "integration-test-hash", "Credit concurrency test", "ACTIVE", true);
+        jdbcTemplate.update(
+                "INSERT INTO PERSONAL_ACCOUNTS (id, user_id, plan, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                accountId, userId, "PERSONAL_FREE", "ACTIVE");
+
         creditService.credit(accountId, new BigDecimal("20.00"),
                 "concurrency-fund-" + accountId, "Concurrency integration test funding");
         PersonalCreditReservation reservation = creditService.reserve(
