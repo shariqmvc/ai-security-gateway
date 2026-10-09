@@ -129,12 +129,12 @@ public class PersonalCreditExecutionService {
             return;
         }
 
-        int inputTokens = response != null && response.getUsage() != null
-                && response.getUsage().getInputTokens() != null
-                ? response.getUsage().getInputTokens() : 0;
-        int outputTokens = response != null && response.getUsage() != null
-                && response.getUsage().getOutputTokens() != null
-                ? response.getUsage().getOutputTokens() : 0;
+        Integer inputTokens = response != null && response.getUsage() != null
+                ? response.getUsage().getInputTokens() : null;
+        Integer outputTokens = response != null && response.getUsage() != null
+                ? response.getUsage().getOutputTokens() : null;
+        boolean usageComplete = inputTokens != null && outputTokens != null
+                && inputTokens >= 0 && outputTokens >= 0;
 
         // Routing/failover may execute a different provider/model than the original
         // request. Persist and price the successful response target when available.
@@ -152,6 +152,19 @@ public class PersonalCreditExecutionService {
                 settledModel,
                 inputTokens,
                 outputTokens);
+
+        if (!usageComplete) {
+            // Missing or partial usage must never be interpreted as a free/near-free
+            // inference. markProviderInvocationSucceeded atomically records the
+            // reservation ceiling as settlement intent so recovery cannot recompute
+            // a lower charge after a crash.
+            log.warn("Provider response omitted complete token usage; settling at reserved ceiling reservationId={} provider={} model={} inputTokens={} outputTokens={}",
+                    reservationContext.reservationId(), settledProvider, settledModel,
+                    inputTokens, outputTokens);
+            creditService.capture(
+                    reservationContext.reservationId(), reservationContext.reservedAmount());
+            return;
+        }
 
         PreRequestCostEstimate actual = costEstimator.estimate(
                 PreRequestCostRequest.builder()
