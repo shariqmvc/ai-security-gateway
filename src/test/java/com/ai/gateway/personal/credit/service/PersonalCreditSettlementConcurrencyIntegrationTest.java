@@ -4,12 +4,10 @@ import com.ai.gateway.personal.billing.PersonalCreditExecutionService;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservation;
 import com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus;
 import com.ai.gateway.personal.credit.entity.PersonalCreditWallet;
-import com.ai.gateway.personal.credit.repository.PersonalCreditLedgerRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditReservationRepository;
 import com.ai.gateway.personal.credit.repository.PersonalCreditWalletRepository;
 import com.ai.gateway.personal.credit.service.PersonalCreditService;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -42,9 +40,6 @@ class PersonalCreditSettlementConcurrencyIntegrationTest {
 
     @Autowired
     private PersonalCreditWalletRepository walletRepository;
-
-    @Autowired
-    private PersonalCreditLedgerRepository ledgerRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
