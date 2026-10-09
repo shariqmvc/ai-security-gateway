@@ -70,13 +70,34 @@ class PersonalCreditExecutionServiceTest {
                 reservationId, new BigDecimal("0.50"));
         AIRequest request = AIRequest.builder().provider(Provider.OPENAI).model("gpt-test").prompt("hello").build();
 
-        service.reconcile(reservationContext, request, com.ai.gateway.core.contract.AIResponse.builder().build());
+        service.reconcile(reservationContext, request, com.ai.gateway.core.contract.AIResponse.builder()
+                                .usage(com.ai.gateway.core.contract.Usage.builder()
+                                        .inputTokens(100).outputTokens(50).build())
+                                .build());
 
         InOrder order = inOrder(creditService);
         order.verify(creditService).markProviderInvocationSucceeded(
                 reservationId, "OPENAI", "gpt-test", 0, 0);
         order.verify(creditService).prepareCapture(reservationId, new BigDecimal("0.25"));
         order.verify(creditService).capture(reservationId, new BigDecimal("0.25"));
+        verify(creditService, never()).release(reservationId);
+    }
+
+    @Test
+    void missingUsageSettlesAtReservedCeilingWithoutEstimatingZeroTokens() {
+        UUID reservationId = UUID.randomUUID();
+        var reservationContext = new PersonalCreditExecutionService.ReservationContext(
+                reservationId, new BigDecimal("0.50"));
+        AIRequest request = AIRequest.builder()
+                .provider(Provider.OPENAI).model("gpt-test").prompt("hello").build();
+
+        service.reconcile(reservationContext, request,
+                com.ai.gateway.core.contract.AIResponse.builder().build());
+
+        verify(creditService).markProviderInvocationSucceeded(
+                reservationId, "OPENAI", "gpt-test", null, null);
+        verify(creditService).capture(reservationId, new BigDecimal("0.50"));
+        verify(costEstimator, never()).estimate(any());
         verify(creditService, never()).release(reservationId);
     }
 
@@ -94,7 +115,10 @@ class PersonalCreditExecutionServiceTest {
 
         assertThrows(IllegalStateException.class,
                 () -> service.reconcile(reservationContext, request,
-                        com.ai.gateway.core.contract.AIResponse.builder().build()));
+                        com.ai.gateway.core.contract.AIResponse.builder()
+                                .usage(com.ai.gateway.core.contract.Usage.builder()
+                                        .inputTokens(100).outputTokens(50).build())
+                                .build()));
 
         InOrder order = inOrder(creditService);
         order.verify(creditService).markProviderInvocationSucceeded(
@@ -144,7 +168,10 @@ class PersonalCreditExecutionServiceTest {
 
         assertThrows(PersonalBillingModeException.class,
                 () -> service.reconcile(reservationContext, request,
-                        com.ai.gateway.core.contract.AIResponse.builder().build()));
+                        com.ai.gateway.core.contract.AIResponse.builder()
+                                .usage(com.ai.gateway.core.contract.Usage.builder()
+                                        .inputTokens(100).outputTokens(50).build())
+                                .build()));
 
         InOrder order = inOrder(creditService);
         order.verify(creditService).markProviderInvocationSucceeded(
