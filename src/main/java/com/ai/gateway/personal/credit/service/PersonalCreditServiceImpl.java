@@ -186,8 +186,13 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
 
         reservation.setSettlementProvider(provider);
         reservation.setSettlementModel(model);
-        reservation.setSettlementInputTokens(inputTokens == null ? 0 : inputTokens);
-        reservation.setSettlementOutputTokens(outputTokens == null ? 0 : outputTokens);
+        reservation.setSettlementInputTokens(inputTokens);
+        reservation.setSettlementOutputTokens(outputTokens);
+        // Null usage means the provider did not supply a complete billable token
+        // count. Persist a conservative, recoverable settlement intent atomically.
+        if (inputTokens == null || outputTokens == null) {
+            reservation.setSettlementAmount(reservation.getReservedAmount());
+        }
         reservation.setStatus(PersonalCreditReservationStatus.SETTLEMENT_PENDING);
         return reservationRepository.save(reservation);
     }
