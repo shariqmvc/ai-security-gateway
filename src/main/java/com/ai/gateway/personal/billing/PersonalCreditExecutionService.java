@@ -223,15 +223,28 @@ public class PersonalCreditExecutionService {
                     "Pending credit settlement is missing provider usage metadata.");
         }
 
+        // Older or partially persisted settlements may have no settlement amount
+        // and incomplete token counts. Never convert a missing count to zero:
+        // settle conservatively at the reservation ceiling, matching reconcile().
+        Integer inputTokens = reservation.getSettlementInputTokens();
+        Integer outputTokens = reservation.getSettlementOutputTokens();
+        if (inputTokens == null || outputTokens == null
+                || inputTokens < 0 || outputTokens < 0) {
+            log.warn("Pending settlement has incomplete token usage; capturing reserved ceiling reservationId={} provider={} model={} inputTokens={} outputTokens={}",
+                    reservation.getId(), reservation.getSettlementProvider(),
+                    reservation.getSettlementModel(), inputTokens, outputTokens);
+            creditService.prepareCapture(reservation.getId(), reservation.getReservedAmount());
+            creditService.capture(reservation.getId(), reservation.getReservedAmount());
+            return;
+        }
+
         Provider provider = Provider.valueOf(reservation.getSettlementProvider());
         PreRequestCostEstimate estimate = costEstimator.estimate(
                 PreRequestCostRequest.builder()
                         .provider(provider)
                         .model(reservation.getSettlementModel())
-                        .inputTokens(reservation.getSettlementInputTokens() == null
-                                ? 0 : reservation.getSettlementInputTokens())
-                        .outputTokens(reservation.getSettlementOutputTokens() == null
-                                ? 0 : reservation.getSettlementOutputTokens())
+                        .inputTokens(inputTokens)
+                        .outputTokens(outputTokens)
                         .cachedInputTokens(0)
                         .build());
         BigDecimal actualAmount = estimate.getTotalEstimatedCost();
