@@ -33,6 +33,9 @@ public interface PersonalCreditService {
 
     PersonalCreditReservation prepareCapture(UUID reservationId, BigDecimal actualAmount);
 
+    /** Raise an incomplete-usage pending settlement to its reserved ceiling. */
+    PersonalCreditReservation enforceReservedCeilingForIncompleteUsage(UUID reservationId);
+
     /** Mark the reservation before invoking the provider so recovery cannot release an active request. */
     PersonalCreditReservation markProviderInvocationStarted(UUID reservationId);
 
