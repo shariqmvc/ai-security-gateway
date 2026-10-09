@@ -393,6 +393,10 @@ public class PersonalCreditServiceImpl implements PersonalCreditService {
         if (reservation.getStatus() != PersonalCreditReservationStatus.RESERVED) {
             throw new PersonalCreditException("Credit reservation is no longer active.");
         }
+        if (reservation.isProviderInvocationStarted()) {
+            throw new PersonalCreditException(
+                    "A reservation cannot be released after provider invocation has started.");
+        }
 
         releaseReservedReservation(reservation);
         return reservation;
