@@ -252,6 +252,28 @@ class PersonalCreditExecutionServiceTest {
     }
 
     @Test
+    void recoveryOverridesLegacySettlementAmountWhenTokenUsageIsMissing() {
+        UUID reservationId = UUID.randomUUID();
+        PersonalCreditReservation reservation = PersonalCreditReservation.builder()
+                .id(reservationId)
+                .reservedAmount(new BigDecimal("0.50"))
+                .settlementAmount(new BigDecimal("0.08"))
+                .status(com.ai.gateway.personal.credit.entity.PersonalCreditReservationStatus.SETTLEMENT_PENDING)
+                .settlementProvider("OPENAI")
+                .settlementModel("gpt-test")
+                .settlementInputTokens(null)
+                .settlementOutputTokens(200)
+                .build();
+
+        service.recoverPendingSettlement(reservation);
+
+        verify(creditService).enforceReservedCeilingForIncompleteUsage(reservationId);
+        verify(creditService).capture(reservationId, new BigDecimal("0.50"));
+        verify(creditService, never()).capture(reservationId, new BigDecimal("0.08"));
+        verify(costEstimator, never()).estimate(any());
+    }
+
+    @Test
     void recoveryRecomputesCostFromPersistedProviderUsageWhenAmountWasNotStored() {
         UUID reservationId = UUID.randomUUID();
         PersonalCreditReservation reservation = PersonalCreditReservation.builder()
