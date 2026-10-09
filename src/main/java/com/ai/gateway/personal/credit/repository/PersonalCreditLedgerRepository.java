@@ -17,5 +17,15 @@ public interface PersonalCreditLedgerRepository extends JpaRepository<PersonalCr
  @Query(value="select coalesce(sum(-amount),0) from PERSONAL_CREDIT_LEDGER where personal_account_id=:accountId and entry_type='CAPTURE' and created_at>=:since",nativeQuery=true)
  BigDecimal sumCapturedSince(@Param("accountId") UUID accountId,@Param("since") LocalDateTime since);
 
+    @Query(value = """
+            select coalesce(sum(amount), 0)
+            from PERSONAL_CREDIT_LEDGER
+            where personal_account_id = :accountId
+              and entry_type in ('PURCHASE', 'PROMOTIONAL_CREDIT', 'CAPTURE', 'REFUND', 'ADJUSTMENT')
+            """, nativeQuery = true)
+    BigDecimal sumBalanceAffectingEntries(@Param("accountId") UUID accountId);
+
+    long countByPersonalAccountId(UUID personalAccountId);
+
     List<PersonalCreditLedger> findByPersonalAccountIdOrderByCreatedAtDesc(UUID personalAccountId);
 }
