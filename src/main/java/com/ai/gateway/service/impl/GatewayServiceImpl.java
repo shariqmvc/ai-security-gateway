@@ -478,6 +478,18 @@ public class GatewayServiceImpl implements GatewayService {
             }
 
             providerInvocationSucceeded = true;
+
+            // Settle successful CREDIT inference immediately after the provider
+            // returns. Nonessential persistence must not strand a reservation
+            // before durable settlement metadata has been recorded.
+            if (creditReservation != null) {
+                personalCreditExecutionService.reconcile(
+                        creditReservation,
+                        aiRequest,
+                        aiResponse);
+                creditReservation = null;
+            }
+
             if (personalInferencePersistenceService != null) {
                 personalInferencePersistenceService.providerAttempt(
                         inferenceId, 1,
@@ -489,14 +501,6 @@ public class GatewayServiceImpl implements GatewayService {
                         java.util.Map.of(
                                 "provider", aiRequest.getProvider() == null ? "" : aiRequest.getProvider().name(),
                                 "model", aiRequest.getModel() == null ? "" : aiRequest.getModel()));
-            }
-
-            if (creditReservation != null) {
-                personalCreditExecutionService.reconcile(
-                        creditReservation,
-                        aiRequest,
-                        aiResponse);
-                creditReservation = null;
             }
 
             if (auth.isPersonalPrincipal()) {
@@ -1150,27 +1154,6 @@ public class GatewayServiceImpl implements GatewayService {
                     providerLatency,
                     result.getFinishReason());
 
-            if (personalInferencePersistenceService != null) {
-                personalInferencePersistenceService.providerAttempt(
-                        inferenceId, 1,
-                        result.getProvider() == null ? null : result.getProvider().name(),
-                        result.getModel(), "SUCCESS",
-                        providerStart, System.nanoTime(), AIResponse.builder()
-                                .response(result.getResponse())
-                                .provider(result.getProvider())
-                                .model(result.getModel())
-                                .usage(Usage.builder()
-                                        .inputTokens(result.getInputTokens())
-                                        .outputTokens(result.getOutputTokens())
-                                        .totalTokens(result.getTotalTokens())
-                                        .build())
-                                .build(), null);
-                personalInferencePersistenceService.event(
-                        inferenceId, "PROVIDER_RESPONSE_RECEIVED", "PROVIDER",
-                        java.util.Map.of("provider", result.getProvider() == null ? "" : result.getProvider().name(),
-                                "model", result.getModel() == null ? "" : result.getModel()));
-            }
-
             AIResponse finalResponse = AIResponse.builder()
                     .response(result.getResponse())
                     .provider(result.getProvider())
@@ -1189,12 +1172,26 @@ public class GatewayServiceImpl implements GatewayService {
             aiRequest.setProvider(result.getProvider());
             aiRequest.setModel(result.getModel());
 
+            // Persist settlement before provider-attempt/event telemetry. If
+            // billing fails, the durable reservation remains recoverable.
             if (creditReservation != null) {
                 personalCreditExecutionService.reconcile(
                         creditReservation,
                         aiRequest,
                         finalResponse);
                 creditReservation = null;
+            }
+
+            if (personalInferencePersistenceService != null) {
+                personalInferencePersistenceService.providerAttempt(
+                        inferenceId, 1,
+                        result.getProvider() == null ? null : result.getProvider().name(),
+                        result.getModel(), "SUCCESS",
+                        providerStart, System.nanoTime(), finalResponse, null);
+                personalInferencePersistenceService.event(
+                        inferenceId, "PROVIDER_RESPONSE_RECEIVED", "PROVIDER",
+                        java.util.Map.of("provider", result.getProvider() == null ? "" : result.getProvider().name(),
+                                "model", result.getModel() == null ? "" : result.getModel()));
             }
 
             if (auth.isPersonalPrincipal()) {
