@@ -140,16 +140,16 @@ class PersonalCreditExecutionServiceTest {
                 .build();
         com.ai.gateway.core.contract.AIResponse response =
                 com.ai.gateway.core.contract.AIResponse.builder()
-                        .provider(Provider.ANTHROPIC)
+                        .provider(Provider.CLAUDE)
                         .model("claude-test")
                         .build();
 
         service.reconcile(reservationContext, request, response);
 
         verify(creditService).markProviderInvocationSucceeded(
-                reservationId, "ANTHROPIC", "claude-test", 0, 0);
+                reservationId, "CLAUDE", "claude-test", 0, 0);
         verify(costEstimator).estimate(argThat(costRequest ->
-                costRequest.getProvider() == Provider.ANTHROPIC
+                costRequest.getProvider() == Provider.CLAUDE
                         && "claude-test".equals(costRequest.getModel())));
     }
 
